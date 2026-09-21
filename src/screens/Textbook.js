@@ -1,5 +1,0 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-export function Textbook({ textbook, onBack }) {
-    return (_jsxs("div", { className: "screen textbook", children: [_jsxs("div", { className: "textbook-header", children: [_jsx("h1", { children: textbook.title }), _jsx("button", { onClick: onBack, children: "\u623B\u308B" })] }), _jsx("div", { className: "textbook-content", children: textbook.chapters.map(chapter => (_jsxs("div", { className: "chapter", children: [_jsx("h2", { children: chapter.title }), chapter.sections.map(section => (_jsxs("div", { className: "section", children: [_jsx("h3", { children: section.title }), section.blocks.map(block => (_jsxs("div", { className: `block ${block.author}`, children: [_jsx("p", { children: block.content }), block.notes.length > 0 && (_jsx("div", { className: "notes", children: block.notes.map(note => (_jsx("div", { className: "note", children: _jsx("small", { children: note.content }) }, note.id))) }))] }, block.id)))] }, section.id)))] }, chapter.id))) })] }));
-}
-//# sourceMappingURL=Textbook.js.map
