@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(pnpm --version)",
+      "PowerShell(firebase --version 2>&1)",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\dev\\\\RisukeruGG\\\\functions\\\\src\")",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\dev\\\\RisukeruGG\" -Force | Select-Object Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"Dir\"}else{\"File\"}}} | Format-Table -AutoSize)",
+      "Bash(Remove-Item \"c:\\\\dev\\\\RisukeruGG\\\\src\\\\components\\\\calendar\\\\CalendarView.tsx\" -Force)",
+      "Bash(Remove-Item \"c:\\\\dev\\\\RisukeruGG\\\\src\\\\components\\\\calendar\\\\SyncErrorBanner.tsx\" -Force)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(pnpm test:e2e)",
+      "Bash(pnpm exec *)",
+      "Bash(bash scripts/seed.bat)",
+      "Bash(node -e ' *)",
+      "PowerShell(.specify/extensions/git/scripts/powershell/auto-commit.ps1 manual)",
+      "Bash(git commit -m ' *)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|js|jsx\\)$\")",
+      "PowerShell(pnpm typecheck 2>&1)",
+      "PowerShell(npx tsc --noEmit --project functions/tsconfig.json 2>&1)",
+      "Bash(grep -v \"planUpdatedAt\\\\|planned\\\\|#\\\\|//\")",
+      "Bash(bash -x .specify/scripts/bash/setup-plan.sh --json)"
+    ]
+  }
+}
