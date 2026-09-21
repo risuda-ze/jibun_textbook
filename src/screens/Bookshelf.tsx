@@ -31,7 +31,7 @@ export function Bookshelf({ onSelectTextbook, onCreateNew }: BookshelfProps) {
     const reader = new FileReader()
     reader.onload = async (evt) => {
       try {
-        const json = JSON.parse(evt.target?.result as string)
+        JSON.parse(evt.target?.result as string)
         // TODO: import logic
       } catch (err) {
         alert('ファイルが破損しています')

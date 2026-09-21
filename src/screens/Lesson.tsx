@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { saveTextbook } from '../db'
-import type { Textbook, Section, Block } from '../types'
+import type { Textbook } from '../types'
 
 interface LessonProps {
   textbook: Textbook

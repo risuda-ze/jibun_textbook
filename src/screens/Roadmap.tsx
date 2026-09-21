@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import type { Textbook, Section } from '../types'
+import type { Textbook } from '../types'
 
 interface RoadmapProps {
   textbook: Textbook
@@ -31,7 +31,7 @@ export function Roadmap({ textbook, onBack, onSelectSection }: RoadmapProps) {
           {textbook.chapters.map(chapter => (
             <div key={chapter.id} className="chapter">
               <h2>{chapter.title}</h2>
-              {chapter.sections.map((section, idx) => (
+              {chapter.sections.map((section) => (
                 <div
                   key={section.id}
                   className={`section-item ${section.status} ${currentIndex === allSections.findIndex(s => s.id === section.id) ? 'current' : ''}`}

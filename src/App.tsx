@@ -57,7 +57,7 @@ export default function App() {
         <Roadmap
           textbook={currentTextbook}
           onBack={() => setScreen('bookshelf')}
-          onSelectSection={(sectionId) => {
+          onSelectSection={() => {
             setScreen('lesson')
           }}
         />

@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/ai.ts","./src/db.ts","./src/main.tsx","./src/types.ts","./src/screens/bookshelf.tsx","./src/screens/create.tsx","./src/screens/lesson.tsx","./src/screens/roadmap.tsx","./src/screens/textbook.tsx"],"version":"5.9.3"}

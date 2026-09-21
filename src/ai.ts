@@ -1,5 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { zodResponseFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod'
 
 let client: Anthropic | null = null
