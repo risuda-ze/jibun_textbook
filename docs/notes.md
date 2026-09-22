@@ -48,7 +48,8 @@
 
 ### CI（`.github/workflows/ci.yml`）
 
-push（全ブランチ）と Pull Request で3つのジョブが走る。配信はしない。
+Pull Request と `master` への push で3つのジョブが走る。配信はしない。
+（push を `master` に絞るのは、PR を開いているブランチで push と pull_request の両方が発火して同じコミットが2回走るのを防ぐため。ブランチの検証は PR で行う）
 
 | ジョブ | 内容 | 落ちる条件 |
 |---|---|---|
