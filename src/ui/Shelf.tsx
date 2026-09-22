@@ -200,22 +200,17 @@ export function Shelf() {
                                     {b.goal && <p className="sub">{b.goal}</p>}
                                 </div>
                                 <Meter tb={b} />
-                                <div className="row">
-                                    <Button
-                                        v="soft"
-                                        onClick={() => openBook(b.id)}
-                                    >
-                                        開く
-                                    </Button>
+                                {/* 左から「JSON書出」「消去」「開く」。主操作の「開く」を右端に置き、右揃えにする */}
+                                <div className="row card-actions">
                                     <Button
                                         v="outline"
                                         sm
                                         onClick={() => downloadBook(b)}
                                     >
-                                        JSONを書き出す
+                                        JSON書出
                                     </Button>
                                     <Button
-                                        v="outline"
+                                        v="danger"
                                         sm
                                         onClick={() => {
                                             if (
@@ -226,7 +221,13 @@ export function Shelf() {
                                                 removeBook(b.id);
                                         }}
                                     >
-                                        消す
+                                        消去
+                                    </Button>
+                                    <Button
+                                        v="soft"
+                                        onClick={() => openBook(b.id)}
+                                    >
+                                        開く
                                     </Button>
                                 </div>
                                 <p className="sub" style={{ fontSize: 13 }}>

@@ -6,13 +6,15 @@ import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react'
  */
 
 /**
- * ボタンの4種（DESIGN.md の Components に対応）
+ * ボタンの5種（DESIGN.md の Components に対応）
  * - primary: 青の塗り。1画面に1つ、その画面でいちばん進めたい操作だけ
  * - soft:    薄い青の地（Ghost CTA）。主操作の次に大事な操作
  * - ghost:   地も枠もない文字ボタン（Ghost Text）。その他の操作
  * - outline: 細い枠の小さなボタン（Outlined Text）。行の中の小さな操作
+ * - danger:  赤い枠と赤い文字（outline の警告版）。取り消しにくい操作（端末から消す等）だけ。
+ *            塗りにしないのは DESIGN.md の「色面は主操作の青だけ」に合わせるため
  */
-export type ButtonVariant = 'primary' | 'soft' | 'ghost' | 'outline'
+export type ButtonVariant = 'primary' | 'soft' | 'ghost' | 'outline' | 'danger'
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { v?: ButtonVariant; sm?: boolean }
 
