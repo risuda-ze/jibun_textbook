@@ -1,0 +1,196 @@
+import { Fragment, useEffect, useRef, useState } from 'react'
+import { allLessons, findLesson, lessonNo, minePercent } from '../lib/status'
+import { go, openLesson, putBook, snapshot, toast, updateLesson, useApp } from '../store'
+import { newBlock, uid, type Lesson, type Textbook } from '../types'
+import { BlockRow, Composer, type NoteDraft } from './blocks'
+import { StatusChip } from './common'
+import { generateInto } from './generate'
+import { Button, Card } from './kit'
+
+const gq = (q: string) => 'https://www.google.com/search?q=' + encodeURIComponent(q)
+
+function Clues({ tb, lesson }: { tb: Textbook; lesson: Lesson }) {
+  const [q, setQ] = useState('')
+  const [url, setUrl] = useState('')
+  const c = lesson.clues
+  return (
+    <Card stack className="clues" aria-label="調べる手がかり">
+      <div><h2 style={{ fontSize: 16 }}>調べる手がかり</h2><p className="sub">AIの文を鵜呑みにせず、自分で確かめるための入口。</p></div>
+      <div>
+        <div className="eyebrow">検索する</div>
+        <div className="row" style={{ marginTop: 6 }}>
+          {c.queries.length ? c.queries.map((x) => <a className="qchip" key={x} href={gq(x)} target="_blank" rel="noopener noreferrer">{x}</a>) : <span className="sub">まだない。下から足せる。</span>}
+        </div>
+      </div>
+      <div>
+        <div className="eyebrow">一次情報</div>
+        <ul className="plain">
+          {c.links.length ? c.links.map((x) => (
+            <li key={x.url}><a href={x.url} target="_blank" rel="noopener noreferrer">{x.title}</a>{x.fetchedAt && <span className="sub"> （{x.fetchedAt} 時点）</span>}</li>
+          )) : <li className="sub">まだない。読んだページのURLを下から足せる。</li>}
+        </ul>
+      </div>
+      {c.how.length > 0 && <div><div className="eyebrow">確かめ方</div><ul className="plain">{c.how.map((h) => <li key={h}>{h}</li>)}</ul></div>}
+      <div className="row">
+        <input type="text" id="clue" value={q} onChange={(e) => setQ(e.target.value)} placeholder="自分で見つけた検索語を足す" style={{ flex: '1 1 200px' }} />
+        <Button v="ghost" onClick={() => { if (!q.trim()) return; updateLesson(tb.id, lesson.id, (l) => { l.clues.queries.push(q.trim()) }); setQ('') }}>検索語を足す</Button>
+      </div>
+      <div className="row">
+        <input type="text" id="cluelink" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="読んだページのURLを足す" style={{ flex: '1 1 200px' }} />
+        <Button v="ghost" onClick={() => {
+          const u = url.trim(); if (!/^https?:\/\//.test(u)) return toast('http から始まるURLを入れる')
+          updateLesson(tb.id, lesson.id, (l) => { l.clues.links.push({ title: u, url: u, fetchedAt: new Date().toISOString().slice(0, 10) }) }); setUrl('')
+        }}>リンクを足す</Button>
+      </div>
+    </Card>
+  )
+}
+
+export function LessonPage({ tb }: { tb: Textbook }) {
+  const { lessonId, ai } = useApp()
+  const f = (lessonId && findLesson(tb, lessonId)) || null
+  const [insAt, setInsAt] = useState<number | null>(null)
+  const [quote, setQuote] = useState('')
+  const [blame, setBlame] = useState(true)
+  const [genDetail, setGenDetail] = useState<string | null>(null)
+  const [task, setTask] = useState('')
+  const qbtn = useRef<HTMLButtonElement>(null)
+  const pending = useRef<{ text: string; blockId: string } | null>(null)
+
+  useEffect(() => { setInsAt(null); setQuote('') }, [lessonId])
+
+  // 本文を選択すると「引用してノートを書く」を出す
+  useEffect(() => {
+    const onSel = () => {
+      const btn = qbtn.current; const sel = document.getSelection()
+      if (!btn) return
+      const node = sel && !sel.isCollapsed ? sel.anchorNode : null
+      const row = node ? (node.nodeType === 1 ? (node as Element) : node.parentElement)?.closest('.doc [data-block]') : null
+      const text = sel?.toString().trim() ?? ''
+      if (!row || !text) { btn.hidden = true; return }
+      const r = sel!.getRangeAt(0).getBoundingClientRect()
+      btn.hidden = false
+      btn.style.top = Math.max(8, r.top - 42) + 'px'
+      btn.style.left = Math.min(window.innerWidth - 210, Math.max(8, r.left)) + 'px'
+      pending.current = { text: text.slice(0, 300), blockId: row.getAttribute('data-block')! }
+    }
+    document.addEventListener('selectionchange', onSel)
+    return () => document.removeEventListener('selectionchange', onSel)
+  }, [])
+
+  if (!f) return <Card className="empty"><p>節が選ばれていない。</p><Button v="primary" onClick={() => go('road')}>ロードマップへ</Button></Card>
+  const l = f.lesson
+  const ls = allLessons(tb)
+  const next = ls[ls.indexOf(l) + 1]
+  const pct = minePercent(l)
+  const withUndo = (msg: string, fn: () => void) => { const before = snapshot(tb.id); fn(); toast(msg, before ? () => putBook(before) : undefined) }
+
+  function addNote(n: NoteDraft) {
+    updateLesson(tb.id, l.id, (d) => {
+      const b = newBlock('me', n.md, { source: n.source, quote: n.quote, images: n.images.map((dataUrl) => ({ id: uid(), dataUrl, alt: '' })) })
+      d.blocks.splice(insAt ?? d.blocks.length, 0, b)
+    })
+    setInsAt(null); setQuote('')
+    toast('書き込んだ')
+  }
+
+  async function generate() {
+    setGenDetail('')
+    await generateInto(tb, l.id, ai, setGenDetail)
+    setGenDetail(null)
+  }
+
+  const composerAt = insAt ?? l.blocks.length
+  const composer = <Composer quote={quote} onUnquote={() => setQuote('')} onSubmit={addNote} />
+
+  return (
+    <>
+      <div className="pagehead">
+        <div>
+          <div className="eyebrow">{lessonNo(tb, l.id)}・{l.minutes}分{l.isTask && '・実践課題'}</div>
+          <h1>{l.title}</h1>
+          <div className="row" style={{ marginTop: 6 }}><StatusChip lesson={l} /></div>
+        </div>
+        <div className="row">
+          <Button v="ghost" onClick={() => go('road')}>ロードマップ</Button>
+          {next && <Button v="ghost" onClick={() => openLesson(next.id)}>次へ {lessonNo(tb, next.id)}</Button>}
+        </div>
+      </div>
+
+      <div className="lesson">
+        <div className="stack">
+          {l.blocks.length === 0 && (
+            <Card stack>
+              <p>この節はまだ資料がない。AIに下書きを作らせるか、下の欄から自分で書き始める。</p>
+              <div className="row">
+                <Button v="soft" disabled={genDetail !== null} onClick={generate}>{genDetail !== null ? genDetail || '生成中…' : '資料を生成'}</Button>
+                <span className="sub">使うAI: {ai.kind === 'anthropic' ? ai.model : ai.kind === 'demo' ? 'デモ応答' : '未対応の接続先'}（「つくる」画面で切り替え）</span>
+              </div>
+            </Card>
+          )}
+          <div className="row">
+            <label className="row sub" htmlFor="blameL"><input type="checkbox" id="blameL" checked={blame} onChange={(e) => setBlame(e.target.checked)} />書き手の印を出す</label>
+            <span className="sub">AI = AIの下書き / 自 = 自分のノート。本文はクリックして直接書き換えられる。本文を選択すると引用できる。</span>
+          </div>
+          <div className={`blocks doc ${blame ? '' : 'noblame'}`}>
+            {l.blocks.map((b, i) => (
+              <Fragment key={b.id}>
+                {composerAt === i ? composer : <button className="ins" onClick={() => { setInsAt(i); setQuote('') }}>＋ ここに書く</button>}
+                <BlockRow
+                  block={b}
+                  onCommit={(md) => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) { x.md = md; if (x.by === 'ai') x.edited = true } })}
+                  onDelete={() => withUndo(b.by === 'me' ? 'ノートを消した' : '文を消した', () => updateLesson(tb.id, l.id, (d) => { d.blocks = d.blocks.filter((y) => y.id !== b.id) }))}
+                  onRemoveImage={(imgId) => withUndo('画像を外した', () => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) x.images = x.images.filter((im) => im.id !== imgId) }))}
+                />
+              </Fragment>
+            ))}
+            {composerAt >= l.blocks.length ? composer : <button className="ins" onClick={() => { setInsAt(null); setQuote('') }}>＋ ここに書く</button>}
+          </div>
+          <Clues tb={tb} lesson={l} />
+        </div>
+
+        <aside className="rail">
+          <Card as="div">
+            <h2>この節の印</h2>
+            <div className="marks">
+              <label className={`mark done ${l.done ? 'on' : ''}`} htmlFor="markdone"><input type="checkbox" id="markdone" checked={l.done} onChange={(e) => updateLesson(tb.id, l.id, (d) => { d.done = e.target.checked })} />完了</label>
+              <label className={`mark review ${l.review ? 'on' : ''}`} htmlFor="markreview"><input type="checkbox" id="markreview" checked={l.review} onChange={(e) => updateLesson(tb.id, l.id, (d) => { d.review = e.target.checked })} />あとで再確認</label>
+            </div>
+            <p className="sub" style={{ fontSize: 12, marginTop: 8 }}>どちらも自分のタイミングで付ける。完了の節は「設計を直す」で変更されない。</p>
+          </Card>
+          <Card as="div">
+            <h2>この節の中身</h2>
+            <div className="meter" role="img" aria-label={`自分の言葉 ${pct}%`}><i style={{ flex: pct, background: 'var(--st-me)' }} /><i style={{ flex: 100 - pct, background: 'var(--st-ai)' }} /></div>
+            <p className="sub" style={{ fontSize: 13 }}>自分の言葉 <b className="mono">{pct}%</b></p>
+          </Card>
+          <Card as="div">
+            <h2>手を動かす</h2>
+            <ul>
+              {l.tasks.map((t, j) => (
+                <li className="check" key={j}>
+                  <input type="checkbox" id={`task${j}`} checked={t.checked} onChange={(e) => updateLesson(tb.id, l.id, (d) => { d.tasks[j].checked = e.target.checked })} />
+                  <label htmlFor={`task${j}`}>{t.text}</label>
+                </li>
+              ))}
+              {l.tasks.length === 0 && <li className="sub">まだない。</li>}
+            </ul>
+            <div className="row" style={{ marginTop: 8 }}>
+              <input type="text" id="newtask" value={task} onChange={(e) => setTask(e.target.value)} placeholder="やることを足す" style={{ flex: '1 1 120px' }} />
+              <Button v="outline" sm onClick={() => { if (!task.trim()) return; updateLesson(tb.id, l.id, (d) => { d.tasks.push({ text: task.trim(), checked: false }) }); setTask('') }}>足す</Button>
+            </div>
+          </Card>
+        </aside>
+      </div>
+
+      <button ref={qbtn} className="qbtn" hidden onPointerDown={(e) => {
+        // クリックより先に選択が消えるので、押した瞬間に処理する
+        e.preventDefault()
+        const p = pending.current; if (!p) return
+        const i = l.blocks.findIndex((b) => b.id === p.blockId)
+        setQuote(p.text); setInsAt(i >= 0 ? i + 1 : null)
+        document.getSelection()?.removeAllRanges()
+        e.currentTarget.hidden = true
+      }}>引用してノートを書く</button>
+    </>
+  )
+}

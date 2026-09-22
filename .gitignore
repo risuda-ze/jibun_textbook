@@ -1,11 +1,12 @@
 node_modules/
 dist/
+dev-dist/
 .env
 .env.local
 *.log
 .DS_Store
-*.js
-*.d.ts
-*.d.ts.map
-*.js.map
 *.tsbuildinfo
+test-results/
+playwright-report/
+# 教科書のデータとキーはコミットしない
+*.textbook.json

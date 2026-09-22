@@ -1,91 +1,69 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## これは何か
 
-## プロジェクト概要
+**じぶん教科書** — AIが下書きした教材に、自分で確かめたこと・やったことを書き込んで「自分の教科書」に育てるアプリ。
+使うのは1人だけ。サーバーは持たない静的なPWAで、PCとAndroidで使う。端末間は教科書のJSONファイルを手で運ぶ。
 
-**自分教科書** — AIが下書きした教材に自分で書き込んで「自分の教科書」に育てるアプリ。PCとAndroidスマホで使用可能。
+仕様の正は brain 側にある（読むだけ。書き換えない）。
 
-## 技術構成
+- 作業指示: `C:\dev\note\brain\06_briefs\jibun_textbook_2026-09-21.md`
+- 決定事項と理由: `C:\dev\note\brain\01_projects\50_jibun_textbook\10_jibun_textbook_concept.md`
+- 画面の構成と文言の見本: `C:\dev\note\brain\01_projects\50_jibun_textbook\30_jibun_textbook_screen_mock.html`
+  （配色は古い。構成と動線だけ参照する）
+- **見た目の正: このリポジトリの `DESIGN.md`**。色・書体・余白・角丸はそこから取る。末尾の「じぶん教科書での適用」に割り当てがある
 
-- **フロントエンド**: TypeScript + React + Vite
-- **UI**: CSS（カスタム、PWA対応）
-- **AI層**: Anthropic API のみ（初期段階）
-- **ストレージ**: IndexedDB（ローカル）、JSON書き出し
-- **検証**: Zod スキーマ
+## 守ること
 
-## 主要ファイル構造
+1. **自分の教科書を守る**。自分のノート・自分で修正した文・完了の節は、AIのどんな返答でも消えない・書き換わらない。
+   保証は `src/lib/protect.ts` にあり、`tests/protect.test.ts` が見張っている。ここを通さずに教科書を書き換える経路を作らない
+2. **APIキーを外に出さない**。キーは端末内（IndexedDB の `settings`）にだけ置く。書き出しJSON・ログ・URL・コミットに入れない。
+   書き出しは必ず `exportJson()`（スキーマを通すので教科書以外の項目は落ちる）を使う
+3. **分野に依存させない**。動画編集でもプログラミングでも同じ画面。分野固有の選択肢・文言・サンプルをコードに持たない
+4. **青いボタンは1画面に1つ**（`Button v="primary"`）。色面のカードも1画面に1つまで。割り当ては `DESIGN.md` 末尾
+5. 公開リポジトリ。教科書のJSON（`*.textbook.json`）と `.env` はコミットしない
+
+## 構成
 
 ```
 src/
-  types.ts          — Textbook/Chapter/Section/Blockの型定義（Zod）
-  db.ts             — IndexedDB操作（保存・読込・削除）
-  ai.ts             — Anthropic API ラッパー（確認質問・コース設計）
-  App.tsx           — 画面ナビゲーション
-  main.tsx          — エントリポイント
-  screens/
-    Bookshelf.tsx   — 教科書一覧、新規作成、読み込み
-    Create.tsx      — 自由入力 → 確認質問 → コース設計
-    Roadmap.tsx     — 章×節のタイムライン（PC）/ 縦列表示（スマホ）
-    Lesson.tsx      — 見たまま編集、ノート差し込み、完了印
-    Textbook.tsx    — 通読表示
+  types.ts        教科書のスキーマ（zod）。ここが保存形式の正。schemaVersion: 1
+  store.ts        状態とIndexedDBへの保存。useApp() で画面に渡す
+  lib/status.ts   節の状態（未作成/AIの下書き/書き込みあり/完了）の導出。保存はしない
+  lib/protect.ts  「設計を直す」の反映と差分。守る対象の機械的な保証
+  lib/io.ts       JSONの書き出し・読み込み・新旧の判定
+  lib/image.ts    画像の縮小（長辺1600px・WebP）
+  lib/md.ts       Markdown ⇔ HTML（見たまま編集の往復）
+  ai/types.ts     AiProvider インターフェース。画面はこれだけを呼ぶ
+  ai/anthropic.ts Anthropic API。調査（Web検索）→ 構造化 の2段構え
+  ai/demo.ts      デモ応答。キーなしの試用と通しテストで使う
+  ui/kit.tsx      共通コンポーネント（Button / Pill / Card / PageHead / Segmented）。画面に色や角丸を直接書かない
+  ui/             5画面（Shelf / Create / Roadmap / LessonPage / Book）と部品
+  styles.css      DESIGN.md のトークンとクラス
+tests/            Vitest（データ・守る対象・Markdown往復・AI層）
+e2e/              Playwright（完了条件をPC幅とスマホ幅で）
+docs/             実装メモ・テスト結果・あとでやること
 ```
 
-## 開発コマンド
+## コマンド
 
 ```bash
-npm install           # 依存をインストール
-npm run dev           # Vite開発サーバー起動（http://localhost:5173）
-npm run build         # 本番ビルド（dist/）
-npm run test          # Vitest実行
-npm run preview       # ビルド後の動作確認
+npm run dev        # 開発サーバー http://localhost:5173/jibun_textbook/
+npm run typecheck
+npm test           # 単体とAI層
+npm run e2e        # 通し。初回は npx playwright install chromium
+npm run build      # dist/ を作る
 ```
 
-## GitHub Pages デプロイ
+## AI層の約束
 
-- Vite の `base` は `/jibun_textbook/` に設定済み
-- GitHub Actions（未設定）でビルド・デプロイ予定
-- 環境変数（APIキー）は IndexedDB にのみ保存、JSON書き出しに含めない
+- 公式SDK `@anthropic-ai/sdk` をブラウザで使う（`dangerouslyAllowBrowser: true`）。モデルIDに日付を付けない
+- 調査と構造化は**別リクエスト**。Web検索の結果には出典が常に付き、構造化出力と同じリクエストでは衝突しうる
+- `pause_turn` は assistant の内容をそのまま送り返して続行。検索エラーはHTTP 200の中身で分岐（例外にならない）
+- 一次情報リンクは、調査で実際に見つけたページからだけ作る。AIが文章中に書いたURLをリンクにしない
+- 失敗しても教科書は変えない。理由を日本語で出して、もう一度試せるようにする
 
-## 仕様確認先
+## 進め方
 
-- **詳細な要件**: `C:\dev\note\brain\06_briefs\jibun_textbook_2026-09-21.md`
-- **UI モック**: `C:\dev\note\brain\01_projects\50_jibun_textbook\30_jibun_textbook_screen_mock.html`
-- **アーキテクチャ**: `C:\dev\note\brain\01_projects\50_jibun_textbook\20_jibun_textbook_architecture.md`
-
-## 実装ステータス
-
-### Phase 0（AIなし、手書き教科書作成）
-
-- [ ] **土台**: Vite + PWA セットアップ、GitHub Pages デプロイ通し
-- [ ] **データ層**: JSON スキーマ、IndexedDB、書き出し・読み込み、単体テスト
-- [ ] **画面**:
-  - [ ] 本棚（新規作成、削除、読み込み）
-  - [ ] ロードマップ（PC タイムライン / スマホ 縦列、現在地表示）
-  - [ ] レッスン（見たまま編集、ノート差し込み、完了・再確認印）
-  - [ ] 教科書（通読、絞り込み、書き手印切り替え）
-  - [ ] つくる（ただし AI なし）
-
-### Phase 1（AI統合）
-
-- [ ] **接続**: APIキー入力 UI、ブラウザ SDK 初期化
-- [ ] **確認質問**: 自由入力 → AI質問生成
-- [ ] **コース設計**: 入力 + 回答 → 章・節・所要時間・実践課題
-- [ ] **節の生成**: Web検索 + 構造化出力（Markdown ブロック）
-- [ ] **設計修正**: 範囲選択 → 差分表示 → 採用（守る対象は機械的に保証）
-
-## 重要な実装ルール
-
-- **見たまま編集**: ブロックをクリック → そのまま編集。エディタライブラリ統合は最大2時間、超えたら Markdown テキスト欄方式に切り替え
-- **状態の導出**: 「完了 / 再確認」の印はデータに保持、状態表示は `status` + `done` + `review` から導出
-- **守る対象は機械的に**: 「自分のノート」「完了した節」は AI からの変更を自動で無視する
-- **検証は必須**: Zod スキーマ、読み込み時の壊れたJSON対応、API キーの安全な取り扱い
-
-## 報告すべき内容（`docs/`）
-
-実装完了後、以下を記録：
-- エディタの採用状況（見たまま vs テキスト欄）
-- Web 検索ツール型、`pause_turn` 発生有無、トークン数
-- 調査・構造化の 2段階構成の是非
-- Android での確認内容
-- 仕様の曖昧箇所と判断結果
+- 機能を足したくなったら `docs/backlog.md` に書いて後回しにする
+- 変更したら `npm run typecheck && npm test && npm run e2e` を通す

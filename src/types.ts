@@ -1,61 +1,117 @@
 import { z } from 'zod'
 
-export const BlockSchema = z.object({
+/** 教科書1冊 = JSON 1ファイル。ここが保存形式の正。APIキーやAI設定は含めない。 */
+
+export const ImageZ = z.object({
   id: z.string(),
-  type: z.enum(['text', 'image', 'drawing', 'quote', 'checklist']),
-  content: z.string(),
-  author: z.enum(['AI', '自']),
-  notes: z.array(
-    z.object({
-      id: z.string(),
-      type: z.enum(['text', 'image', 'drawing', 'quote', 'url']),
-      content: z.string(),
-      timestamp: z.number()
-    })
-  ).default([])
+  dataUrl: z.string(),
+  alt: z.string().default(''),
 })
 
-export const SectionSchema = z.object({
+export const BlockZ = z.object({
+  id: z.string(),
+  /** 書き手。ai = AIの下書き / me = 自分のノート */
+  by: z.enum(['ai', 'me']),
+  /** 本文。Markdown文字列 */
+  md: z.string(),
+  /** AIの文を自分で書き換えたか */
+  edited: z.boolean().default(false),
+  /** 出典URLやメモ */
+  source: z.string().default(''),
+  /** 本文から引用した文 */
+  quote: z.string().default(''),
+  images: z.array(ImageZ).default([]),
+})
+
+export const LinkZ = z.object({
+  title: z.string(),
+  url: z.string(),
+  fetchedAt: z.string().default(''),
+})
+
+export const CluesZ = z.object({
+  queries: z.array(z.string()).default([]),
+  links: z.array(LinkZ).default([]),
+  how: z.array(z.string()).default([]),
+})
+
+export const TaskZ = z.object({ text: z.string(), checked: z.boolean().default(false) })
+
+export const LessonZ = z.object({
   id: z.string(),
   title: z.string(),
-  goal: z.string(),
-  status: z.enum(['未作成', 'AIの下書き', '書き込みあり', '完了']),
+  minutes: z.number().default(45),
+  /** 実践課題の節か */
+  isTask: z.boolean().default(false),
+  /** 手動の印: 完了 */
   done: z.boolean().default(false),
+  /** 手動の印: あとで再確認 */
   review: z.boolean().default(false),
-  blocks: z.array(BlockSchema).default([]),
-  hints: z.array(z.object({
-    query: z.string(),
-    sources: z.array(z.object({
-      title: z.string(),
-      url: z.string()
-    }))
-  })).default([]),
-  checklist: z.array(z.object({
-    id: z.string(),
-    text: z.string(),
-    checked: z.boolean().default(false)
-  })).default([]),
-  updatedAt: z.number()
+  summary: z.string().default(''),
+  tasks: z.array(TaskZ).default([]),
+  clues: CluesZ.default({ queries: [], links: [], how: [] }),
+  blocks: z.array(BlockZ).default([]),
 })
 
-export const ChapterSchema = z.object({
+export const ChapterZ = z.object({
   id: z.string(),
   title: z.string(),
-  sections: z.array(SectionSchema)
+  lessons: z.array(LessonZ).default([]),
 })
 
-export const TextbookSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  goal: z.string(),
-  context: z.string(),
-  chapters: z.array(ChapterSchema),
+export const InputZ = z.object({
+  prompt: z.string().default(''),
+  can: z.string().default(''),
+  time: z.string().default(''),
+  env: z.string().default(''),
+})
+
+export const TextbookZ = z.object({
   schemaVersion: z.literal(1),
-  createdAt: z.number(),
-  updatedAt: z.number()
+  id: z.string(),
+  title: z.string(),
+  goal: z.string().default(''),
+  input: InputZ.default({ prompt: '', can: '', time: '', env: '' }),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  chapters: z.array(ChapterZ).default([]),
 })
 
-export type Block = z.infer<typeof BlockSchema>
-export type Section = z.infer<typeof SectionSchema>
-export type Chapter = z.infer<typeof ChapterSchema>
-export type Textbook = z.infer<typeof TextbookSchema>
+export type Image = z.infer<typeof ImageZ>
+export type Block = z.infer<typeof BlockZ>
+export type Clues = z.infer<typeof CluesZ>
+export type Task = z.infer<typeof TaskZ>
+export type Lesson = z.infer<typeof LessonZ>
+export type Chapter = z.infer<typeof ChapterZ>
+export type CourseInput = z.infer<typeof InputZ>
+export type Textbook = z.infer<typeof TextbookZ>
+
+export const uid = (): string =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : 'id-' + Math.random().toString(36).slice(2) + Date.now().toString(36)
+
+export const nowIso = (): string => new Date().toISOString()
+
+export function newBlock(by: Block['by'], md: string, extra: Partial<Block> = {}): Block {
+  return { id: uid(), by, md, edited: false, source: '', quote: '', images: [], ...extra }
+}
+
+export function newLesson(title: string, extra: Partial<Lesson> = {}): Lesson {
+  return {
+    id: uid(), title, minutes: 45, isTask: false, done: false, review: false, summary: '',
+    tasks: [], clues: { queries: [], links: [], how: [] }, blocks: [], ...extra,
+  }
+}
+
+export function newChapter(title: string, lessons: Lesson[] = []): Chapter {
+  return { id: uid(), title, lessons }
+}
+
+export function newTextbook(title: string, extra: Partial<Textbook> = {}): Textbook {
+  const t = nowIso()
+  return {
+    schemaVersion: 1, id: uid(), title, goal: '', input: { prompt: '', can: '', time: '', env: '' },
+    createdAt: t, updatedAt: t, chapters: [], ...extra,
+  }
+}
