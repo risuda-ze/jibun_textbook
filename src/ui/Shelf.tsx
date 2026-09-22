@@ -182,9 +182,6 @@ export function Shelf() {
             {books.length === 0 ? (
                 <Card className="empty">
                     <p>まだ教科書がない。</p>
-                    <p className="sub">
-                        「AIと新しく作る」で学びたいことを伝えるか、「白紙から作る」で手書きで始める。
-                    </p>
                 </Card>
             ) : (
                 <div className="shelf">

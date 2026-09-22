@@ -1,27 +1,31 @@
 # CLAUDE.md
 
-## これは何か
+## コミュニケーションルール
+
+- 賢い原始人のように、単語と簡単な文法の身を使用
+- 専門用語を簡略せず、正確に使用
+
+## 制限
+
+- 変更指示は`C:\dev\jibun_textbook\.claude\agents\change-orchestrator.md`が受け取る
+- 車輪の再生産はしない。新しいアイデアの相談がきたら必ずGitHubにアクセスし、同様のアイデアや、より良いアイデアがないか確認すること。
+- 重複した検証指示は極力行わない
+- 回答は冗長にせず、50行未満とする。50行以上の回答が必ず必要な場合はファイル化すること
+- 仕様の改定や作成は人間が行う
+- APIキーは端末内（IndexedDB の `settings`）にだけ置く。書き出しJSON・ログ・URL・コミットに入れない。書き出しは必ず `exportJson()`を使う
+
+## 概要
 
 **じぶん教科書** — AIが下書きした教材に、自分で確かめたこと・やったことを書き込んで「自分の教科書」に育てるアプリ。
 使うのは1人だけ。サーバーは持たない静的なPWAで、PCとAndroidで使う。端末間は教科書のJSONファイルを手で運ぶ。
 
-仕様の正は brain 側にある（読むだけ。書き換えない）。
+仕様は以下を参照する
 
 - 作業指示: `C:\dev\note\brain\06_briefs\jibun_textbook_2026-09-21.md`
 - 決定事項と理由: `C:\dev\note\brain\01_projects\50_jibun_textbook\10_jibun_textbook_concept.md`
 - 画面の構成と文言の見本: `C:\dev\note\brain\01_projects\50_jibun_textbook\30_jibun_textbook_screen_mock.html`
   （配色は古い。構成と動線だけ参照する）
 - **見た目の正: このリポジトリの `DESIGN.md`**。色・書体・余白・角丸はそこから取る。末尾の「じぶん教科書での適用」に割り当てがある
-
-## 守ること
-
-1. **自分の教科書を守る**。自分のノート・自分で修正した文・完了の節は、AIのどんな返答でも消えない・書き換わらない。
-   保証は `src/lib/protect.ts` にあり、`tests/protect.test.ts` が見張っている。ここを通さずに教科書を書き換える経路を作らない
-2. **APIキーを外に出さない**。キーは端末内（IndexedDB の `settings`）にだけ置く。書き出しJSON・ログ・URL・コミットに入れない。
-   書き出しは必ず `exportJson()`（スキーマを通すので教科書以外の項目は落ちる）を使う
-3. **分野に依存させない**。動画編集でもプログラミングでも同じ画面。分野固有の選択肢・文言・サンプルをコードに持たない
-4. **青いボタンは1画面に1つ**（`Button v="primary"`）。色面のカードも1画面に1つまで。割り当ては `DESIGN.md` 末尾
-5. 公開リポジトリ。教科書のJSON（`*.textbook.json`）と `.env` はコミットしない
 
 ## 構成
 
@@ -55,15 +59,10 @@ npm run e2e        # 通し。初回は npx playwright install chromium
 npm run build      # dist/ を作る
 ```
 
-## AI層の約束
+## AI層規約
 
 - 公式SDK `@anthropic-ai/sdk` をブラウザで使う（`dangerouslyAllowBrowser: true`）。モデルIDに日付を付けない
 - 調査と構造化は**別リクエスト**。Web検索の結果には出典が常に付き、構造化出力と同じリクエストでは衝突しうる
 - `pause_turn` は assistant の内容をそのまま送り返して続行。検索エラーはHTTP 200の中身で分岐（例外にならない）
 - 一次情報リンクは、調査で実際に見つけたページからだけ作る。AIが文章中に書いたURLをリンクにしない
 - 失敗しても教科書は変えない。理由を日本語で出して、もう一度試せるようにする
-
-## 進め方
-
-- 機能を足したくなったら `docs/backlog.md` に書いて後回しにする
-- 変更したら `npm run typecheck && npm test && npm run e2e` を通す
