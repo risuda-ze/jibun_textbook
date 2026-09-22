@@ -1,4 +1,4 @@
-import { TextbookZ, type Textbook, uid, nowIso } from '../types'
+import { TextbookStrictZ, TextbookZ, type Textbook, uid, nowIso } from '../types'
 
 export const SIZE_WARN_BYTES = 8 * 1024 * 1024
 
@@ -30,9 +30,11 @@ export function parseImport(text: string): ParseResult {
   if (!raw || typeof raw !== 'object') return { ok: false, reason: '教科書のJSONではありません。' }
   const v = (raw as { schemaVersion?: unknown }).schemaVersion
   if (v !== 1) return { ok: false, reason: `このアプリでは読み込めない形式のファイルです（schemaVersion: ${String(v)}）。アプリを更新してから読み込んでください。` }
-  const r = TextbookZ.safeParse(raw)
+  // 読み込みは id の一意性まで検証する（#36）。端末内の既存データは store.init が振り直して救済する
+  const r = TextbookStrictZ.safeParse(raw)
   if (!r.success) {
     const i = r.error.issues[0]
+    if (i.code === 'custom') return { ok: false, reason: `${i.message}。同じ id の章・節・ノートが複数あるため読み込めません。` }
     return { ok: false, reason: `形式が正しくありません（${i.path.join('.') || 'root'}: ${i.message}）。` }
   }
   return { ok: true, tb: r.data }
