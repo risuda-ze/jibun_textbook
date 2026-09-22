@@ -46,10 +46,17 @@
 
 ## CI と配信（2026-09-22）
 
+### ブランチの流れ
+
+- default ブランチは **`production`**（配信される状態）。統合ブランチは **`develop`**
+- 作業は Issue ごとに `feat/<Issue番号>_<概要>` を `develop` から切り、`develop` に向けて PR を出す。`develop → production` も PR で行う
+- Rulesets により `develop` と `production` は直接 push できず、線形履歴（squash か rebase でマージ）と CI の3ジョブ成功が必須
+- 配信用のタグ `vX.Y.Z` は `production` のコミットに打つ。タグは打ち直せない（`version-rule`）ので、打つ前に対象コミットを確かめる
+
 ### CI（`.github/workflows/ci.yml`）
 
-Pull Request と `master` への push で3つのジョブが走る。配信はしない。
-（push を `master` に絞るのは、PR を開いているブランチで push と pull_request の両方が発火して同じコミットが2回走るのを防ぐため。ブランチの検証は PR で行う）
+Pull Request と `develop` / `production` への push で3つのジョブが走る。配信はしない。
+（push を `develop` と `production` に絞るのは、PR を開いているブランチで push と pull_request の両方が発火して同じコミットが2回走るのを防ぐため。ブランチの検証は PR で行う）
 
 | ジョブ | 内容 | 落ちる条件 |
 |---|---|---|
@@ -59,7 +66,7 @@ Pull Request と `master` への push で3つのジョブが走る。配信は�
 
 Dependabot（`.github/dependabot.yml`）は npm を毎週月曜、GitHub Actions を毎月見て更新 PR を出す。
 minor と patch は1本にまとめる。Dependabot alerts と security updates はリポジトリ設定で有効にしてある。
-public 化のあと、`master` の branch protection で `check` `audit` `e2e` を required にする（private では設定できない）。
+Rulesets: `develop-rule` と `production-rule` が PR 必須・線形履歴・required checks（CI の3ジョブ）を課す。`version-rule` は `v*` タグの更新と削除を禁止する。
 
 ### 配信（`.github/workflows/deploy.yml`）
 
@@ -69,7 +76,7 @@ GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`v*` タグ�
 1. リポジトリを public にする（Pages の無料枠は public が条件）
 2. Settings → Pages → Source を「GitHub Actions」にする
 3. `git tag vX.Y.Z && git push origin vX.Y.Z` で配信される（`release.yml` があれば Release も同時に発行される）
-4. 手動で配信し直す: `gh workflow run deploy.yml -f ref=vX.Y.Z`（`ref` が空なら実行元の `master`）
+4. 手動で配信し直す: `gh workflow run deploy.yml -f ref=vX.Y.Z`（`ref` が空なら実行元の `production`）
 5. Android の Chrome で配信 URL を開き、メニューから「ホーム画面に追加」
 
 注意: ワークフローは**タグ先のコミットに入っている定義**で動く。古いコミットにタグを打つと、その時点に
