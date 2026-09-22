@@ -28,7 +28,7 @@ export function Create() {
   const field = (k: keyof CourseInput) => (e: { target: { value: string } }) => setInput({ ...input, [k]: e.target.value })
 
   async function ask() {
-    if (!input.prompt.trim()) return toast('学びたいことを書いてから進む')
+    if (!input.prompt.trim()) return toast('学びたいことを書いてから進んでください')
     setError(''); setDesign(null); setBusy('ask')
     try {
       const qs = await getProvider(ai).askQuestions(input)
@@ -56,12 +56,12 @@ export function Create() {
     })
     putBook(tb)
     openBook(tb.id)
-    toast('教科書を作った。節を選んで資料を生成する')
+    toast('教科書を作りました。節を選んで資料を生成してください')
   }
 
   return (
     <>
-      <PageHead eyebrow="つくる・Step 1" title="何を学びたいか伝える" lead="話し言葉でよい。AIが足りない所を聞き返し、調べてからコースを設計する。" />
+      <PageHead eyebrow="つくる・Step 1" title="何を学びたいか伝える" lead="話し言葉で構いません。AIが足りない所を聞き返し、調べてからコースを設計します。" />
       <AiBar />
       <div className="newgrid">
         <Card stack>
@@ -69,13 +69,13 @@ export function Create() {
             <textarea id="goal" value={input.prompt} onChange={field('prompt')} placeholder="例: 短い秒数に編集技術を詰め込んだ動画を作れるようになりたい / Rustで自分用の小さなツールを書けるようになりたい" />
           </label>
           <div className="opts">
-            <label className="f" htmlFor="can">今できること<input type="text" id="can" value={input.can} onChange={field('can')} placeholder="自由に。空でもよい" /></label>
+            <label className="f" htmlFor="can">今できること<input type="text" id="can" value={input.can} onChange={field('can')} placeholder="自由に。空でも構いません" /></label>
             <label className="f" htmlFor="time">使える時間・期限<input type="text" id="time" value={input.time} onChange={field('time')} placeholder="例: 週3時間、年内まで" /></label>
-            <label className="f" htmlFor="env">道具・環境<input type="text" id="env" value={input.env} onChange={field('env')} placeholder="ソフト、言語、機材など。未定でもよい" /></label>
+            <label className="f" htmlFor="env">道具・環境<input type="text" id="env" value={input.env} onChange={field('env')} placeholder="ソフト、言語、機材など。未定でも構いません" /></label>
           </div>
           <div className="row">
             <Button v={design ? 'soft' : 'primary'} onClick={ask} disabled={busy !== null}>{busy === 'ask' ? '質問を考えている…' : design ? 'もう一度調べ直す' : '調べてコース設計を作る'}</Button>
-            <span className="sub">全部自由入力。先に設計だけ作り、資料は節ごとに後で生成する。</span>
+            <span className="sub">全部自由入力です。先に設計だけ作り、資料は節ごとに後で生成します。</span>
           </div>
           {error && <p className="err" role="alert">{error}</p>}
         </Card>
@@ -84,7 +84,7 @@ export function Create() {
           {qa && showQa && busy !== 'design' && (
             <>
               <div className="eyebrow">AIからの確認</div>
-              <p className="sub">答えなくても進める。</p>
+              <p className="sub">答えなくても進めます。</p>
               {qa.map((x, i) => (
                 <label className="f" htmlFor={`q${i}`} key={i} style={{ color: 'var(--ink)', fontSize: 14 }}>{x.q}
                   <input type="text" id={`q${i}`} value={x.a} onChange={(e) => setQa(qa.map((y, j) => (j === i ? { ...y, a: e.target.value } : y)))} />
@@ -122,7 +122,7 @@ export function Create() {
             <input type="text" id="tweak" value={note} onChange={(e) => setNote(e.target.value)} placeholder="設計への注文（例: 基礎は短く、実践課題を増やして）" style={{ flex: '1 1 280px' }} />
             <Button v="ghost" disabled={busy !== null || !note.trim()} onClick={() => run(note)}>設計を直してもらう</Button>
           </div>
-          <p className="sub">あとからでも、ロードマップの「設計を直す」で節・章・全体を選んで直せる。</p>
+          <p className="sub">あとからでも、ロードマップの「設計を直す」で節・章・全体を選んで直せます。</p>
         </Card>
       )}
     </>

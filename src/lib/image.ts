@@ -13,7 +13,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((res, rej) => {
     const img = new Image()
     img.onload = () => res(img)
-    img.onerror = () => rej(new Error('画像を読めない'))
+    img.onerror = () => rej(new Error('画像を読み込めませんでした。'))
     img.src = src
   })
 }
@@ -22,7 +22,7 @@ const readAsDataUrl = (f: Blob): Promise<string> =>
   new Promise((res, rej) => {
     const r = new FileReader()
     r.onload = () => res(String(r.result))
-    r.onerror = () => rej(new Error('ファイルを読めない'))
+    r.onerror = () => rej(new Error('ファイルを読み込めませんでした。'))
     r.readAsDataURL(f)
   })
 

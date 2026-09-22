@@ -117,7 +117,7 @@ export function removeBook(id: string): void {
   if (!b) return
   setState({ books: state.books.filter((x) => x.id !== id), bookId: state.bookId === id ? null : state.bookId, screen: 'shelf' })
   del(TB + id).catch(() => {})
-  toast(`「${b.title}」を消した`, () => putBook(b, false))
+  toast(`「${b.title}」を消しました`, () => putBook(b, false))
 }
 
 export function setAi(p: Partial<AiSettings>): void {

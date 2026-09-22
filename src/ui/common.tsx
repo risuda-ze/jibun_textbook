@@ -55,8 +55,8 @@ export function AiBar() {
       {ai.kind === 'anthropic' && editKey && (
         <div className="row">
           <input type="password" id="ai_key" autoComplete="off" placeholder="sk-ant-…" value={key} onChange={(e) => setKey(e.target.value)} style={{ flex: '1 1 260px' }} aria-label="APIキー" />
-          <Button v="soft" onClick={() => { setAi({ apiKey: key.trim() }); setKey(''); setEditKey(false); toast(key.trim() ? 'キーをこの端末に保存した' : 'キーを消した') }}>保存</Button>
-          <span className="sub">この端末の中にだけ保存する。書き出すJSONには入らない。</span>
+          <Button v="soft" onClick={() => { setAi({ apiKey: key.trim() }); setKey(''); setEditKey(false); toast(key.trim() ? 'キーをこの端末に保存しました' : 'キーを消しました') }}>保存</Button>
+          <span className="sub">この端末の中にだけ保存します。書き出すJSONには入りません。</span>
         </div>
       )}
       {ai.kind === 'anthropic' && (
@@ -74,8 +74,8 @@ export function AiBar() {
           </label>
         </div>
       )}
-      {(ai.kind === 'compat' || ai.kind === 'local') && <p className="sub">この接続先はまだ使えない。次の段階で対応する。{ai.kind === 'local' && 'ローカルのモデルはPCでだけ使える予定。'}</p>}
-      {ai.kind === 'demo' && <p className="sub">APIキーなしで動線を試すための見本を返す。調査はしない。</p>}
+      {(ai.kind === 'compat' || ai.kind === 'local') && <p className="sub">この接続先はまだ使えません。次の段階で対応します。{ai.kind === 'local' && 'ローカルのモデルはPCでだけ使える予定です。'}</p>}
+      {ai.kind === 'demo' && <p className="sub">APIキーなしで動線を試すための見本を返します。調査はしません。</p>}
     </Card>
   )
 }
