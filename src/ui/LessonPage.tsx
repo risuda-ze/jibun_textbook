@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { allLessons, findLesson, lessonNo, minePercent } from '../lib/status'
-import { go, openLesson, putBook, snapshot, toast, updateLesson, useApp } from '../store'
-import { newBlock, uid, type Lesson, type Textbook } from '../types'
-import { BlockRow, Composer, type NoteDraft } from './blocks'
+import { go, openLesson, putBook, setDraft as storeDraft, snapshot, toast, updateLesson, useApp } from '../store'
+import { emptyDraft, newBlock, uid, type Lesson, type NoteDraft, type Textbook } from '../types'
+import { BlockRow, Composer } from './blocks'
 import { StatusChip } from './common'
 import { generateInto } from './generate'
 import { Button, Card } from './kit'
@@ -47,17 +47,16 @@ function Clues({ tb, lesson }: { tb: Textbook; lesson: Lesson }) {
 }
 
 export function LessonPage({ tb }: { tb: Textbook }) {
-  const { lessonId, ai } = useApp()
+  const { lessonId, ai, drafts } = useApp()
   const f = (lessonId && findLesson(tb, lessonId)) || null
   const [insAt, setInsAt] = useState<number | null>(null)
-  const [quote, setQuote] = useState('')
   const [blame, setBlame] = useState(true)
   const [genDetail, setGenDetail] = useState<string | null>(null)
   const [task, setTask] = useState('')
   const qbtn = useRef<HTMLButtonElement>(null)
   const pending = useRef<{ text: string; blockId: string } | null>(null)
 
-  useEffect(() => { setInsAt(null); setQuote('') }, [lessonId])
+  useEffect(() => { setInsAt(null) }, [lessonId])
 
   // 本文を選択すると「引用してノートを書く」を出す
   useEffect(() => {
@@ -84,13 +83,17 @@ export function LessonPage({ tb }: { tb: Textbook }) {
   const next = ls[ls.indexOf(l) + 1]
   const pct = minePercent(l)
   const withUndo = (msg: string, fn: () => void) => { const before = snapshot(tb.id); fn(); toast(msg, before ? () => putBook(before) : undefined) }
+  // ノートの下書きは store に節ごとに持つ。差し込み位置の変更・節の切り替え・画面の移動で消えない（#12）
+  const draft = drafts[l.id] ?? emptyDraft()
+  const setDraft = (d: NoteDraft) => storeDraft(l.id, d)
 
-  function addNote(n: NoteDraft) {
+  function addNote() {
+    const n = draft
     updateLesson(tb.id, l.id, (d) => {
-      const b = newBlock('me', n.md, { source: n.source, quote: n.quote, images: n.images.map((dataUrl) => ({ id: uid(), dataUrl, alt: '' })) })
+      const b = newBlock('me', n.md.trim(), { source: n.source.trim(), quote: n.quote, images: n.images.map((dataUrl) => ({ id: uid(), dataUrl, alt: '' })) })
       d.blocks.splice(insAt ?? d.blocks.length, 0, b)
     })
-    setInsAt(null); setQuote('')
+    setInsAt(null); setDraft(emptyDraft())
     toast('書き込みました')
   }
 
@@ -101,7 +104,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
   }
 
   const composerAt = insAt ?? l.blocks.length
-  const composer = <Composer quote={quote} onUnquote={() => setQuote('')} onSubmit={addNote} />
+  const composer = <Composer draft={draft} onChange={setDraft} onSubmit={addNote} />
 
   return (
     <>
@@ -135,7 +138,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
           <div className={`blocks doc ${blame ? '' : 'noblame'}`}>
             {l.blocks.map((b, i) => (
               <Fragment key={b.id}>
-                {composerAt === i ? composer : <button className="ins" onClick={() => { setInsAt(i); setQuote('') }}>＋ ここに書く</button>}
+                {composerAt === i ? composer : <button className="ins" onClick={() => setInsAt(i)}>＋ ここに書く</button>}
                 <BlockRow
                   block={b}
                   onCommit={(md) => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) { x.md = md; if (x.by === 'ai') x.edited = true } })}
@@ -144,7 +147,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
                 />
               </Fragment>
             ))}
-            {composerAt >= l.blocks.length ? composer : <button className="ins" onClick={() => { setInsAt(null); setQuote('') }}>＋ ここに書く</button>}
+            {composerAt >= l.blocks.length ? composer : <button className="ins" onClick={() => setInsAt(null)}>＋ ここに書く</button>}
           </div>
           <Clues tb={tb} lesson={l} />
         </div>
@@ -187,7 +190,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
         e.preventDefault()
         const p = pending.current; if (!p) return
         const i = l.blocks.findIndex((b) => b.id === p.blockId)
-        setQuote(p.text); setInsAt(i >= 0 ? i + 1 : null)
+        setDraft({ ...draft, quote: p.text }); setInsAt(i >= 0 ? i + 1 : null)
         document.getSelection()?.removeAllRanges()
         e.currentTarget.hidden = true
       }}>引用してノートを書く</button>
