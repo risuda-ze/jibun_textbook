@@ -167,8 +167,8 @@ test('完了条件5: 設計を直す。差分を見て採用。守る対象は�
   await redo.locator('#redotext').fill('実践を先に')
   await redo.getByRole('button', { name: '変更案を出してもらう' }).click()
   await expect(redo.locator('.diff li').filter({ hasText: '残す' })).toHaveCount(2)
-  await expect(redo.getByText('完了の節のため触らない')).toBeVisible()
-  await expect(redo.getByText('自分の書き込みありのため触らない')).toBeVisible()
+  await expect(redo.getByText('完了の節のため触りません')).toBeVisible()
+  await expect(redo.getByText('自分の書き込みありのため触りません')).toBeVisible()
   await expect(redo.locator('.diff li').filter({ hasText: '変更' })).toHaveCount(1)
   await expect(redo.locator('.diff li').filter({ hasText: '追加' })).toHaveCount(1)
 
@@ -223,19 +223,19 @@ test('完了条件7: JSONの書き出しと読み込み。キーは入らない�
   await expect(page.getByText('APIキー 設定済み')).toBeVisible()
 
   await page.getByRole('tab', { name: /本棚/ }).click()
-  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'JSONを書き出す' }).click()])
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'JSON書出' }).click()])
   expect(dl.suggestedFilename()).toBe('新しい教科書.textbook.json')
   const json = readFileSync((await dl.path())!, 'utf8')
   expect(json).not.toContain('SECRET')
   expect(json).not.toContain('apiKey')
   expect(json).toContain('端末をまたぐノート')
-  await expect(page.getByText(/書き出した（/)).toBeVisible()
+  await expect(page.getByText(/書き出しました（/)).toBeVisible()
   const tb = JSON.parse(json)
   expect(tb.schemaVersion).toBe(1)
 
   // 消して、読み込み直す（別の端末で読む想定）
-  await page.getByRole('button', { name: '消す', exact: true }).click()
-  await expect(page.getByText('まだ教科書がない。')).toBeVisible()
+  await page.getByRole('button', { name: '消去', exact: true }).click()
+  await expect(page.getByText('まだ教科書がありません。')).toBeVisible()
   const upload = (name: string, body: string) => page.locator('#importfile').setInputFiles({ name, mimeType: 'application/json', buffer: Buffer.from(body) })
   await upload('a.json', json)
   await expect(page.getByRole('heading', { name: '新しい教科書' })).toBeVisible()
@@ -249,7 +249,7 @@ test('完了条件7: JSONの書き出しと読み込み。キーは入らない�
   // 古いJSON → 警告して選ばせる
   await upload('c.json', json)
   const dlg = page.getByRole('alertdialog')
-  await expect(dlg.getByText('読み込もうとしたファイルの方が古い。')).toBeVisible()
+  await expect(dlg.getByText('読み込もうとしたファイルの方が古いです。')).toBeVisible()
   await dlg.getByRole('button', { name: 'やめる' }).click()
   await expect(page.getByRole('heading', { name: 'スマホで続きを書いた' })).toBeVisible()
   await upload('c.json', json)

@@ -20,7 +20,7 @@ export function Book({ tb }: { tb: Textbook }) {
   const blocks = allLessons(tb).flatMap((l) => l.blocks)
   return (
     <>
-      <PageHead eyebrow="教科書（通読）" title={tb.title} lead="全レッスンを1冊につなげた、読み返すための表示。書くのはレッスン側。"
+      <PageHead eyebrow="教科書（通読）" title={tb.title} lead="全レッスンを1冊につなげた、読み返すための表示です。書くのはレッスン側で行います。"
         actions={<Button v="ghost" onClick={() => downloadBook(tb)}>JSONを書き出す</Button>} />
       <div className="row">
         {chapters.map(({ c, ci }) => (

@@ -59,7 +59,7 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
     putBook(after)
     if (!findLesson(after, lesson.id)) { const c = currentLesson(after); if (c) selectLesson(c.id) }
     onClose()
-    toast('変更案を反映した', before ? () => putBook(before) : undefined)
+    toast('変更案を反映しました', before ? () => putBook(before) : undefined)
   }
 
   return (
@@ -70,7 +70,7 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
       </div>
       <div className="row">
         <Segmented label="直す範囲" value={scope} options={scopes} onChange={(k) => { setScope(k); setPlan(null) }} />
-        <span className="sub">節や章は下の一覧で選び直せる。</span>
+        <span className="sub">節や章は下の一覧で選び直せます。</span>
       </div>
       <div className="row">
         <input type="text" id="redotext" value={order} onChange={(e) => setOrder(e.target.value)} placeholder="どう変えたいか（例: 理論は短く、実践を先に）" style={{ flex: '1 1 280px' }} />
@@ -87,7 +87,7 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
                   <Pill tone={DIFF_CHIP[r.kind]}>{DIFF_LABEL[r.kind]}</Pill>
                   <span style={r.level === 'chapter' ? { fontWeight: 900 } : undefined}>
                     {r.from && <><s className="sub">{r.from}</s> → </>}{r.text}
-                    {r.note && <span className="sub"> {r.note}のため触らない</span>}
+                    {r.note && <span className="sub"> {r.note}のため触りません</span>}
                   </span>
                 </li>
               ))}
@@ -96,7 +96,7 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
           <UsageLine usage={usage} />
           <div className="row">
             <Button v="primary" onClick={adopt}>この案を採用</Button>
-            <span className="sub">採用するまで何も変わらない。自分のノート・自分で直した文・完了の節は、どの案でも残る。</span>
+            <span className="sub">採用するまで何も変わりません。自分のノート・自分で直した文・完了の節は、どの案でも残ります。</span>
           </div>
         </>
       )}
@@ -146,7 +146,7 @@ export function Roadmap({ tb }: { tb: Textbook }) {
   function removeLesson(id: string) {
     const before = snapshot(tb.id)
     updateBook(tb.id, (d) => { for (const c of d.chapters) c.lessons = c.lessons.filter((l) => l.id !== id); d.chapters = d.chapters.filter((c) => c.lessons.length) })
-    toast('節を消した', before ? () => putBook(before) : undefined)
+    toast('節を消しました', before ? () => putBook(before) : undefined)
   }
 
   return (
@@ -167,7 +167,7 @@ export function Roadmap({ tb }: { tb: Textbook }) {
       <div className="row legend">
         {(['none', 'ai', 'me', 'done'] as const).map((k) => <Pill key={k} tone={k}>{STATUS_LABEL[k]}</Pill>)}
         <Pill tone="review">再確認</Pill>
-        <span className="tlnote">◆ は実践課題。幅は所要時間。赤い線が現在地。</span>
+        <span className="tlnote">◆ は実践課題、幅は所要時間、赤い線が現在地です。</span>
       </div>
 
       {/* PC幅: タイムライン */}
@@ -224,7 +224,7 @@ export function Roadmap({ tb }: { tb: Textbook }) {
               <input className="titleinput" aria-label="節の名前" value={sel.lesson.title} onChange={(e) => updateLesson(tb.id, sel.lesson.id, (l) => { l.title = e.target.value })} />
             </div>
             <div className="row"><StatusChip lesson={sel.lesson} /></div>
-            <p className="sub">{sel.lesson.summary || (sel.lesson.blocks.length ? '本文あり。' : 'まだ資料がない。AIに生成させるか、自分で書き始める。')}</p>
+            <p className="sub">{sel.lesson.summary || (sel.lesson.blocks.length ? '本文あり。' : 'まだ資料がありません。AIに生成させるか、自分で書き始めてください。')}</p>
             <div className="row">
               {sel.lesson.blocks.length === 0 && (
                 <Button v="soft" disabled={gen !== null} onClick={() => generate(sel.lesson.id)}>{gen?.id === sel.lesson.id ? gen.detail || '生成中…' : 'この節の資料を生成'}</Button>
@@ -246,14 +246,19 @@ export function Roadmap({ tb }: { tb: Textbook }) {
                 </li>
               ))}
             </ul>
-            <div className="row" style={{ marginTop: 8 }}>
+            {/* この章への操作は章構成の右下に。コース全体への「章を足す」はカードの外に置く */}
+            <div className="row" style={{ marginTop: 8, justifyContent: 'flex-end' }}>
               <Button v="outline" sm onClick={() => addLesson(sel.chapter.id)}>この章に節を足す</Button>
-              <Button v="outline" sm onClick={addChapter}>章を足す</Button>
             </div>
           </div>
         </Card>
       ) : (
-        <Card className="empty"><p>節がない。</p><Button v="primary" onClick={addChapter}>章を足す</Button></Card>
+        <Card className="empty"><p>節がありません。</p><Button v="primary" onClick={addChapter}>章を足す</Button></Card>
+      )}
+      {sel && (
+        <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
+          <Button v="outline" sm onClick={addChapter}>章を足す</Button>
+        </div>
       )}
     </>
   )

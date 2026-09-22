@@ -44,8 +44,8 @@ export function downloadBook(tb: Textbook): void {
     markExported(tb.id);
     toast(
         size > SIZE_WARN_BYTES
-            ? `書き出した（${formatSize(size)}）は8MBを超えています。添付上限に注意してください。`
-            : `書き出した（${formatSize(size)}）`,
+            ? `書き出しました（${formatSize(size)}）。8MBを超えているので、添付上限に注意してください。`
+            : `書き出しました（${formatSize(size)}）`,
     );
 }
 
@@ -135,7 +135,7 @@ export function Shelf() {
                     aria-label="古いファイルの読み込み"
                 >
                     <p>
-                        <b>読み込もうとしたファイルの方が古い。</b>「
+                        <b>読み込もうとしたファイルの方が古いです。</b>「
                         {older.existing.title}」
                     </p>
                     <p className="sub mono">
@@ -155,7 +155,7 @@ export function Shelf() {
                                 const prev = older.existing;
                                 putBook(older.incoming, false);
                                 setOlder(null);
-                                toast("古い内容で上書きした", () =>
+                                toast("古い内容で上書きしました", () =>
                                     putBook(prev, false),
                                 );
                             }}
@@ -167,7 +167,7 @@ export function Shelf() {
                             onClick={() => {
                                 putBook(asCopy(older.incoming), false);
                                 setOlder(null);
-                                toast("別の本として追加した");
+                                toast("別の本として追加しました");
                             }}
                         >
                             別の本として追加
@@ -181,7 +181,7 @@ export function Shelf() {
 
             {books.length === 0 ? (
                 <Card className="empty">
-                    <p>まだ教科書がない。</p>
+                    <p>まだ教科書がありません。</p>
                 </Card>
             ) : (
                 <div className="shelf">
@@ -200,33 +200,34 @@ export function Shelf() {
                                     {b.goal && <p className="sub">{b.goal}</p>}
                                 </div>
                                 <Meter tb={b} />
-                                <div className="row">
-                                    <Button
-                                        v="soft"
-                                        onClick={() => openBook(b.id)}
-                                    >
-                                        開く
-                                    </Button>
+                                {/* 左から「JSON書出」「消去」「開く」。主操作の「開く」を右端に置き、右揃えにする */}
+                                <div className="row card-actions">
                                     <Button
                                         v="outline"
                                         sm
                                         onClick={() => downloadBook(b)}
                                     >
-                                        JSONを書き出す
+                                        JSON書出
                                     </Button>
                                     <Button
-                                        v="outline"
+                                        v="danger"
                                         sm
                                         onClick={() => {
                                             if (
                                                 confirm(
-                                                    `「${b.title}」を端末から消す？`,
+                                                    `「${b.title}」を端末から消しますか？`,
                                                 )
                                             )
                                                 removeBook(b.id);
                                         }}
                                     >
-                                        消す
+                                        消去
+                                    </Button>
+                                    <Button
+                                        v="soft"
+                                        onClick={() => openBook(b.id)}
+                                    >
+                                        開く
                                     </Button>
                                 </div>
                                 <p className="sub" style={{ fontSize: 13 }}>
@@ -239,7 +240,7 @@ export function Shelf() {
                                             <br />
                                             <Pill tone="review">
                                                 {d === null
-                                                    ? "まだ一度も書き出していない"
+                                                    ? "まだ一度も書き出していません"
                                                     : `最後の書き出しから${d}日`}
                                             </Pill>
                                         </>

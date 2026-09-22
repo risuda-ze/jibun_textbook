@@ -41,3 +41,18 @@ Web検索ツールの型 `web_search_20260209` が選んだモデルで受け付
 
 `node scripts/screenshots.mjs <出力先>` で全5画面をPC幅とスマホ幅で撮り、画面モックと見比べた。
 色・書体・配置はモックどおり。スマホ幅ではロードマップが章ごとの一覧に切り替わり、横スクロールは出ない。
+
+## 追記（2026-09-22・Issue #8 #3 #2 #6 #5 #4）
+
+実行環境: Windows 11 / Node 24.13 / Chromium（Playwright 1.63）。brain セッションから直接実装。
+
+| 種類 | コマンド | 結果 |
+|---|---|---|
+| 型チェック | `npm run typecheck` | エラーなし |
+| 単体＋AI層（Vitest） | `npm test` | 4ファイル・39件すべて成功 |
+| 通し（Playwright） | `npm run e2e` | 9シナリオ × PC幅・スマホ幅 = 18件すべて成功 |
+| 依存の脆弱性 | `npm audit --audit-level=high` | 0件 |
+
+- e2e は作業前の時点で 14件失敗していた。原因は「初回生成」コミットの画面文言（本棚の見出し `myTextbook`・ボタン `AIと新規作成`）に e2e が追随していなかったこと。#4 の敬体統一と合わせて e2e を現状に合わせ、全件成功に戻した
+- #6 #5 の配置変更は e2e の PC 幅・スマホ幅（Pixel 7）の両方で通っている。見た目は `node scripts/screenshots.mjs` で確認
+- CI（`.github/workflows/ci.yml`）はまだ GitHub 上で走っていない（push 待ち）

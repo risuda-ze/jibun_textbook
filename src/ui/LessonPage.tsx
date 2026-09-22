@@ -15,11 +15,11 @@ function Clues({ tb, lesson }: { tb: Textbook; lesson: Lesson }) {
   const c = lesson.clues
   return (
     <Card stack className="clues" aria-label="調べる手がかり">
-      <div><h2 style={{ fontSize: 16 }}>調べる手がかり</h2><p className="sub">AIの文を鵜呑みにせず、自分で確かめるための入口。</p></div>
+      <div><h2 style={{ fontSize: 16 }}>調べる手がかり</h2><p className="sub">AIの文を鵜呑みにせず、自分で確かめるための入口です。</p></div>
       <div>
         <div className="eyebrow">検索する</div>
         <div className="row" style={{ marginTop: 6 }}>
-          {c.queries.length ? c.queries.map((x) => <a className="qchip" key={x} href={gq(x)} target="_blank" rel="noopener noreferrer">{x}</a>) : <span className="sub">まだない。下から足せる。</span>}
+          {c.queries.length ? c.queries.map((x) => <a className="qchip" key={x} href={gq(x)} target="_blank" rel="noopener noreferrer">{x}</a>) : <span className="sub">まだありません。下から足せます。</span>}
         </div>
       </div>
       <div>
@@ -27,7 +27,7 @@ function Clues({ tb, lesson }: { tb: Textbook; lesson: Lesson }) {
         <ul className="plain">
           {c.links.length ? c.links.map((x) => (
             <li key={x.url}><a href={x.url} target="_blank" rel="noopener noreferrer">{x.title}</a>{x.fetchedAt && <span className="sub"> （{x.fetchedAt} 時点）</span>}</li>
-          )) : <li className="sub">まだない。読んだページのURLを下から足せる。</li>}
+          )) : <li className="sub">まだありません。読んだページのURLを下から足せます。</li>}
         </ul>
       </div>
       {c.how.length > 0 && <div><div className="eyebrow">確かめ方</div><ul className="plain">{c.how.map((h) => <li key={h}>{h}</li>)}</ul></div>}
@@ -38,7 +38,7 @@ function Clues({ tb, lesson }: { tb: Textbook; lesson: Lesson }) {
       <div className="row">
         <input type="text" id="cluelink" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="読んだページのURLを足す" style={{ flex: '1 1 200px' }} />
         <Button v="ghost" onClick={() => {
-          const u = url.trim(); if (!/^https?:\/\//.test(u)) return toast('http から始まるURLを入れる')
+          const u = url.trim(); if (!/^https?:\/\//.test(u)) return toast('http から始まるURLを入れてください')
           updateLesson(tb.id, lesson.id, (l) => { l.clues.links.push({ title: u, url: u, fetchedAt: new Date().toISOString().slice(0, 10) }) }); setUrl('')
         }}>リンクを足す</Button>
       </div>
@@ -78,7 +78,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
     return () => document.removeEventListener('selectionchange', onSel)
   }, [])
 
-  if (!f) return <Card className="empty"><p>節が選ばれていない。</p><Button v="primary" onClick={() => go('road')}>ロードマップへ</Button></Card>
+  if (!f) return <Card className="empty"><p>節が選ばれていません。</p><Button v="primary" onClick={() => go('road')}>ロードマップへ</Button></Card>
   const l = f.lesson
   const ls = allLessons(tb)
   const next = ls[ls.indexOf(l) + 1]
@@ -91,7 +91,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
       d.blocks.splice(insAt ?? d.blocks.length, 0, b)
     })
     setInsAt(null); setQuote('')
-    toast('書き込んだ')
+    toast('書き込みました')
   }
 
   async function generate() {
@@ -121,7 +121,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
         <div className="stack">
           {l.blocks.length === 0 && (
             <Card stack>
-              <p>この節はまだ資料がない。AIに下書きを作らせるか、下の欄から自分で書き始める。</p>
+              <p>この節はまだ資料がありません。AIに下書きを作らせるか、下の欄から自分で書き始めてください。</p>
               <div className="row">
                 <Button v="soft" disabled={genDetail !== null} onClick={generate}>{genDetail !== null ? genDetail || '生成中…' : '資料を生成'}</Button>
                 <span className="sub">使うAI: {ai.kind === 'anthropic' ? ai.model : ai.kind === 'demo' ? 'デモ応答' : '未対応の接続先'}（「つくる」画面で切り替え）</span>
@@ -130,7 +130,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
           )}
           <div className="row">
             <label className="row sub" htmlFor="blameL"><input type="checkbox" id="blameL" checked={blame} onChange={(e) => setBlame(e.target.checked)} />書き手の印を出す</label>
-            <span className="sub">AI = AIの下書き / 自 = 自分のノート。本文はクリックして直接書き換えられる。本文を選択すると引用できる。</span>
+            <span className="sub">AI = AIの下書き / 自 = 自分のノート。本文はクリックして直接書き換えられます。本文を選択すると引用できます。</span>
           </div>
           <div className={`blocks doc ${blame ? '' : 'noblame'}`}>
             {l.blocks.map((b, i) => (
@@ -139,8 +139,8 @@ export function LessonPage({ tb }: { tb: Textbook }) {
                 <BlockRow
                   block={b}
                   onCommit={(md) => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) { x.md = md; if (x.by === 'ai') x.edited = true } })}
-                  onDelete={() => withUndo(b.by === 'me' ? 'ノートを消した' : '文を消した', () => updateLesson(tb.id, l.id, (d) => { d.blocks = d.blocks.filter((y) => y.id !== b.id) }))}
-                  onRemoveImage={(imgId) => withUndo('画像を外した', () => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) x.images = x.images.filter((im) => im.id !== imgId) }))}
+                  onDelete={() => withUndo(b.by === 'me' ? 'ノートを消しました' : '文を消しました', () => updateLesson(tb.id, l.id, (d) => { d.blocks = d.blocks.filter((y) => y.id !== b.id) }))}
+                  onRemoveImage={(imgId) => withUndo('画像を外しました', () => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) x.images = x.images.filter((im) => im.id !== imgId) }))}
                 />
               </Fragment>
             ))}
@@ -156,7 +156,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
               <label className={`mark done ${l.done ? 'on' : ''}`} htmlFor="markdone"><input type="checkbox" id="markdone" checked={l.done} onChange={(e) => updateLesson(tb.id, l.id, (d) => { d.done = e.target.checked })} />完了</label>
               <label className={`mark review ${l.review ? 'on' : ''}`} htmlFor="markreview"><input type="checkbox" id="markreview" checked={l.review} onChange={(e) => updateLesson(tb.id, l.id, (d) => { d.review = e.target.checked })} />あとで再確認</label>
             </div>
-            <p className="sub" style={{ fontSize: 12, marginTop: 8 }}>どちらも自分のタイミングで付ける。完了の節は「設計を直す」で変更されない。</p>
+            <p className="sub" style={{ fontSize: 12, marginTop: 8 }}>どちらも自分のタイミングで付けます。完了の節は「設計を直す」で変更されません。</p>
           </Card>
           <Card as="div">
             <h2>この節の中身</h2>
@@ -172,7 +172,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
                   <label htmlFor={`task${j}`}>{t.text}</label>
                 </li>
               ))}
-              {l.tasks.length === 0 && <li className="sub">まだない。</li>}
+              {l.tasks.length === 0 && <li className="sub">まだありません。</li>}
             </ul>
             <div className="row" style={{ marginTop: 8 }}>
               <input type="text" id="newtask" value={task} onChange={(e) => setTask(e.target.value)} placeholder="やることを足す" style={{ flex: '1 1 120px' }} />

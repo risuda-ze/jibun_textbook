@@ -128,11 +128,11 @@ export function diffTextbooks(before: Textbook, after: Textbook, onlyChapterId?:
 
 /** 節の作り直しの差分 */
 export function diffLessonRegen(lesson: Lesson, newMd: string[]): DiffRow[] {
-  if (lesson.done) return [{ kind: 'keep', level: 'lesson', text: '完了の節なので何も変えない' }]
+  if (lesson.done) return [{ kind: 'keep', level: 'lesson', text: '完了の節なので何も変えません' }]
   const mine = lesson.blocks.filter(isMine).length
   const ai = lesson.blocks.length - mine
   return [
-    { kind: 'change', level: 'lesson', text: `AIの下書き ${ai}件 を、新しい下書き ${newMd.filter((m) => m.trim()).length}件 に置き換える` },
+    { kind: 'change', level: 'lesson', text: `AIの下書き ${ai}件 を、新しい下書き ${newMd.filter((m) => m.trim()).length}件 に置き換えます` },
     { kind: 'keep', level: 'lesson', text: `自分のノートと自分で直した文 ${mine}件` },
   ]
 }
