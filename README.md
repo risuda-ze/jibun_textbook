@@ -32,7 +32,7 @@ npm test            # 単体テスト（Vitest）
 npm run e2e         # 通しテスト（Playwright。初回は npx playwright install chromium）
 ```
 
-push と Pull Request のたびに CI（`.github/workflows/ci.yml`）が型チェック・単体テスト・ビルド・依存の脆弱性検査（`npm audit --audit-level=high`）・通しテストを行います。
+Pull Request と `master` への push のたびに CI（`.github/workflows/ci.yml`）が型チェック・単体テスト・ビルド・依存の脆弱性検査（`npm audit --audit-level=high`）・通しテストを行います。
 脆弱性が high 以上で見つかると CI は失敗します。依存の更新は Dependabot が PR を出します。
 
 ## 配信
