@@ -308,6 +308,7 @@ test('ノートの下書きは差し込み位置や節の切り替えで消え�
   await expect(page.locator('.doc [data-by="me"]').filter({ hasText: 'まだ書きかけ' })).toBeVisible()
   await expect(page.locator('#note')).toHaveValue('')
   await expect(page.locator('.atts img')).toHaveCount(0)
+})
 
 test('不正な URL と画像は無害化される（読み込んだ JSON 由来）', async ({ page }) => {
   await page.goto("./")
