@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { htmlToMd, mdToHtml } from '../lib/md'
 import { shrinkImage } from '../lib/image'
+import { isHttpUrl, isImageDataUrl } from '../lib/safe'
 import { toast } from '../store'
 import type { Block, NoteDraft } from '../types'
 import { Button } from './kit'
@@ -55,11 +56,12 @@ export function BlockRow({ block: b, read, onCommit, onDelete, onRemoveImage }: 
         {read ? <div className="blk-body" dangerouslySetInnerHTML={{ __html: mdToHtml(b.md) }} /> : <Editable md={b.md} onCommit={(m) => onCommit?.(m)} />}
         {b.images.map((im) => (
           <span className="imgwrap" key={im.id}>
-            <img src={im.dataUrl} alt={im.alt || '自分で入れた画像'} />
+            {/* JSON 由来の画像は data:image/ だけを表示する（#35） */}
+            {isImageDataUrl(im.dataUrl) ? <img src={im.dataUrl} alt={im.alt || '自分で入れた画像'} /> : <span className="sub">表示できない画像です</span>}
             {!read && <button onClick={() => onRemoveImage?.(im.id)} aria-label="この画像を外す">×</button>}
           </span>
         ))}
-        {b.source && <div className="src">出典: {/^https?:\/\//.test(b.source) ? <a href={b.source} target="_blank" rel="noopener noreferrer">{b.source}</a> : b.source}</div>}
+        {b.source && <div className="src">出典: {isHttpUrl(b.source) ? <a href={b.source} target="_blank" rel="noopener noreferrer">{b.source}</a> : b.source}</div>}
         {b.edited && !read && <div className="src">自分で修正</div>}
       </div>
     </div>
