@@ -46,7 +46,7 @@
 
 ## CI と配信（2026-09-22）
 
-### ブランチの流れ（2026-09-23）
+### ブランチの流れ
 
 - default ブランチは **`production`**（配信される状態）。統合ブランチは **`develop`**
 - 作業は Issue ごとに `feat/<Issue番号>_<概要>` を `develop` から切り、`develop` に向けて PR を出す。`develop → production` も PR で行う
@@ -66,7 +66,7 @@ Pull Request と `develop` / `production` への push で3つのジョブが走�
 
 Dependabot（`.github/dependabot.yml`）は npm を毎週月曜、GitHub Actions を毎月見て更新 PR を出す。
 minor と patch は1本にまとめる。Dependabot alerts と security updates はリポジトリ設定で有効にしてある。
-Rulesets（2026-09-23 設定）: `develop-rule` と `production-rule` が PR 必須・線形履歴・required checks（CI の3ジョブ）を課す。`version-rule` は `v*` タグの更新と削除を禁止する。
+Rulesets: `develop-rule` と `production-rule` が PR 必須・線形履歴・required checks（CI の3ジョブ）を課す。`version-rule` は `v*` タグの更新と削除を禁止する。
 
 ### 配信（`.github/workflows/deploy.yml`）
 
