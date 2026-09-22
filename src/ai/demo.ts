@@ -19,7 +19,7 @@ export class DemoProvider implements AiProvider {
   async designCourse(input: CourseInput, _qa: QA[], note: string, onProgress: Progress) {
     const t = topicOf(input)
     onProgress(0, '学びたいことを分解している'); await wait()
-    onProgress(1, 'デモ応答のためWeb調査はしない'); await wait()
+    onProgress(1, 'デモ応答のためWeb調査はしません'); await wait()
     onProgress(2, 'コース設計を作っている'); await wait()
     const L = (title: string, minutes = 45, isTask = false) => ({ title, minutes, isTask, summary: `${title}ができるようになる。` })
     const design = {
@@ -39,7 +39,7 @@ export class DemoProvider implements AiProvider {
 
   async generateLesson(tb: Textbook, lessonId: string, onProgress: Progress) {
     const f = findLesson(tb, lessonId)!
-    onProgress(0, 'デモ応答のためWeb調査はしない'); await wait()
+    onProgress(0, 'デモ応答のためWeb調査はしません'); await wait()
     onProgress(1, '資料を書いている'); await wait()
     const t = f.lesson.title
     const draft = {

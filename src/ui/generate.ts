@@ -18,8 +18,8 @@ export async function generateInto(tb: Textbook, lessonId: string, ai: AiSetting
       }
     })
     toast(usage.searches || usage.inputTokens
-      ? `資料を生成した（検索${usage.searches}回・入力${usage.inputTokens.toLocaleString()}・出力${usage.outputTokens.toLocaleString()}トークン）`
-      : '資料を生成した')
+      ? `資料を生成しました（検索${usage.searches}回・入力${usage.inputTokens.toLocaleString()}・出力${usage.outputTokens.toLocaleString()}トークン）`
+      : '資料を生成しました')
     return true
   } catch (e) {
     toast((e as Error).message)

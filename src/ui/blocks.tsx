@@ -119,7 +119,7 @@ export function Composer({ quote, onUnquote, onSubmit }: { quote: string; onUnqu
   }
 
   function submit() {
-    if (!md.trim() && !images.length && !quote) return toast('文か画像を入れてから書き込む')
+    if (!md.trim() && !images.length && !quote) return toast('文か画像を入れてから書き込んでください')
     onSubmit({ md: md.trim(), images, source: source.trim(), quote })
     setMd(''); setSource(''); setImages([]); setPad(false)
   }
@@ -127,10 +127,10 @@ export function Composer({ quote, onUnquote, onSubmit }: { quote: string; onUnqu
   return (
     <div className="addnote" onPaste={(e) => {
       const fs = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'))
-      if (fs.length) { e.preventDefault(); void addFiles(fs); toast('画像を貼り付けた') }
+      if (fs.length) { e.preventDefault(); void addFiles(fs); toast('画像を貼り付けました') }
     }}>
       {quote && <blockquote>{quote} <button className="linkbtn" onClick={onUnquote}>引用をやめる</button></blockquote>}
-      <textarea ref={note} id="note" value={md} onChange={(e) => setMd(e.target.value)} placeholder="自分の言葉で。やってみた結果、調べて分かったこと、引っかかった点など。スクショは Ctrl+V で貼れる" />
+      <textarea ref={note} id="note" value={md} onChange={(e) => setMd(e.target.value)} placeholder="自分の言葉で。やってみた結果、調べて分かったこと、引っかかった点など。スクショは Ctrl+V で貼れます" />
       {images.length > 0 && (
         <div className="atts">
           {images.map((u, i) => (
