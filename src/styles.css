@@ -76,6 +76,9 @@ main.stack{gap:var(--s24)}
 .btn.ghost:hover:not(:disabled){background:var(--wash)}
 .btn.outline{border-color:var(--hairline-strong);border-radius:var(--radius-small);padding:5px 10px;color:rgba(0,0,0,.9)}
 .btn.outline:hover:not(:disabled){border-color:rgba(0,0,0,.9)}
+/* 警告色。塗りではなく赤い枠＋赤い文字（色面は主操作の青だけ、という DESIGN.md の制約に合わせる） */
+.btn.danger{border-color:var(--danger);border-radius:var(--radius-small);padding:5px 10px;color:var(--danger)}
+.btn.danger:hover:not(:disabled){background:rgba(217,55,74,.08)}
 .btn.sm{font-size:13px;padding-block:3px}
 .btn:disabled{opacity:.45;cursor:default}
 .linkbtn{background:none;border:0;padding:0;font-size:var(--text-caption);font-weight:500;color:var(--ink-2);text-decoration:underline}
@@ -102,6 +105,8 @@ main.stack{gap:var(--s24)}
 
 /* ---------- 共通の並べ方・文字 ---------- */
 .row{display:flex;flex-wrap:wrap;gap:var(--s8);align-items:center}
+/* 本棚の教科書カードの操作列。右揃え。折り返しても右に寄る */
+.row.card-actions{justify-content:flex-end}
 .stack{display:flex;flex-direction:column;gap:var(--s16)}
 .pagehead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:var(--s16);padding-top:var(--s16)}
 .pagehead>div:first-child{flex:1 1 320px;min-width:0}

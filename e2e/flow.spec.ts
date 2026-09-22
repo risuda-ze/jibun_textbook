@@ -223,7 +223,7 @@ test('完了条件7: JSONの書き出しと読み込み。キーは入らない�
   await expect(page.getByText('APIキー 設定済み')).toBeVisible()
 
   await page.getByRole('tab', { name: /本棚/ }).click()
-  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'JSONを書き出す' }).click()])
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'JSON書出' }).click()])
   expect(dl.suggestedFilename()).toBe('新しい教科書.textbook.json')
   const json = readFileSync((await dl.path())!, 'utf8')
   expect(json).not.toContain('SECRET')
@@ -234,7 +234,7 @@ test('完了条件7: JSONの書き出しと読み込み。キーは入らない�
   expect(tb.schemaVersion).toBe(1)
 
   // 消して、読み込み直す（別の端末で読む想定）
-  await page.getByRole('button', { name: '消す', exact: true }).click()
+  await page.getByRole('button', { name: '消去', exact: true }).click()
   await expect(page.getByText('まだ教科書がない。')).toBeVisible()
   const upload = (name: string, body: string) => page.locator('#importfile').setInputFiles({ name, mimeType: 'application/json', buffer: Buffer.from(body) })
   await upload('a.json', json)
