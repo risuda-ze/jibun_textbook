@@ -44,12 +44,37 @@
 - 判断: 参照元のキャラクターイラストやロゴは使っていない。表示サイズ（54〜96px）は道具には大きすぎるので使っていない
 - テスト: 型チェック・単体39件・通し18件は、リデザイン後も全部成功
 
-## 配信の手順（未実施）
+## CI と配信（2026-09-22）
 
-1. GitHubに公開リポジトリ `jibun_textbook` を作って push する（リポジトリ名を変えるなら `vite.config.ts` の `base` も変える）
+### CI（`.github/workflows/ci.yml`）
+
+Pull Request と `master` への push で3つのジョブが走る。配信はしない。
+（push を `master` に絞るのは、PR を開いているブランチで push と pull_request の両方が発火して同じコミットが2回走るのを防ぐため。ブランチの検証は PR で行う）
+
+| ジョブ | 内容 | 落ちる条件 |
+|---|---|---|
+| `check` | `npm run typecheck` → `npm test` → `npm run build` | 型エラー・単体テスト失敗・ビルド失敗 |
+| `audit` | `npm audit --audit-level=high` | **high 以上の脆弱性が1件でもある**。moderate 以下は Dependabot の更新 PR に任せる |
+| `e2e` | Playwright（Chromium）で `npm run e2e`。デモ応答だけを使い外部につながない | 通しテスト失敗。失敗時は `playwright-report/` と `test-results/` が artifact に残る |
+
+Dependabot（`.github/dependabot.yml`）は npm を毎週月曜、GitHub Actions を毎月見て更新 PR を出す。
+minor と patch は1本にまとめる。Dependabot alerts と security updates はリポジトリ設定で有効にしてある。
+public 化のあと、`master` の branch protection で `check` `audit` `e2e` を required にする（private では設定できない）。
+
+### 配信（`.github/workflows/deploy.yml`）
+
+GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`v*` タグの push と手動実行でだけ配信する**。
+ブランチへの push では配信しない。配信のタイミングは人が握る。
+
+1. リポジトリを public にする（Pages の無料枠は public が条件）
 2. Settings → Pages → Source を「GitHub Actions」にする
-3. `.github/workflows/deploy.yml` が `master` / `main` への push でテスト・ビルド・配信する
-4. Androidの Chrome で配信URLを開き、メニューから「ホーム画面に追加」
+3. `git tag vX.Y.Z && git push origin vX.Y.Z` で配信される（`release.yml` があれば Release も同時に発行される）
+4. 手動で配信し直す: `gh workflow run deploy.yml -f ref=vX.Y.Z`（`ref` が空なら実行元の `master`）
+5. Android の Chrome で配信 URL を開き、メニューから「ホーム画面に追加」
+
+注意: ワークフローは**タグ先のコミットに入っている定義**で動く。古いコミットにタグを打つと、その時点に
+`deploy.yml` の新しい定義が無いので自動では走らない。その場合は 4 の手動実行で `ref` にタグを指定する。
+リポジトリ名を変えるなら `vite.config.ts` の `base` も変える。
 
 ## 実APIで分かったこと
 
