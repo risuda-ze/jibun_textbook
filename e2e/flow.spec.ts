@@ -14,7 +14,7 @@ async function blankBook(page: Page) {
 
 async function demoBook(page: Page) {
   await page.goto('./')
-  await page.getByRole('button', { name: 'AIと新しく作る' }).click()
+  await page.getByRole('button', { name: 'AIと新規作成' }).click()
   await page.getByRole('button', { name: 'デモ応答' }).click()
   await page.locator('#goal').fill('Rustで自分用の小さなツールを書けるようになりたい')
   await page.locator('#env').fill('Windows、VS Code')
