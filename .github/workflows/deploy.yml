@@ -1,9 +1,19 @@
 name: Deploy to GitHub Pages
 
+# 配信は v* タグを打ったときと、手動で実行したときだけ。ブランチへの push では配信しない。
+# 手動実行では ref にタグ名（例: v0.1.0）を入れると、その時点の内容を配信し直せる。
+# 注意: ワークフローはタグ先のコミットに入っている定義で動く。古いコミットにタグを打った場合は
+# 自動では走らないので、master から手動実行して ref にそのタグを指定する。
+
 on:
   push:
-    branches: [master, main]
+    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      ref:
+        description: '配信するタグまたはコミット（空なら実行元）'
+        required: false
+        default: ''
 
 concurrency:
   group: pages
@@ -23,6 +33,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -30,6 +42,7 @@ jobs:
           cache: npm
 
       - run: npm ci
+      # 配信物が壊れていないことの最後の砦。CI と重複するが残す
       - run: npm test
       - run: npm run build
 

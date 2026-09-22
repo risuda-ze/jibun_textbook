@@ -1,0 +1,26 @@
+# 依存の更新 PR を自動で出す。マージの判断は人が行う。
+# 脆弱性の検出は Settings → Code security の Dependabot alerts（有効）と、
+# CI の audit ジョブ（npm audit --audit-level=high）でブロックする。
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Tokyo
+    # minor と patch はまとめて1本の PR にする（PR が増えすぎないように）。major は個別
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'deps'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: 'ci'
