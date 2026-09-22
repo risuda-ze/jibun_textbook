@@ -74,7 +74,7 @@
 | 公開して問題ないファイルだけか | 追跡 79 ファイル。`src/` `tests/` `e2e/` `public/` `scripts/` `docs/` `DESIGN.md` `CLAUDE.md` `.claude/`（エージェント定義 8 件・スキル 7 件・`settings.json`）。**要判断**: (a) `DESIGN.md` は Notion のサイトを参照して書いたスタイル記述で、Notion のロゴ・画像・コードは含まない。(b) `.claude/settings.json` の allow に `C:\dev\note\brain\...` のローカルパスが入っている（個人の環境が分かる。秘密ではない）。(c) `.claude/agents` `.claude/skills` は汎用の作業手順で、個人情報は無い。`settings.local.json` はグローバル ignore で追跡外 | 要確認（人が判断） | (b) が気になるなら該当行を消す。それ以外は公開して差し支えないと判断する |
 | `test-results/` `dist/` `playwright-report/` を追跡しない | `.gitignore` 済み。追跡ファイルに無い | 済 | — |
 | Actions の権限が最小 | `ci.yml` は `contents: read`。`deploy.yml` は `pages: write` `id-token: write` のみ。`release.yml`（#1）は `contents: write` が要る | 済 | — |
-| ブランチ保護 | private では設定できない（GitHub Free）。public 化後に `master` の required checks に `check` `audit` `e2e` を入れる | 未（public 化待ち） | #8 の残り |
+| ブランチ保護 | Rulesets で設定済み（2026-09-23）: `develop-rule` / `production-rule` は PR 必須・線形履歴・required checks（`型・単体・ビルド` `依存の脆弱性（high 以上で失敗）` `通し（Playwright）`）。`version-rule` は `v*` タグの更新・削除を禁止 | 済 | 1人運用で詰みうる「Code Owners のレビュー必須」「最新 push の承認必須」は要見直し |
 
 ## 8. データの消去・復元
 
