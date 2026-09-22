@@ -246,14 +246,19 @@ export function Roadmap({ tb }: { tb: Textbook }) {
                 </li>
               ))}
             </ul>
-            <div className="row" style={{ marginTop: 8 }}>
+            {/* この章への操作は章構成の右下に。コース全体への「章を足す」はカードの外に置く */}
+            <div className="row" style={{ marginTop: 8, justifyContent: 'flex-end' }}>
               <Button v="outline" sm onClick={() => addLesson(sel.chapter.id)}>この章に節を足す</Button>
-              <Button v="outline" sm onClick={addChapter}>章を足す</Button>
             </div>
           </div>
         </Card>
       ) : (
         <Card className="empty"><p>節がない。</p><Button v="primary" onClick={addChapter}>章を足す</Button></Card>
+      )}
+      {sel && (
+        <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
+          <Button v="outline" sm onClick={addChapter}>章を足す</Button>
+        </div>
       )}
     </>
   )
