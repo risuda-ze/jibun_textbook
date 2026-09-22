@@ -22,7 +22,7 @@
 | スキーマ検証と `schemaVersion` チェック | `parseImport()` が `JSON.parse` → `schemaVersion === 1` → `TextbookZ.safeParse` の順に検証（`src/lib/io.ts`）。失敗理由を画面に出す | 済 | 版が上がったら移行処理を足す |
 | 起動時に IndexedDB から読むデータも検証する | `init()` が各教科書を `TextbookZ.safeParse` で検証し、失敗したものは読み込まない（`src/store.ts`） | 済（ただし黙って捨てる。#17） | — |
 | サイズ上限 | 書き出し側は 8MB 超で警告（`SIZE_WARN_BYTES`）。**読み込み側に上限が無い**。何十 MB でも `JSON.parse` する | 未 | 読み込み前に `File.size` を見て上限（例 16MB）を超えたら断る（#17 に記載） |
-| 不正な `id` / 重複 / 循環 | `id` は文字列なら何でも通る。同じ `id` の節が2つあっても検証で弾かない。木構造なので循環は起きない | 未 | zod の `superRefine` で `id` の一意性を検証する（候補 Issue） |
+| 不正な `id` / 重複 / 循環 | 読み込み（`parseImport`）は `TextbookStrictZ`（`superRefine` で章・節・ブロック・画像の id の一意性を検証）で弾き、どの id が重複しているかを理由に出す。端末内のデータは `store.init` が `renumberDuplicateIds` で振り直して救済し、件数をトーストで知らせる。木構造なので循環は起きない（#36） | 済 | — |
 | URL 項目のスキーム検証 | スキーマ（`LinkZ.url`・`Block.source`・`Image.dataUrl`）は `z.string()` のまま弾かない（古い JSON を読めなくしないため）。描画時に `src/lib/safe.ts` の `isHttpUrl` / `isImageDataUrl` で無害化する（#35） | 済 | 描画経路を増やすときは必ずこの2関数を通す |
 | 同じ `id` の教科書との衝突 | `updatedAt` を比べて新しければ自動上書き、古ければ確認（`decideImport()`）。上書きは元に戻せる | 済 | — |
 
@@ -96,7 +96,7 @@
 新しく起こす候補:
 
 1. ~~URL のスキーム検証~~ → #35 で対応済み（描画時に無害化）
-2. **`id` の一意性検証**: `TextbookZ` に `superRefine` で節・章・ブロックの `id` 重複を弾く
+2. ~~`id` の一意性検証~~ → #36 で対応済み
 3. **CSP の導入**: `index.html` の `meta` で `connect-src` を Anthropic API に限定。PWA の登録と Google Fonts が動くことを e2e で確認
 4. **実 API での確認**（人が行う）: エラー文にキーが混ざらないこと、検索回数の実測、`navigator.storage.persisted()` の結果
 

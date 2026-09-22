@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { TextbookZ, newBlock, newChapter, newLesson, newTextbook, type Textbook } from '../src/types'
+import { TextbookZ, findDuplicateIds, newBlock, newChapter, newLesson, newTextbook, renumberDuplicateIds, type Textbook } from '../src/types'
 import { currentLesson, lessonNo, lessonStatus, minePercent, statusCounts } from '../src/lib/status'
 import { asCopy, decideImport, exportJson, parseImport } from '../src/lib/io'
 import { fitSize } from '../src/lib/image'
@@ -96,5 +96,41 @@ describe('画像の縮小サイズ', () => {
     expect(fitSize(1080, 2400)).toEqual({ w: 720, h: 1600 })
     expect(fitSize(800, 600)).toEqual({ w: 800, h: 600 })
     expect(fitSize(1600, 1600)).toEqual({ w: 1600, h: 1600 })
+  })
+})
+
+describe('id の一意性（#36）', () => {
+  const dupBook = (): Textbook => {
+    const tb = book()
+    // 2つ目の節に1つ目と同じ id を付け、ブロックの id も重ねる
+    tb.chapters[0].lessons[1].id = tb.chapters[0].lessons[0].id
+    tb.chapters[0].lessons[2].blocks[1].id = tb.chapters[0].lessons[2].blocks[0].id
+    return tb
+  }
+  it('重複を見つける', () => {
+    expect(findDuplicateIds(book())).toEqual([])
+    expect(findDuplicateIds(dupBook())).toHaveLength(2)
+  })
+  it('読み込みは理由つきで断る', () => {
+    const r = parseImport(JSON.stringify(dupBook()))
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toContain('id が重複しています')
+  })
+  it('振り直すと重複が無くなり、中身は変わらない', () => {
+    const src = dupBook()
+    const { tb, count } = renumberDuplicateIds(src)
+    expect(count).toBe(2)
+    expect(findDuplicateIds(tb)).toEqual([])
+    expect(tb.chapters[0].lessons[0].id).toBe(src.chapters[0].lessons[0].id)
+    expect(tb.chapters[0].lessons[1].id).not.toBe(src.chapters[0].lessons[1].id)
+    expect(tb.chapters[0].lessons.map((l) => l.title)).toEqual(src.chapters[0].lessons.map((l) => l.title))
+    expect(tb.chapters[0].lessons[2].blocks.map((b) => b.md)).toEqual(['本文', 'やってみた'])
+    expect(parseImport(exportJson(tb)).ok).toBe(true)
+  })
+  it('重複が無ければそのまま', () => {
+    const src = book()
+    const { tb, count } = renumberDuplicateIds(src)
+    expect(count).toBe(0)
+    expect(tb).toEqual(src)
   })
 })

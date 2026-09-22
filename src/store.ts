@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { del, get, keys, set } from 'idb-keyval'
-import { TextbookZ, isDraftEmpty, nowIso, type Lesson, type NoteDraft, type Textbook } from './types'
+import { TextbookZ, findDuplicateIds, isDraftEmpty, nowIso, renumberDuplicateIds, type Lesson, type NoteDraft, type Textbook } from './types'
 import { DEFAULT_AI, type AiSettings } from './ai/types'
 import { currentLesson, findLesson } from './lib/status'
 
@@ -38,15 +38,24 @@ const SETTINGS = 'settings'
 
 export async function init(): Promise<void> {
   const books: Textbook[] = []
+  let renumbered = 0
   try {
     for (const k of await keys()) {
       if (typeof k !== 'string' || !k.startsWith(TB)) continue
       const r = TextbookZ.safeParse(await get(k))
-      if (r.success) books.push(r.data)
+      if (!r.success) continue
+      // 端末内のデータは弾かず、重複した id を振り直して救済する（#36）
+      if (findDuplicateIds(r.data).length) {
+        const fixed = renumberDuplicateIds(r.data)
+        renumbered += fixed.count
+        await set(k, fixed.tb).catch(() => {})
+        books.push(fixed.tb)
+      } else books.push(r.data)
     }
     const s = (await get(SETTINGS)) as { ai?: AiSettings; lastExport?: Record<string, string> } | undefined
     books.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     setState({ ready: true, books, ai: { ...DEFAULT_AI, ...s?.ai }, lastExport: s?.lastExport ?? {} })
+    if (renumbered) toast(`重複していた id を ${renumbered} 件振り直しました。`)
     // 端末の保存領域を勝手に消されないよう、永続化を要求する
     void navigator.storage?.persist?.()
   } catch {
