@@ -4,6 +4,7 @@ import { go, openLesson, putBook, setDraft as storeDraft, snapshot, toast, updat
 import { emptyDraft, newBlock, uid, type Lesson, type NoteDraft, type Textbook } from '../types'
 import { BlockRow, Composer } from './blocks'
 import { StatusChip } from './common'
+import { isHttpUrl } from '../lib/safe'
 import { generateInto } from './generate'
 import { Button, Card } from './kit'
 
@@ -26,7 +27,8 @@ function Clues({ tb, lesson }: { tb: Textbook; lesson: Lesson }) {
         <div className="eyebrow">一次情報</div>
         <ul className="plain">
           {c.links.length ? c.links.map((x) => (
-            <li key={x.url}><a href={x.url} target="_blank" rel="noopener noreferrer">{x.title}</a>{x.fetchedAt && <span className="sub"> （{x.fetchedAt} 時点）</span>}</li>
+            // JSON 由来の URL は http(s) 以外をリンクにしない（#35）
+            <li key={x.url}>{isHttpUrl(x.url) ? <a href={x.url} target="_blank" rel="noopener noreferrer">{x.title}</a> : <span title="http(s) 以外のURLはリンクにしません">{x.title}</span>}{x.fetchedAt && <span className="sub"> （{x.fetchedAt} 時点）</span>}</li>
           )) : <li className="sub">まだありません。読んだページのURLを下から足せます。</li>}
         </ul>
       </div>
@@ -38,7 +40,7 @@ function Clues({ tb, lesson }: { tb: Textbook; lesson: Lesson }) {
       <div className="row">
         <input type="text" id="cluelink" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="読んだページのURLを足す" style={{ flex: '1 1 200px' }} />
         <Button v="ghost" onClick={() => {
-          const u = url.trim(); if (!/^https?:\/\//.test(u)) return toast('http から始まるURLを入れてください')
+          const u = url.trim(); if (!isHttpUrl(u)) return toast('http から始まるURLを入れてください')
           updateLesson(tb.id, lesson.id, (l) => { l.clues.links.push({ title: u, url: u, fetchedAt: new Date().toISOString().slice(0, 10) }) }); setUrl('')
         }}>リンクを足す</Button>
       </div>

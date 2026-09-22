@@ -308,4 +308,25 @@ test('ノートの下書きは差し込み位置や節の切り替えで消え�
   await expect(page.locator('.doc [data-by="me"]').filter({ hasText: 'まだ書きかけ' })).toBeVisible()
   await expect(page.locator('#note')).toHaveValue('')
   await expect(page.locator('.atts img')).toHaveCount(0)
+
+test('不正な URL と画像は無害化される（読み込んだ JSON 由来）', async ({ page }) => {
+  await page.goto("./")
+  const now = new Date().toISOString()
+  const tb = {
+    schemaVersion: 1, id: 'bad-urls', title: '不正なURLの教科書', createdAt: now, updatedAt: now,
+    chapters: [{ id: 'c1', title: '第1章', lessons: [{ id: 'l1', title: '節1', clues: { queries: [], how: [],
+      links: [{ title: '悪いリンク', url: 'javascript:alert(1)' }, { title: '良いリンク', url: 'https://example.com/' }] },
+      blocks: [{ id: 'b1', by: 'me', md: '本文', source: 'javascript:alert(2)', images: [{ id: 'i1', dataUrl: 'data:text/html,<b>x</b>', alt: '' }] }] }] }],
+  }
+  await page.locator('#importfile').setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tb)) })
+  await page.getByRole('button', { name: '開く' }).click()
+  await page.getByRole('button', { name: 'レッスンを開く' }).click()
+  const clues = page.getByLabel('調べる手がかり')
+  await expect(clues.getByText('悪いリンク')).toBeVisible()
+  await expect(clues.getByRole('link', { name: '悪いリンク' })).toHaveCount(0)
+  await expect(clues.getByRole('link', { name: '良いリンク' })).toHaveAttribute('href', 'https://example.com/')
+  await expect(page.locator('.doc img')).toHaveCount(0)
+  await expect(page.locator('.doc').getByText('表示できない画像です')).toBeVisible()
+  await expect(page.locator('.doc').getByRole('link', { name: 'javascript:alert(2)' })).toHaveCount(0)
+  await expect(page.locator('.doc').getByText('javascript:alert(2)')).toBeVisible()
 })
