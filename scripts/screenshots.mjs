@@ -11,7 +11,7 @@ for (const [name, opts] of [['pc', { viewport: { width: 1280, height: 900 } }], 
   const page = await ctx.newPage()
   const shot = (n) => page.screenshot({ path: `${out}/${name}_${n}.png`, fullPage: true })
   await page.goto(base)
-  await page.getByRole('button', { name: 'AIと新しく作る' }).click()
+  await page.getByRole('button', { name: 'AIと新規作成' }).click()
   await page.getByRole('button', { name: 'デモ応答' }).click()
   await page.locator('#goal').fill('短い秒数に編集技術を詰め込んだ動画を作れるようになりたい')
   await page.locator('#can').fill('カット編集はできる')
