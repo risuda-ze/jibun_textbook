@@ -50,7 +50,7 @@
 
 | 要件 | 現状（該当箇所） | 判定 | 対応方針 |
 |---|---|---|---|
-| CSP（Content-Security-Policy） | `index.html` に `meta http-equiv` は無い。GitHub Pages はヘッダを設定できないので `meta` で入れるしかない。外部への接続先は Anthropic API と Google Fonts（`fonts.googleapis.com` / `fonts.gstatic.com`）だけ | 未 | `connect-src 'self' https://api.anthropic.com; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'` を `meta` で入れる。Vite のインライン script と PWA の登録が動くか e2e で確かめる（候補 Issue） |
+| CSP（Content-Security-Policy） | 本番ビルドの `index.html` に `meta http-equiv` で入れる（`vite.config.ts` の `cspMeta` プラグイン・#37）。`default-src 'self'`、`script-src 'self'`（本番ビルドにインライン script は無い）、`style-src 'self' 'unsafe-inline' fonts.googleapis.com`（React の style 属性のため）、`font-src fonts.gstatic.com`、`img-src 'self' data: blob:`、`connect-src 'self' api.anthropic.com`、`worker-src 'self'`、`object-src 'none'`、`base-uri 'self'`、`form-action 'none'`。開発サーバーには入れない（HMR と React preamble がインライン script を使う） | 済 | e2e「CSP 違反が出ない」が見張る。接続先を増やすときは `connect-src` に足す。`frame-ancestors` は meta では効かない（Pages では設定不可） |
 | Service Worker のキャッシュに教科書データやキーが入らない | `vite-plugin-pwa` の `workbox.globPatterns` はビルド成果物（js/css/html/svg/png/woff2）だけ（`vite.config.ts`）。IndexedDB は対象外。API 応答の runtime caching は設定していない | 済 | Anthropic API を runtime cache に入れない設定を維持 |
 | HTTPS 前提 | GitHub Pages は HTTPS。混在コンテンツ（`http://` のローカルモデル）は Phase 2 の課題として認識済み | 済 | — |
 | 保存領域が勝手に消されない | `navigator.storage.persist()` を起動時に要求（`src/store.ts`）。許可されるかはブラウザ次第 | 要確認 | Android Chrome で「ホーム画面に追加」後に `navigator.storage.persisted()` を確認する |
@@ -97,7 +97,7 @@
 
 1. ~~URL のスキーム検証~~ → #35 で対応済み（描画時に無害化）
 2. ~~`id` の一意性検証~~ → #36 で対応済み
-3. **CSP の導入**: `index.html` の `meta` で `connect-src` を Anthropic API に限定。PWA の登録と Google Fonts が動くことを e2e で確認
+3. ~~CSP の導入~~ → #37 で対応済み（本番ビルドの meta）
 4. **実 API での確認**（人が行う）: エラー文にキーが混ざらないこと、検索回数の実測、`navigator.storage.persisted()` の結果
 
 ## 根拠

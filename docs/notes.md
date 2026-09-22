@@ -136,3 +136,9 @@ zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても
 
 - id の一意性は **読み込み（JSON）では弾き、端末内のデータでは振り直して救済**する。`TextbookZ` 自体には `superRefine` を付けず、`TextbookStrictZ` を `parseImport` だけで使う。起動時に弾くと本棚から教科書が消えたように見えるため
 - 振り直しは後ろの重複だけを新しい uuid にし、最初の1つは元のまま。件数をトーストで知らせる
+
+## 2026-09-23 の判断（#37）
+
+- CSP は **本番ビルドにだけ** meta で入れる（`vite.config.ts` の `cspMeta` プラグイン、`apply: 'build'`）。開発サーバーは HMR と React の preamble がインライン script を使うので、入れると動かない。本番ビルドの `index.html` にインライン script が無いことは確認済み
+- `style-src` に `'unsafe-inline'` を許す。React の `style={{}}`（style 属性）が多く、外すには全部をクラスに置き換える必要がある。script は `'self'` だけなので、実害は小さい
+- `frame-ancestors` は meta では無効なので書かない（Pages ではヘッダを出せない）。クリックジャッキング対策は諦める（自分専用・認証無しなので影響が小さい）
