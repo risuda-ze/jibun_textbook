@@ -1,0 +1,64 @@
+name: Release
+
+# v* タグを打つと、その時点のビルド成果物（dist/ の zip）を GitHub Release に添付する。
+# 手動実行では tag に既存のタグ名（例: v0.1.0）を入れると、そのタグの内容で発行し直せる。
+# 注意: ワークフローはタグ先のコミットに入っている定義で動く。古いコミットにタグを打った場合は
+# 自動では走らないので、production から手動実行して tag にそのタグを指定する。
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '発行するタグ（例: v0.1.0）'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      # タグ名は vX.Y.Z だけを受け付ける。打ち間違い（v1 / V0.1.0 など）で発行しない
+      - name: タグ名を確認
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "タグ名が vX.Y.Z の形式ではありません: $TAG"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ env.TAG }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+      - name: 成果物を zip にする
+        run: |
+          cd dist
+          zip -r "../jibun_textbook-${TAG}.zip" .
+          cd ..
+          ls -l "jibun_textbook-${TAG}.zip"
+
+      - name: Release を作成（既にあれば zip を差し替え）
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }}
+          files: jibun_textbook-${{ env.TAG }}.zip
+          generate_release_notes: true
+          body: |
+            ビルド成果物 `jibun_textbook-${{ env.TAG }}.zip` は `dist/` の中身です。
+            `base` が `/jibun_textbook/` なので、解凍して直接開いても動きません。GitHub Pages 配下（https://risuda-ze.github.io/jibun_textbook/ ）で動く前提の成果物です。
+            配信は `deploy.yml`（タグの push か手動実行）で行います。

@@ -104,3 +104,18 @@ GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`v*` タグ�
 ## 実APIで分かったこと
 
 （キーを入れて試したら、ここに書く）
+
+### 発行（`.github/workflows/release.yml`）
+
+`v*` タグを打つと、その時点の `dist/` を zip にして GitHub Release に添付する（`softprops/action-gh-release`）。配信（`deploy.yml`）と同じトリガーなので、**タグ = Release + 配信**。
+
+1. `package.json` の `version` を上げてコミットし、`production` まで入れる
+2. `production` のそのコミットに `git tag vX.Y.Z && git push origin vX.Y.Z`。`release.yml` と `deploy.yml` が走る
+3. タグ名は `vX.Y.Z` だけを受け付ける。両ワークフローの最初のステップで形式を確かめ、違えば何もしない
+4. 手動で発行し直す: `gh workflow run release.yml --ref production -f tag=vX.Y.Z`
+
+**v0.1.0 の発行（初回生成 `6a96429`）**: この時点のコミットに `release.yml` は無いので、タグを push しても自動では走らない。
+`gh workflow run release.yml --ref production -f tag=v0.1.0` で発行する（この PR が `production` に入った後）。**配信はしない**。理由: Pages には既に新しい `production` の内容が配信されており、
+v0.1.0（初回生成の状態）を配信すると画面が巻き戻るため。v0.1.0 は「この時点の状態」を固定して参照するための Release で、配信の対象は次のタグから。
+
+zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても動かない。Pages 配下で動く前提の成果物。
