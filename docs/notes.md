@@ -98,7 +98,7 @@ GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`v*` タグ�
 
 （キーを入れて試したら、ここに書く）
 
-### 発行（`.github/workflows/release.yml`・2026-09-23）
+### 発行（`.github/workflows/release.yml`）
 
 `v*` タグを打つと、その時点の `dist/` を zip にして GitHub Release に添付する（`softprops/action-gh-release`）。配信（`deploy.yml`）と同じトリガーなので、**タグ = Release + 配信**。
 
