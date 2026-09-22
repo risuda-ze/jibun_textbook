@@ -277,3 +277,35 @@ test('AIにつながらないときは教科書を変えずに理由を出す', 
   await expect(page.getByRole('status')).toContainText('APIキーが未設定')
   await expect(page.locator('.detail').getByText('未作成').first()).toBeVisible()
 })
+
+test('ノートの下書きは差し込み位置や節の切り替えで消えない', async ({ page }) => {
+  await demoBook(page)
+  await page.getByRole('button', { name: 'この節の資料を生成' }).click()
+  await page.locator('.doc [data-by="ai"]').first().waitFor()
+
+  // 書きかけの文と画像
+  await page.locator('#note').fill('まだ書きかけ')
+  await page.locator('#imgf').setInputFiles({ name: 'draft.png', mimeType: 'image/png', buffer: PNG })
+  await expect(page.locator('.atts img')).toHaveCount(1)
+  await page.locator('#src').fill('https://example.com/')
+
+  // 差し込み位置を先頭に変えても残る
+  await page.locator('.ins').first().click()
+  await expect(page.locator('#note')).toHaveValue('まだ書きかけ')
+  await expect(page.locator('.atts img')).toHaveCount(1)
+  await expect(page.locator('#src')).toHaveValue('https://example.com/')
+
+  // 別の節へ行くと、その節の下書きは空。戻ると元の下書きが残っている
+  await page.getByRole('button', { name: /次へ 1-2/ }).click()
+  await expect(page.locator('#note')).toHaveValue('')
+  await page.getByRole('button', { name: 'ロードマップ', exact: true }).click()
+  await page.getByRole('button', { name: /続きから 1-1/ }).click()
+  await expect(page.locator('#note')).toHaveValue('まだ書きかけ')
+  await expect(page.locator('.atts img')).toHaveCount(1)
+
+  // 書き込むと下書きは空になる
+  await page.getByRole('button', { name: '書き込む' }).click()
+  await expect(page.locator('.doc [data-by="me"]').filter({ hasText: 'まだ書きかけ' })).toBeVisible()
+  await expect(page.locator('#note')).toHaveValue('')
+  await expect(page.locator('.atts img')).toHaveCount(0)
+})

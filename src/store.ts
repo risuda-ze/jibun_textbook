@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { del, get, keys, set } from 'idb-keyval'
-import { TextbookZ, nowIso, type Lesson, type Textbook } from './types'
+import { TextbookZ, isDraftEmpty, nowIso, type Lesson, type NoteDraft, type Textbook } from './types'
 import { DEFAULT_AI, type AiSettings } from './ai/types'
 import { currentLesson, findLesson } from './lib/status'
 
@@ -16,11 +16,13 @@ export type State = {
   ai: AiSettings
   /** 教科書ごとの最後に書き出した日時。端末内だけの情報 */
   lastExport: Record<string, string>
+  /** ノート入力欄の下書き（節idごと）。画面をまたいで残すが端末には保存しない（#12） */
+  drafts: Record<string, NoteDraft>
   toast: Toast | null
 }
 
 let state: State = {
-  ready: false, books: [], bookId: null, lessonId: null, screen: 'shelf', ai: DEFAULT_AI, lastExport: {}, toast: null,
+  ready: false, books: [], bookId: null, lessonId: null, screen: 'shelf', ai: DEFAULT_AI, lastExport: {}, drafts: {}, toast: null,
 }
 const listeners = new Set<() => void>()
 const emit = () => listeners.forEach((l) => l())
@@ -123,6 +125,12 @@ export function removeBook(id: string): void {
 export function setAi(p: Partial<AiSettings>): void {
   setState({ ai: { ...state.ai, ...p } })
   void saveSettings()
+}
+
+/** ノートの下書きを置き換える。空なら消す */
+export function setDraft(lessonId: string, d: NoteDraft): void {
+  const { [lessonId]: _drop, ...rest } = state.drafts
+  setState({ drafts: isDraftEmpty(d) ? rest : { ...rest, [lessonId]: d } })
 }
 
 export function markExported(id: string): void {
