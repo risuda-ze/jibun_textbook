@@ -244,7 +244,7 @@ test('完了条件7: JSONの書き出しと読み込み。キーは入らない�
   const newer = { ...tb, title: 'スマホで続きを書いた', updatedAt: new Date(Date.now() + 60_000).toISOString() }
   await upload('b.json', JSON.stringify(newer))
   await expect(page.getByRole('heading', { name: 'スマホで続きを書いた' })).toBeVisible()
-  await expect(page.getByText('新しい内容で上書きした')).toBeVisible()
+  await expect(page.getByText('新しい内容で上書きしました')).toBeVisible()
 
   // 古いJSON → 警告して選ばせる
   await upload('c.json', json)
