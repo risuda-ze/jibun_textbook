@@ -34,7 +34,7 @@
 | 編集で確定する HTML もサニタイズする | `htmlToMd()` が turndown の前に `DOMPurify.sanitize()` を通す | 済 | — |
 | 貼り付けた HTML が確定前に生のまま DOM に入らない | **未対応**。`Editable` に `onPaste` が無く、貼り付け直後は貼った HTML がそのまま contenteditable に入る（blur で確定するまで）。自分の貼り付けなので第三者の入力ではないが、外部サイトからコピーした HTML が一時的に生で入る | 未 | `onPaste` で `text/plain` に落とすか、貼り付け時に sanitize（#17） |
 | 外部リンクの `rel="noopener noreferrer"` | 自分のコードが作る `<a target="_blank">`（出典・手がかり・一次情報）には付いている（`blocks.tsx` `LessonPage.tsx`）。Markdown 内のリンクは marked が `target` を付けないので同一タブで開く | 済 | — |
-| `javascript:` / `data:` スキーム | Markdown 内のリンクは DOMPurify が `javascript:` を除去する。JSON 由来の `clues.links[].url` と出典 `b.source` は `isHttpUrl` を通ったときだけ `<a>` にし、それ以外は文字として出す。画像 `dataUrl` は `isImageDataUrl`（`data:image/…`）を通ったときだけ `<img>` にし、それ以外は「表示できない画像です」と出す（`src/lib/safe.ts`・#35・2026-09-23） | 済 | `tests/safe.test.ts` と e2e「不正な URL と画像は無害化される」が見張る |
+| `javascript:` / `data:` スキーム | Markdown 内のリンクは DOMPurify が `javascript:` を除去する。JSON 由来の `clues.links[].url` と出典 `b.source` は `isHttpUrl` を通ったときだけ `<a>` にし、それ以外は文字として出す。画像 `dataUrl` は `isImageDataUrl`（`data:image/…`）を通ったときだけ `<img>` にし、それ以外は「表示できない画像です」と出す（`src/lib/safe.ts`・#35） | 済 | `tests/safe.test.ts` と e2e「不正な URL と画像は無害化される」が見張る |
 
 ## 4. AI 応答の取り扱い
 
