@@ -331,3 +331,22 @@ test('不正な URL と画像は無害化される（読み込んだ JSON 由来
   await expect(page.locator('.doc').getByRole('link', { name: 'javascript:alert(2)' })).toHaveCount(0)
   await expect(page.locator('.doc').getByText('javascript:alert(2)')).toBeVisible()
 })
+
+test('CSP 違反が出ない（本番ビルドの meta CSP）', async ({ page }) => {
+  const violations: string[] = []
+  page.on('console', (m) => { if (/Content Security Policy|CSP/i.test(m.text())) violations.push(m.text()) })
+  page.on('pageerror', (e) => violations.push('pageerror: ' + e.message))
+  await demoBook(page)
+  await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveAttribute('content', /connect-src 'self' https:\/\/api\.anthropic\.com/)
+  await page.getByRole('button', { name: 'この節の資料を生成' }).click()
+  await page.locator('.doc [data-by="ai"]').first().waitFor()
+  // 画像（data URL）と手描きの図（canvas → data URL）
+  await page.locator('#imgf').setInputFiles({ name: 'csp.png', mimeType: 'image/png', buffer: PNG })
+  await expect(page.locator('.atts img')).toHaveCount(1)
+  await writeNote(page, 'CSP の確認')
+  await expect(page.locator('.doc [data-by="me"] img')).toHaveCount(1)
+  // 書き出し（blob URL のダウンロード）
+  await page.getByRole('button', { name: 'ロードマップ', exact: true }).click()
+  await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'JSONを書き出す' }).click()])
+  expect(violations).toEqual([])
+})
