@@ -77,6 +77,57 @@ export const TextbookZ = z.object({
   chapters: z.array(ChapterZ).default([]),
 })
 
+/**
+ * id の一意性（#36）。章・節・ブロック・画像の id は教科書全体で重ならないこと。
+ * 重なると findLesson / updateLesson が最初の1つしか扱えず、片方の編集が反映されない。
+ * TextbookZ 自体には付けない（端末内の古いデータを読めなくしないため）。読み込み（parseImport）は
+ * TextbookStrictZ で弾き、起動時（store.init）は renumberDuplicateIds で振り直して救済する。
+ */
+export function findDuplicateIds(tb: Textbook): string[] {
+  const seen = new Set<string>()
+  const dup = new Set<string>()
+  const see = (id: string) => { if (seen.has(id)) dup.add(id); else seen.add(id) }
+  see(tb.id)
+  for (const c of tb.chapters) {
+    see(c.id)
+    for (const l of c.lessons) {
+      see(l.id)
+      for (const b of l.blocks) {
+        see(b.id)
+        for (const im of b.images) see(im.id)
+      }
+    }
+  }
+  return [...dup]
+}
+
+/** 重複した id を後ろから振り直す。最初の1つは元のまま。戻り値の count は振り直した数 */
+export function renumberDuplicateIds(tb: Textbook): { tb: Textbook; count: number } {
+  const seen = new Set<string>()
+  let count = 0
+  const fix = <T extends { id: string }>(x: T): T => {
+    if (seen.has(x.id)) { count++; return { ...x, id: uid() } }
+    seen.add(x.id)
+    return x
+  }
+  const out: Textbook = fix({
+    ...tb,
+    chapters: tb.chapters.map((c) => ({
+      ...fix(c),
+      lessons: c.lessons.map((l) => ({
+        ...fix(l),
+        blocks: l.blocks.map((b) => ({ ...fix(b), images: b.images.map(fix) })),
+      })),
+    })),
+  })
+  return { tb: out, count }
+}
+
+export const TextbookStrictZ = TextbookZ.superRefine((tb, ctx) => {
+  const dup = findDuplicateIds(tb)
+  if (dup.length) ctx.addIssue({ code: 'custom', path: ['id'], message: `id が重複しています: ${dup.slice(0, 5).join(', ')}${dup.length > 5 ? ' …' : ''}` })
+})
+
 export type Image = z.infer<typeof ImageZ>
 export type Block = z.infer<typeof BlockZ>
 export type Clues = z.infer<typeof CluesZ>
@@ -85,6 +136,11 @@ export type Lesson = z.infer<typeof LessonZ>
 export type Chapter = z.infer<typeof ChapterZ>
 export type CourseInput = z.infer<typeof InputZ>
 export type Textbook = z.infer<typeof TextbookZ>
+
+/** ノート入力欄の下書き。画面をまたいで保持するが、端末には保存しない（#12） */
+export type NoteDraft = { md: string; images: string[]; source: string; quote: string }
+export const emptyDraft = (): NoteDraft => ({ md: '', images: [], source: '', quote: '' })
+export const isDraftEmpty = (d: NoteDraft): boolean => !d.md.trim() && !d.images.length && !d.source.trim() && !d.quote
 
 export const uid = (): string =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto

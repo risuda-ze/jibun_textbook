@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { htmlToMd, mdToHtml } from '../lib/md'
 import { shrinkImage } from '../lib/image'
+import { isHttpUrl, isImageDataUrl } from '../lib/safe'
 import { toast } from '../store'
-import type { Block } from '../types'
+import type { Block, NoteDraft } from '../types'
 import { Button } from './kit'
 
 /** 見たまま編集。表示は md→HTML、フォーカスが外れた時に変更があれば HTML→md で確定する。 */
@@ -55,11 +56,12 @@ export function BlockRow({ block: b, read, onCommit, onDelete, onRemoveImage }: 
         {read ? <div className="blk-body" dangerouslySetInnerHTML={{ __html: mdToHtml(b.md) }} /> : <Editable md={b.md} onCommit={(m) => onCommit?.(m)} />}
         {b.images.map((im) => (
           <span className="imgwrap" key={im.id}>
-            <img src={im.dataUrl} alt={im.alt || '自分で入れた画像'} />
+            {/* JSON 由来の画像は data:image/ だけを表示する（#35） */}
+            {isImageDataUrl(im.dataUrl) ? <img src={im.dataUrl} alt={im.alt || '自分で入れた画像'} /> : <span className="sub">表示できない画像です</span>}
             {!read && <button onClick={() => onRemoveImage?.(im.id)} aria-label="この画像を外す">×</button>}
           </span>
         ))}
-        {b.source && <div className="src">出典: {/^https?:\/\//.test(b.source) ? <a href={b.source} target="_blank" rel="noopener noreferrer">{b.source}</a> : b.source}</div>}
+        {b.source && <div className="src">出典: {isHttpUrl(b.source) ? <a href={b.source} target="_blank" rel="noopener noreferrer">{b.source}</a> : b.source}</div>}
         {b.edited && !read && <div className="src">自分で修正</div>}
       </div>
     </div>
@@ -99,29 +101,33 @@ export function DrawPad({ onSave, onClose }: { onSave: (dataUrl: string) => void
   )
 }
 
-export type NoteDraft = { md: string; images: string[]; source: string; quote: string }
-
-/** ノートの入力欄。文・貼り付け画像・手描きの図・引用・出典URL。 */
-export function Composer({ quote, onUnquote, onSubmit }: { quote: string; onUnquote: () => void; onSubmit: (n: NoteDraft) => void }) {
-  const [md, setMd] = useState('')
-  const [source, setSource] = useState('')
-  const [images, setImages] = useState<string[]>([])
+/**
+ * ノートの入力欄。文・貼り付け画像・手描きの図・引用・出典URL。
+ * 下書きは親（LessonPage）が持つ。差し込み位置を変えるとこの部品は描画位置が変わって作り直されるため、
+ * 自分の state に持つと下書きが消える（#12）。
+ */
+export function Composer({ draft, onChange, onSubmit }: { draft: NoteDraft; onChange: (d: NoteDraft) => void; onSubmit: () => void }) {
   const [pad, setPad] = useState(false)
   const file = useRef<HTMLInputElement>(null)
   const note = useRef<HTMLTextAreaElement>(null)
+  // 画像の読み込みは非同期なので、最新の下書きに足すために ref で持つ
+  const latest = useRef(draft)
+  latest.current = draft
+  const set = (p: Partial<NoteDraft>) => onChange({ ...latest.current, ...p })
+  const { md, images, source, quote } = draft
   useEffect(() => { if (quote) note.current?.focus() }, [quote])
 
   async function addFiles(files: Iterable<File>) {
     for (const f of files) {
       if (!f.type.startsWith('image/')) continue
-      try { const url = await shrinkImage(f); setImages((v) => [...v, url]) } catch { toast('画像を読み込めませんでした。') }
+      try { const url = await shrinkImage(f); set({ images: [...latest.current.images, url] }) } catch { toast('画像を読み込めませんでした。') }
     }
   }
 
   function submit() {
     if (!md.trim() && !images.length && !quote) return toast('文か画像を入れてから書き込んでください')
-    onSubmit({ md: md.trim(), images, source: source.trim(), quote })
-    setMd(''); setSource(''); setImages([]); setPad(false)
+    onSubmit()
+    setPad(false)
   }
 
   return (
@@ -129,21 +135,21 @@ export function Composer({ quote, onUnquote, onSubmit }: { quote: string; onUnqu
       const fs = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'))
       if (fs.length) { e.preventDefault(); void addFiles(fs); toast('画像を貼り付けました') }
     }}>
-      {quote && <blockquote>{quote} <button className="linkbtn" onClick={onUnquote}>引用をやめる</button></blockquote>}
-      <textarea ref={note} id="note" value={md} onChange={(e) => setMd(e.target.value)} placeholder="自分の言葉で。やってみた結果、調べて分かったこと、引っかかった点など。スクショは Ctrl+V で貼れます" />
+      {quote && <blockquote>{quote} <button className="linkbtn" onClick={() => set({ quote: '' })}>引用をやめる</button></blockquote>}
+      <textarea ref={note} id="note" value={md} onChange={(e) => set({ md: e.target.value })} placeholder="自分の言葉で。やってみた結果、調べて分かったこと、引っかかった点など。スクショは Ctrl+V で貼れます" />
       {images.length > 0 && (
         <div className="atts">
           {images.map((u, i) => (
-            <figure key={i}><img src={u} alt={`入れる画像 ${i + 1}`} /><button onClick={() => setImages(images.filter((_, j) => j !== i))} aria-label="この画像を外す">×</button></figure>
+            <figure key={i}><img src={u} alt={`入れる画像 ${i + 1}`} /><button onClick={() => set({ images: images.filter((_, j) => j !== i) })} aria-label="この画像を外す">×</button></figure>
           ))}
         </div>
       )}
-      {pad && <DrawPad onClose={() => setPad(false)} onSave={async (u) => { const s = await shrinkImage(u).catch(() => u); setImages((v) => [...v, s]); setPad(false) }} />}
+      {pad && <DrawPad onClose={() => setPad(false)} onSave={async (u) => { const s = await shrinkImage(u).catch(() => u); set({ images: [...latest.current.images, s] }); setPad(false) }} />}
       <input ref={file} type="file" id="imgf" accept="image/*" multiple hidden onChange={(e) => { void addFiles(e.target.files ?? []); e.target.value = '' }} />
       <div className="row">
         <Button v="outline" sm onClick={() => file.current?.click()}>画像を入れる</Button>
         <Button v="outline" sm onClick={() => setPad(true)}>図を描く</Button>
-        <input type="text" id="src" value={source} onChange={(e) => setSource(e.target.value)} placeholder="出典URL（任意）" style={{ flex: '1 1 180px' }} />
+        <input type="text" id="src" value={source} onChange={(e) => set({ source: e.target.value })} placeholder="出典URL（任意）" style={{ flex: '1 1 180px' }} />
         <Button v="primary" onClick={submit}>書き込む</Button>
       </div>
     </div>

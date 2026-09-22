@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 # 配信は v* タグを打ったときと、手動で実行したときだけ。ブランチへの push では配信しない。
 # 手動実行では ref にタグ名（例: v0.1.0）を入れると、その時点の内容を配信し直せる。
 # 注意: ワークフローはタグ先のコミットに入っている定義で動く。古いコミットにタグを打った場合は
-# 自動では走らないので、master から手動実行して ref にそのタグを指定する。
+# 自動では走らないので、production から手動実行して ref にそのタグを指定する。
 
 on:
   push:
@@ -32,6 +32,15 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
+      # タグからの配信は vX.Y.Z の形式だけを受け付ける。打ち間違い（v1 / V0.1.0 など）で配信しない。手動実行は対象外
+      - name: タグ名を確認
+        if: github.event_name == 'push'
+        run: |
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "タグ名が vX.Y.Z の形式ではありません: ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.ref }}

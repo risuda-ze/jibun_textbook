@@ -1,12 +1,12 @@
 name: CI
 
-# Pull Request と master への push で、型・単体・ビルド・依存の脆弱性・通しを確かめる。
-# push は master だけに絞る。PR を開いているブランチで push と pull_request の両方が発火し、同じコミットで2回走るのを防ぐ。
+# Pull Request と develop / production への push で、型・単体・ビルド・依存の脆弱性・通しを確かめる。
+# push は develop と production だけに絞る。PR を開いているブランチで push と pull_request の両方が発火し、同じコミットで2回走るのを防ぐ。
 # 配信はここでは行わない（deploy.yml が v* タグと手動でだけ配信する）。
 
 on:
   push:
-    branches: [master]
+    branches: [develop, production]
     tags-ignore: ['v*']
   pull_request:
   workflow_dispatch:

@@ -46,10 +46,17 @@
 
 ## CI と配信（2026-09-22）
 
+### ブランチの流れ
+
+- default ブランチは **`production`**（配信される状態）。統合ブランチは **`develop`**
+- 作業は Issue ごとに `feat/<Issue番号>_<概要>` を `develop` から切り、`develop` に向けて PR を出す。`develop → production` も PR で行う
+- Rulesets により `develop` と `production` は直接 push できず、線形履歴（squash か rebase でマージ）と CI の3ジョブ成功が必須
+- 配信用のタグ `vX.Y.Z` は `production` のコミットに打つ。タグは打ち直せない（`version-rule`）ので、打つ前に対象コミットを確かめる
+
 ### CI（`.github/workflows/ci.yml`）
 
-Pull Request と `master` への push で3つのジョブが走る。配信はしない。
-（push を `master` に絞るのは、PR を開いているブランチで push と pull_request の両方が発火して同じコミットが2回走るのを防ぐため。ブランチの検証は PR で行う）
+Pull Request と `develop` / `production` への push で3つのジョブが走る。配信はしない。
+（push を `develop` と `production` に絞るのは、PR を開いているブランチで push と pull_request の両方が発火して同じコミットが2回走るのを防ぐため。ブランチの検証は PR で行う）
 
 | ジョブ | 内容 | 落ちる条件 |
 |---|---|---|
@@ -59,7 +66,7 @@ Pull Request と `master` への push で3つのジョブが走る。配信は�
 
 Dependabot（`.github/dependabot.yml`）は npm を毎週月曜、GitHub Actions を毎月見て更新 PR を出す。
 minor と patch は1本にまとめる。Dependabot alerts と security updates はリポジトリ設定で有効にしてある。
-public 化のあと、`master` の branch protection で `check` `audit` `e2e` を required にする（private では設定できない）。
+Rulesets: `develop-rule` と `production-rule` が PR 必須・線形履歴・required checks（CI の3ジョブ）を課す。`version-rule` は `v*` タグの更新と削除を禁止する。
 
 ### 配信（`.github/workflows/deploy.yml`）
 
@@ -69,7 +76,7 @@ GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`v*` タグ�
 1. リポジトリを public にする（Pages の無料枠は public が条件）
 2. Settings → Pages → Source を「GitHub Actions」にする
 3. `git tag vX.Y.Z && git push origin vX.Y.Z` で配信される（`release.yml` があれば Release も同時に発行される）
-4. 手動で配信し直す: `gh workflow run deploy.yml -f ref=vX.Y.Z`（`ref` が空なら実行元の `master`）
+4. 手動で配信し直す: `gh workflow run deploy.yml -f ref=vX.Y.Z`（`ref` が空なら実行元の `production`）
 5. Android の Chrome で配信 URL を開き、メニューから「ホーム画面に追加」
 
 注意: ワークフローは**タグ先のコミットに入っている定義**で動く。古いコミットにタグを打つと、その時点に
@@ -97,3 +104,35 @@ GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`v*` タグ�
 ## 実APIで分かったこと
 
 （キーを入れて試したら、ここに書く）
+
+### 発行（`.github/workflows/release.yml`）
+
+`v*` タグを打つと、その時点の `dist/` を zip にして GitHub Release に添付する（`softprops/action-gh-release`）。配信（`deploy.yml`）と同じトリガーなので、**タグ = Release + 配信**。
+
+1. `package.json` の `version` を上げてコミットし、`production` まで入れる
+2. `production` のそのコミットに `git tag vX.Y.Z && git push origin vX.Y.Z`。`release.yml` と `deploy.yml` が走る
+3. タグ名は `vX.Y.Z` だけを受け付ける。両ワークフローの最初のステップで形式を確かめ、違えば何もしない
+4. 手動で発行し直す: `gh workflow run release.yml --ref production -f tag=vX.Y.Z`
+
+**v0.1.0 の発行（初回生成 `6a96429`）**: この時点のコミットに `release.yml` は無いので、タグを push しても自動では走らない。
+`gh workflow run release.yml --ref production -f tag=v0.1.0` で発行する（この PR が `production` に入った後）。**配信はしない**。理由: Pages には既に新しい `production` の内容が配信されており、
+v0.1.0（初回生成の状態）を配信すると画面が巻き戻るため。v0.1.0 は「この時点の状態」を固定して参照するための Release で、配信の対象は次のタグから。
+
+zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても動かない。Pages 配下で動く前提の成果物。
+
+## 2026-09-23 の判断（#12）
+
+- ノートの下書きは `store.ts` の `drafts`（節idごと・端末には保存しない）に置いた。`LessonPage` の state では、ロードマップへ移動した時点で画面ごと消えるため。`Composer` は制御コンポーネントにし、自分では state を持たない
+- 差し込み位置を変えても引用は残す（以前は位置変更で引用を消していた）。引用は「本文のどこに書くか」ではなく「何に対して書くか」なので、位置と切り離した
+- 節を切り替えると、その節の下書きは別に持つ。書き込むか空にすると消える。ページを閉じると全部消える（現状どおり）
+
+## 2026-09-23 の判断（#35）
+
+- URL のスキーム検証は **スキーマでは弾かず、描画時に無害化**する（`src/lib/safe.ts` の `isHttpUrl` / `isImageDataUrl`）。zod で弾くと、過去に書き出した JSON が読めなくなる可能性があるため。読み込み時のエラーで「壊れている」と言われるより、リンクにならない・画像が出ない方が失うものが少ない
+- 対象は JSON 由来の3か所: 調べる手がかりの一次情報リンク、ノートの出典、ノートの画像。Markdown 内のリンクは DOMPurify が担当
+- `<img src>` は `data:image/…` だけを通す。https の画像 URL も通さない（画像は data URL で JSON に埋め込む方針のため）
+
+## 2026-09-23 の判断（#36）
+
+- id の一意性は **読み込み（JSON）では弾き、端末内のデータでは振り直して救済**する。`TextbookZ` 自体には `superRefine` を付けず、`TextbookStrictZ` を `parseImport` だけで使う。起動時に弾くと本棚から教科書が消えたように見えるため
+- 振り直しは後ろの重複だけを新しい uuid にし、最初の1つは元のまま。件数をトーストで知らせる

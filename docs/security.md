@@ -22,8 +22,8 @@
 | スキーマ検証と `schemaVersion` チェック | `parseImport()` が `JSON.parse` → `schemaVersion === 1` → `TextbookZ.safeParse` の順に検証（`src/lib/io.ts`）。失敗理由を画面に出す | 済 | 版が上がったら移行処理を足す |
 | 起動時に IndexedDB から読むデータも検証する | `init()` が各教科書を `TextbookZ.safeParse` で検証し、失敗したものは読み込まない（`src/store.ts`） | 済（ただし黙って捨てる。#17） | — |
 | サイズ上限 | 書き出し側は 8MB 超で警告（`SIZE_WARN_BYTES`）。**読み込み側に上限が無い**。何十 MB でも `JSON.parse` する | 未 | 読み込み前に `File.size` を見て上限（例 16MB）を超えたら断る（#17 に記載） |
-| 不正な `id` / 重複 / 循環 | `id` は文字列なら何でも通る。同じ `id` の節が2つあっても検証で弾かない。木構造なので循環は起きない | 未 | zod の `superRefine` で `id` の一意性を検証する（候補 Issue） |
-| URL 項目のスキーム検証 | `LinkZ.url`・`Block.source`・`Image.dataUrl` は `z.string()` のみ。**`javascript:` などの URL を弾かない** | 未 | §3 と合わせて対応 |
+| 不正な `id` / 重複 / 循環 | 読み込み（`parseImport`）は `TextbookStrictZ`（`superRefine` で章・節・ブロック・画像の id の一意性を検証）で弾き、どの id が重複しているかを理由に出す。端末内のデータは `store.init` が `renumberDuplicateIds` で振り直して救済し、件数をトーストで知らせる。木構造なので循環は起きない（#36） | 済 | — |
+| URL 項目のスキーム検証 | スキーマ（`LinkZ.url`・`Block.source`・`Image.dataUrl`）は `z.string()` のまま弾かない（古い JSON を読めなくしないため）。描画時に `src/lib/safe.ts` の `isHttpUrl` / `isImageDataUrl` で無害化する（#35） | 済 | 描画経路を増やすときは必ずこの2関数を通す |
 | 同じ `id` の教科書との衝突 | `updatedAt` を比べて新しければ自動上書き、古ければ確認（`decideImport()`）。上書きは元に戻せる | 済 | — |
 
 ## 3. Markdown → HTML の描画
@@ -34,7 +34,7 @@
 | 編集で確定する HTML もサニタイズする | `htmlToMd()` が turndown の前に `DOMPurify.sanitize()` を通す | 済 | — |
 | 貼り付けた HTML が確定前に生のまま DOM に入らない | **未対応**。`Editable` に `onPaste` が無く、貼り付け直後は貼った HTML がそのまま contenteditable に入る（blur で確定するまで）。自分の貼り付けなので第三者の入力ではないが、外部サイトからコピーした HTML が一時的に生で入る | 未 | `onPaste` で `text/plain` に落とすか、貼り付け時に sanitize（#17） |
 | 外部リンクの `rel="noopener noreferrer"` | 自分のコードが作る `<a target="_blank">`（出典・手がかり・一次情報）には付いている（`blocks.tsx` `LessonPage.tsx`）。Markdown 内のリンクは marked が `target` を付けないので同一タブで開く | 済 | — |
-| `javascript:` / `data:` スキーム | Markdown 内のリンクは DOMPurify が `javascript:` を除去する。**JSON 由来の `clues.links[].url` は `<a href>` に直接入る**（`LessonPage.tsx` の `Clues`）。出典 `b.source` は `/^https?:\/\//` を通ったときだけリンクにする。画像 `dataUrl` は `<img src>` に直接入る（`javascript:` は現代のブラウザでは `img src` で実行されないが、`data:text/html` などは意図しない） | 未 | 描画時に `http(s):` 以外の `url` をリンクにしない。`dataUrl` は `data:image/` で始まるものだけ表示する（候補 Issue） |
+| `javascript:` / `data:` スキーム | Markdown 内のリンクは DOMPurify が `javascript:` を除去する。JSON 由来の `clues.links[].url` と出典 `b.source` は `isHttpUrl` を通ったときだけ `<a>` にし、それ以外は文字として出す。画像 `dataUrl` は `isImageDataUrl`（`data:image/…`）を通ったときだけ `<img>` にし、それ以外は「表示できない画像です」と出す（`src/lib/safe.ts`・#35） | 済 | `tests/safe.test.ts` と e2e「不正な URL と画像は無害化される」が見張る |
 
 ## 4. AI 応答の取り扱い
 
@@ -74,7 +74,7 @@
 | 公開して問題ないファイルだけか | 追跡 79 ファイル。`src/` `tests/` `e2e/` `public/` `scripts/` `docs/` `DESIGN.md` `CLAUDE.md` `.claude/`（エージェント定義 8 件・スキル 7 件・`settings.json`）。**要判断**: (a) `DESIGN.md` は Notion のサイトを参照して書いたスタイル記述で、Notion のロゴ・画像・コードは含まない。(b) `.claude/settings.json` の allow に `C:\dev\note\brain\...` のローカルパスが入っている（個人の環境が分かる。秘密ではない）。(c) `.claude/agents` `.claude/skills` は汎用の作業手順で、個人情報は無い。`settings.local.json` はグローバル ignore で追跡外 | 要確認（人が判断） | (b) が気になるなら該当行を消す。それ以外は公開して差し支えないと判断する |
 | `test-results/` `dist/` `playwright-report/` を追跡しない | `.gitignore` 済み。追跡ファイルに無い | 済 | — |
 | Actions の権限が最小 | `ci.yml` は `contents: read`。`deploy.yml` は `pages: write` `id-token: write` のみ。`release.yml`（#1）は `contents: write` が要る | 済 | — |
-| ブランチ保護 | private では設定できない（GitHub Free）。public 化後に `master` の required checks に `check` `audit` `e2e` を入れる | 未（public 化待ち） | #8 の残り |
+| ブランチ保護 | Rulesets で設定済み: `develop-rule` / `production-rule` は PR 必須・線形履歴・required checks（`型・単体・ビルド` `依存の脆弱性（high 以上で失敗）` `通し（Playwright）`）。`version-rule` は `v*` タグの更新・削除を禁止 | 済 | 1人運用で詰みうる「Code Owners のレビュー必須」「最新 push の承認必須」は要見直し |
 
 ## 8. データの消去・復元
 
@@ -95,8 +95,8 @@
 
 新しく起こす候補:
 
-1. **URL のスキーム検証**: `clues.links[].url` と `Block.source` は `http(s):` 以外をリンクにしない。`Image.dataUrl` は `data:image/` で始まるものだけ表示する。zod の段階で弾くか、描画時に弾くかを決める
-2. **`id` の一意性検証**: `TextbookZ` に `superRefine` で節・章・ブロックの `id` 重複を弾く
+1. ~~URL のスキーム検証~~ → #35 で対応済み（描画時に無害化）
+2. ~~`id` の一意性検証~~ → #36 で対応済み
 3. **CSP の導入**: `index.html` の `meta` で `connect-src` を Anthropic API に限定。PWA の登録と Google Fonts が動くことを e2e で確認
 4. **実 API での確認**（人が行う）: エラー文にキーが混ざらないこと、検索回数の実測、`navigator.storage.persisted()` の結果
 
