@@ -4,6 +4,8 @@ name: Deploy to GitHub Pages
 # 手動実行では ref にタグ名（例: v0.1.0）を入れると、その時点の内容を配信し直せる。
 # 注意: ワークフローはタグ先のコミットに入っている定義で動く。古いコミットにタグを打った場合は
 # 自動では走らないので、production から手動実行して ref にそのタグを指定する。
+# 注意: github-pages 環境の Deployment branches に「tag v*」の許可が要る（無いとタグからの配信が
+# environment protection rules で拒否される）。docs/notes.md「配信」を参照。
 
 on:
   push:
