@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { htmlToMd, mdToHtml } from '../lib/md'
+import { htmlToMd, mdToHtml, toggleTask } from '../lib/md'
 import { shrinkImage } from '../lib/image'
 import { isHttpUrl, isImageDataUrl } from '../lib/safe'
 import { toast } from '../store'
@@ -41,16 +41,31 @@ type RowProps = {
   block: Block
   read?: boolean
   onCommit?: (md: string) => void
+  /** 本文のチェックリストを切り替えたとき。onCommit と違い「自分で修正」にはしない（#56） */
+  onCheck?: (md: string) => void
   onDelete?: () => void
   onRemoveImage?: (imageId: string) => void
 }
 
-export function BlockRow({ block: b, read, onCommit, onDelete, onRemoveImage }: RowProps) {
+export function BlockRow({ block: b, read, onCommit, onCheck, onDelete, onRemoveImage }: RowProps) {
   const [cls, mk, tt] = MARK(b)
+  // 本文のチェックボックスのクリックを拾い、Markdown 側を反転して保存する。DOM の切り替えは保存後の再描画に任せる
+  const onBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const t = e.target
+    if (!(t instanceof HTMLInputElement) || t.type !== 'checkbox') return
+    e.preventDefault()
+    const body = t.closest('.blk-body') as HTMLElement | null
+    if (!body || !onCheck) return
+    const i = [...body.querySelectorAll('input[type="checkbox"]')].indexOf(t)
+    if (i < 0) return
+    // 見たまま編集の中では、フォーカスが残っていると再描画が反映されないので外す
+    if (body.isContentEditable) body.blur()
+    onCheck(toggleTask(b.md, i))
+  }
   return (
     <div className={`ln ${cls}`} data-block={b.id} data-by={b.by}>
       <span className="gut" title={tt}>{mk}</span>
-      <div>
+      <div onClick={onBodyClick}>
         {!read && <div className="ln-acts"><Button v="outline" sm onClick={onDelete}>消す</Button></div>}
         {b.quote && <blockquote>{b.quote}</blockquote>}
         {read ? <div className="blk-body" dangerouslySetInnerHTML={{ __html: mdToHtml(b.md) }} /> : <Editable md={b.md} onCommit={(m) => onCommit?.(m)} />}
