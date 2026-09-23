@@ -3,9 +3,9 @@ import { allLessons, findLesson, lessonNo, minePercent } from '../lib/status'
 import { go, openLesson, putBook, setDraft as storeDraft, setWide, snapshot, toast, updateLesson, useApp } from '../store'
 import { emptyDraft, newBlock, uid, type Lesson, type NoteDraft, type Textbook } from '../types'
 import { BlockRow, Composer } from './blocks'
-import { StatusChip } from './common'
+import { StatusChip, Working, stepPercent } from './common'
 import { isHttpUrl } from '../lib/safe'
-import { generateInto } from './generate'
+import { GEN_STEPS, generateInto, startGen, type GenState } from './generate'
 import { Button, Card } from './kit'
 
 const gq = (q: string) => 'https://www.google.com/search?q=' + encodeURIComponent(q)
@@ -55,7 +55,8 @@ export function LessonPage({ tb }: { tb: Textbook }) {
   const f = (lessonId && findLesson(tb, lessonId)) || null
   const [insAt, setInsAt] = useState<number | null>(null)
   const [blame, setBlame] = useState(true)
-  const [genDetail, setGenDetail] = useState<string | null>(null)
+  // 資料を生成の進行中（#55）
+  const [gen, setGen] = useState<GenState | null>(null)
   const [task, setTask] = useState('')
   const qbtn = useRef<HTMLButtonElement>(null)
   const pending = useRef<{ text: string; blockId: string } | null>(null)
@@ -102,9 +103,10 @@ export function LessonPage({ tb }: { tb: Textbook }) {
   }
 
   async function generate() {
-    setGenDetail('')
-    await generateInto(tb, l.id, ai, setGenDetail)
-    setGenDetail(null)
+    const g = startGen()
+    setGen(g)
+    await generateInto(tb, l.id, ai, (step, detail) => setGen({ ...g, step, detail }))
+    setGen(null)
   }
 
   const composerAt = insAt ?? l.blocks.length
@@ -132,8 +134,9 @@ export function LessonPage({ tb }: { tb: Textbook }) {
             <Card stack>
               <p>この節はまだ資料がありません。AIに下書きを作らせるか、下の欄から自分で書き始めてください。</p>
               <div className="row">
-                <Button v="soft" disabled={genDetail !== null} onClick={generate}>{genDetail !== null ? genDetail || '生成中…' : '資料を生成'}</Button>
-                <span className="sub">使うAI: {ai.kind === 'anthropic' ? ai.model : ai.kind === 'demo' ? 'デモ応答' : '未対応の接続先'}（「つくる」画面で切り替え）</span>
+                <Button v="soft" disabled={gen !== null} onClick={generate} progress={gen ? stepPercent(gen.step, GEN_STEPS) : null}>{gen ? '生成中…' : '資料を生成'}</Button>
+                {gen && <Working running detail={gen.detail} startedAt={gen.startedAt} endedAt={gen.endedAt} />}
+                {!gen && <span className="sub">使うAI: {ai.kind === 'anthropic' ? ai.model : ai.kind === 'demo' ? 'デモ応答' : '未対応の接続先'}（「つくる」画面で切り替え）</span>}
               </div>
             </Card>
           )}

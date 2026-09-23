@@ -2,10 +2,18 @@ import { getProvider, type AiSettings } from '../ai'
 import { toast, updateLesson } from '../store'
 import { newBlock, type Textbook } from '../types'
 
+/** 生成の段階数（Web を調査している → 資料を書いている → 資料ができた）。ボタンの塗りは stepPercent(step, GEN_STEPS) */
+export const GEN_STEPS = 2
+
+/** 進行中の状態。画面がボタンの塗りと Working に使う（#55） */
+export type GenState = { step: number; detail: string; startedAt: number; endedAt: number | null }
+
+export const startGen = (): GenState => ({ step: 0, detail: '', startedAt: Date.now(), endedAt: null })
+
 /** 節の資料を生成して教科書に入れる。失敗しても教科書は変えない。 */
-export async function generateInto(tb: Textbook, lessonId: string, ai: AiSettings, onDetail: (d: string) => void): Promise<boolean> {
+export async function generateInto(tb: Textbook, lessonId: string, ai: AiSettings, onProgress: (step: number, detail: string) => void): Promise<boolean> {
   try {
-    const { draft, usage } = await getProvider(ai).generateLesson(tb, lessonId, (_s, d) => onDetail(d))
+    const { draft, usage } = await getProvider(ai).generateLesson(tb, lessonId, onProgress)
     if (!draft.blocks.length) throw new Error('AIが本文を返しませんでした。もう一度お試しください。')
     updateLesson(tb.id, lessonId, (l) => {
       // 生成を待つ間に自分で書いたノートがあれば、その後ろに足す

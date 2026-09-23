@@ -7,7 +7,7 @@ import { newChapter, newLesson, type Lesson, type Textbook } from '../types'
 import { Meter, StatusChip, Working, stepPercent } from './common'
 import { UsageLine } from './Create'
 import { downloadBook } from './Shelf'
-import { generateInto } from './generate'
+import { GEN_STEPS, generateInto, startGen, type GenState } from './generate'
 import { Button, Card, Pill, Segmented, type PillTone } from './kit'
 
 const PXMIN = 1.6
@@ -113,7 +113,8 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
 export function Roadmap({ tb }: { tb: Textbook }) {
   const { lessonId, ai } = useApp()
   const [redo, setRedo] = useState(false)
-  const [gen, setGen] = useState<{ id: string; detail: string } | null>(null)
+  // 資料を生成の進行中（#55）。押したボタンが進んだ分だけ塗られ、脇に今していることと経過秒数が出る
+  const [gen, setGen] = useState<({ id: string } & GenState) | null>(null)
   const cur = currentLesson(tb)
   const sel = (lessonId && findLesson(tb, lessonId)) || (cur && findLesson(tb, cur.id)) || (tb.chapters[0]?.lessons[0] && findLesson(tb, tb.chapters[0].lessons[0].id))
 
@@ -133,8 +134,9 @@ export function Roadmap({ tb }: { tb: Textbook }) {
   const W = units * UNIT * PXMIN
 
   async function generate(id: string) {
-    setGen({ id, detail: '' })
-    const ok = await generateInto(tb, id, ai, (d) => setGen({ id, detail: d }))
+    const g = { id, ...startGen() }
+    setGen(g)
+    const ok = await generateInto(tb, id, ai, (step, detail) => setGen({ ...g, step, detail }))
     setGen(null)
     if (ok) openLesson(id)
   }
@@ -235,7 +237,10 @@ export function Roadmap({ tb }: { tb: Textbook }) {
             <p className="sub">{sel.lesson.summary || (sel.lesson.blocks.length ? '本文あり。' : 'まだ資料がありません。AIに生成させるか、自分で書き始めてください。')}</p>
             <div className="row">
               {sel.lesson.blocks.length === 0 && (
-                <Button v="soft" disabled={gen !== null} onClick={() => generate(sel.lesson.id)}>{gen?.id === sel.lesson.id ? gen.detail || '生成中…' : 'この節の資料を生成'}</Button>
+                <Button v="soft" disabled={gen !== null} onClick={() => generate(sel.lesson.id)} progress={gen?.id === sel.lesson.id ? stepPercent(gen.step, GEN_STEPS) : null}>{gen?.id === sel.lesson.id ? '生成中…' : 'この節の資料を生成'}</Button>
+              )}
+              {gen?.id === sel.lesson.id && (
+                <Working running detail={gen.detail} startedAt={gen.startedAt} endedAt={gen.endedAt} />
               )}
               <Button v={sel.lesson.blocks.length ? 'soft' : 'ghost'} onClick={() => openLesson(sel.lesson.id)}>{sel.lesson.blocks.length ? 'レッスンを開く' : '自分で書き始める'}</Button>
               <Button v="outline" sm onClick={() => removeLesson(sel.lesson.id)}>この節を消す</Button>
