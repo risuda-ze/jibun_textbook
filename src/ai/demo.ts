@@ -6,8 +6,22 @@ import { abortError, zeroUsage, type AiOpts, type AiProvider, type Progress, typ
  * デモ応答。APIキーなしで動線を試すためのサンプルを返す。通しテストもこれを使う。
  * 内容は入力から機械的に組み立てた見本で、調査はしていない。
  */
+/**
+ * 見本の1段階あたりの待ち時間（ms）。通しテストは `?demoDelay=3000` のように URL で長くして、
+ * 「やめる」を押す前に終わってしまう競走を避ける（#84）。本番の URL に付ける意味は無い
+ */
+export const DEMO_DELAY_MS = (() => {
+  try {
+    const v = new URLSearchParams(globalThis.location?.search ?? '').get('demoDelay')
+    const n = v === null ? NaN : Number(v)
+    return Number.isFinite(n) && n >= 0 ? n : 200
+  } catch {
+    return 200
+  }
+})()
+
 /** 見本の待ち時間。signal で中止できる（#14。e2e で「やめる」を確かめるため） */
-const wait = (ms = 200, signal?: AbortSignal) => new Promise<void>((res, rej) => {
+const wait = (ms = DEMO_DELAY_MS, signal?: AbortSignal) => new Promise<void>((res, rej) => {
   if (signal?.aborted) return rej(abortError())
   const onAbort = () => { clearTimeout(t); rej(abortError()) }
   const t = setTimeout(() => { signal?.removeEventListener('abort', onAbort); res() }, ms)
@@ -24,9 +38,9 @@ export class DemoProvider implements AiProvider {
 
   async designCourse(input: CourseInput, _qa: QA[], note: string, onProgress: Progress, opts: AiOpts = {}) {
     const t = topicOf(input)
-    onProgress(0, '学びたいことを分解している'); await wait(200, opts.signal)
-    onProgress(1, 'デモ応答のためWeb調査はしません'); await wait(200, opts.signal)
-    onProgress(2, 'コース設計を作っている'); await wait(200, opts.signal)
+    onProgress(0, '学びたいことを分解している'); await wait(DEMO_DELAY_MS, opts.signal)
+    onProgress(1, 'デモ応答のためWeb調査はしません'); await wait(DEMO_DELAY_MS, opts.signal)
+    onProgress(2, 'コース設計を作っている'); await wait(DEMO_DELAY_MS, opts.signal)
     const L = (title: string, minutes = 45, isTask = false) => ({ title, minutes, isTask, summary: `${title}ができるようになる。` })
     const design = {
       title: t,
@@ -48,8 +62,8 @@ export class DemoProvider implements AiProvider {
     // 渡された資料（#63）は本文に名前と先頭だけ写して、動線を確かめられるようにする
     const mats = opts.materials ?? []
     const sourceOnly = !!opts.sourceOnly && mats.length > 0
-    onProgress(0, sourceOnly ? '渡された資料だけで書きます（デモ応答）' : 'デモ応答のためWeb調査はしません'); await wait(200, opts.signal)
-    onProgress(1, '資料を書いている'); await wait(200, opts.signal)
+    onProgress(0, sourceOnly ? '渡された資料だけで書きます（デモ応答）' : 'デモ応答のためWeb調査はしません'); await wait(DEMO_DELAY_MS, opts.signal)
+    onProgress(1, '資料を書いている'); await wait(DEMO_DELAY_MS, opts.signal)
     const t = f.lesson.title
     const matLine = mats.length
       ? `\n\n（デモ）渡された資料: ${mats.map((m) => `${m.name}・${(m.text ?? 'PDF').replace(/\s+/g, ' ').slice(0, 40)}`).join(' ／ ')}${sourceOnly ? '（この資料だけから作る）' : ''}`
@@ -73,7 +87,7 @@ export class DemoProvider implements AiProvider {
 
   async proposeRedesign(tb: Textbook, scope: RedesignScope, lessonId: string, order: string, onProgress: Progress, opts: AiOpts = {}) {
     const f = findLesson(tb, lessonId)!
-    onProgress(0, '変更案を作っている'); await wait(200, opts.signal)
+    onProgress(0, '変更案を作っている'); await wait(DEMO_DELAY_MS, opts.signal)
     const tag = order ? `（${order.slice(0, 16)}）` : '（見直し）'
     let plan: RedesignPlan
     const keepOrChange = (l: Textbook['chapters'][number]['lessons'][number], first: boolean) => ({

@@ -1,3 +1,4 @@
+import { L } from './labels'
 import { useState } from 'react'
 import { researchNote } from './generate'
 import { getProvider, type CourseDesign, type QA, type Usage } from '../ai'
@@ -76,7 +77,7 @@ export function Create() {
             {/* 押すと灰色になり、段階が進んだ分だけ青で塗られる（#50）。設計を作る間はこのボタンが進行中になる */}
             <Button v={design ? 'soft' : 'primary'} onClick={ask} disabled={busyAny}
               progress={asking ? 0 : d.busy && !redoing ? stepPercent(d.step, STEP_LABELS.length) : null}>
-              {asking ? '質問を考えている…' : d.busy && !redoing ? '設計しています…' : design ? 'もう一度調べ直す' : '調べてコース設計を作る'}
+              {asking ? '質問を考えている…' : d.busy && !redoing ? '設計しています…' : design ? 'もう一度調べ直す' : L.design}
             </Button>
             {d.busy && !redoing
               ? <RunControls detail={d.detail} startedAt={d.startedAt} endedAt={d.endedAt} onStop={d.stop} />
