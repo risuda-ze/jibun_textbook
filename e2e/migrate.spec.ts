@@ -17,6 +17,15 @@ test('Help で id が重複した JSON を選ぶと、直した所が見えて�
   await result.getByRole('button', { name: '本棚に追加' }).click()
   await expect(page.getByRole('heading', { name: '直す本' })).toBeVisible()
   await expect(page.getByRole('status')).toContainText('直した所')
+
+  // 同じ本の古いファイルを Help から入れようとすると、本棚と同じ確認が出る（#78）
+  await page.getByRole('button', { name: 'Help' }).click()
+  await page.locator('#repairfile').setInputFiles(file('old.textbook.json', { ...DUP, updatedAt: '2025-01-01T00:00:00.000Z', chapters: [{ id: 'c1', title: '第1章', lessons: [{ id: 'l1', title: '節1' }] }] }))
+  await page.getByLabel('直した結果').getByRole('button', { name: '本棚に追加' }).click()
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog).toContainText('読み込もうとしたファイルの方が古いです')
+  await dialog.getByRole('button', { name: 'やめる' }).click()
+  await expect(page.getByRole('heading', { name: '直す本' })).toBeVisible()
 })
 
 test('直せない JSON は理由と問い合わせへの導線が出る', async ({ page }) => {
