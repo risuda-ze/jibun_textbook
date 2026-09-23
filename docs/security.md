@@ -45,7 +45,8 @@
 | 構造化出力を検証する | `messages.parse()` + `zodOutputFormat(schema)` で受け取り、`parsed_output == null` は失敗扱い（`structure()`） | 済 | — |
 | AI 応答で教科書が壊れない | 失敗時は教科書を変えない（`src/ui/generate.ts`）。再設計は `src/lib/protect.ts` が守る対象（自分のノート・直した文・完了の節）を機械的に残し、`tests/protect.test.ts` が見張る | 済 | — |
 | Web 検索の結果が入力トークンとして課金される・上限を切る | `max_uses` を渡している。`pause_turn` の続行は最大5回（`MAX_PAUSE_CONTINUES`） | 済 | 実 API で検索回数を1回実測する（`docs/notes.md`「実 API で分かったこと」） |
-| 応答の切り詰め（`max_tokens`）を知らせる | 節の生成で Web 調査が切れたら、生成完了のトーストで知らせる（`LessonDraft.truncated`・#17） | 済 | 設計（`designCourse`）の調査は未対応。必要なら同じ形で足す |
+| 応答の切り詰め（`max_tokens`）を知らせる | 節の生成と設計の両方で、Web 調査が `max_tokens` か `pause_turn` の上限で切れたら完了のトーストで知らせる（`ResearchInfo.truncated`・#17 #81） | 済 | — |
+| Web 検索の失敗を知らせる | 検索エラー（HTTP 200 の中身。`max_uses_exceeded` 等）を `ResearchInfo.searchErrors` に集め、完了のトーストで回数と理由を出す。1回も成功しなかったときは「モデルの知識だけで書いた」と明かす（#81） | 済 | — |
 
 ## 5. 配信・ブラウザ側
 
