@@ -117,8 +117,10 @@ export function putBook(tb: Textbook, touch = true): void {
 
 /** 読めなかった教科書の生データを消す（#17） */
 export function dropBroken(key: string): void {
-  setState({ broken: state.broken.filter((b) => b.key !== key) })
-  del(key).catch(() => {})
+  // 端末から消えてから一覧を更新する（消える前に再読み込みされると復活するため）
+  del(key)
+    .catch(() => {})
+    .then(() => setState({ broken: state.broken.filter((b) => b.key !== key) }))
 }
 
 export function updateBook(id: string, fn: (draft: Textbook) => void): void {
