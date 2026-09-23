@@ -4,7 +4,7 @@ import { TextbookZ, findDuplicateIds, isDraftEmpty, nowIso, renumberDuplicateIds
 import { DEFAULT_AI, type AiSettings } from './ai/types'
 import { currentLesson, findLesson } from './lib/status'
 
-export type Screen = 'shelf' | 'new' | 'road' | 'lesson' | 'book'
+export type Screen = 'shelf' | 'new' | 'road' | 'lesson' | 'book' | 'help'
 export type Toast = { id: number; msg: string; undo?: () => void }
 
 export type State = {
