@@ -144,6 +144,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
                 <BlockRow
                   block={b}
                   onCommit={(md) => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) { x.md = md; if (x.by === 'ai') x.edited = true } })}
+                  onCheck={(md) => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) x.md = md })}
                   onDelete={() => withUndo(b.by === 'me' ? 'ノートを消しました' : '文を消しました', () => updateLesson(tb.id, l.id, (d) => { d.blocks = d.blocks.filter((y) => y.id !== b.id) }))}
                   onRemoveImage={(imgId) => withUndo('画像を外しました', () => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) x.images = x.images.filter((im) => im.id !== imgId) }))}
                 />

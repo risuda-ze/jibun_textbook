@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { allLessons, isMine, reviewCount } from '../lib/status'
-import { openLesson } from '../store'
+import { openLesson, updateLesson } from '../store'
 import type { Block, Lesson, Textbook } from '../types'
 import { BlockRow } from './blocks'
 import { downloadBook } from './Shelf'
@@ -43,7 +43,7 @@ export function Book({ tb }: { tb: Textbook }) {
                   {l.done && <Pill tone="done">完了</Pill>}{l.review && <Pill tone="review">再確認</Pill>}
                   <button className="linkbtn" onClick={() => openLesson(l.id)}>このページに書く</button>
                 </h3>
-                {bs.map((b) => <BlockRow key={b.id} block={b} read />)}
+                {bs.map((b) => <BlockRow key={b.id} block={b} read onCheck={(md) => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) x.md = md })} />)}
               </div>
             ))}
           </section>

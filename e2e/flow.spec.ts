@@ -386,3 +386,28 @@ test('AI の作業中は押したボタンが進行中の色になり、終わ�
   await expect(redo.getByRole('button', { name: '案を作成中…' })).toHaveClass(/gauge/)
   await expect(redo.getByRole('button', { name: '別の案を出す' })).not.toHaveClass(/gauge/)
 })
+
+test('本文のチェックリストはクリックで切り替わり、保存される（レッスン・通読）', async ({ page }) => {
+  await blankBook(page)
+  await page.getByRole('button', { name: '自分で書き始める' }).click()
+  await page.locator('#note').fill('- [ ] 未\n- [x] 済')
+  await page.getByRole('button', { name: '書き込む' }).click()
+  const boxes = page.locator('.doc [data-by="me"] input[type="checkbox"]')
+  await expect(boxes).toHaveCount(2)
+  await expect(boxes.nth(0)).not.toBeChecked()
+  await expect(boxes.nth(1)).toBeChecked()
+  await boxes.nth(0).click()
+  await expect(boxes.nth(0)).toBeChecked()
+  // 別の画面へ行って戻っても残る
+  await page.getByRole('button', { name: 'ロードマップ', exact: true }).click()
+  await page.getByRole('button', { name: /続きから 1-1/ }).click()
+  await expect(page.locator('.doc [data-by="me"] input[type="checkbox"]').nth(0)).toBeChecked()
+  // 通読でも切り替えられる
+  await page.getByRole('tab', { name: /教科書/ }).click()
+  const bookBoxes = page.locator('.book input[type="checkbox"]')
+  await expect(bookBoxes).toHaveCount(2)
+  await bookBoxes.nth(1).click()
+  await expect(bookBoxes.nth(1)).not.toBeChecked()
+  await page.getByRole('button', { name: 'このページに書く' }).click()
+  await expect(page.locator('.doc [data-by="me"] input[type="checkbox"]').nth(1)).not.toBeChecked()
+})
