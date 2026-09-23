@@ -1,6 +1,7 @@
 import type { Lesson, Textbook } from '../types'
 import { STATUS_LABEL, lessonStatus, statusCounts, type Status } from '../lib/status'
 import { MODELS, type AiKind } from '../ai/types'
+import { WEB_SEARCH_USD_PER_1000 } from '../ai/anthropic'
 import { setAi, toast, useApp } from '../store'
 import { useEffect, useRef, useState } from 'react'
 import { Button, Card, Pill, Segmented } from './kit'
@@ -68,7 +69,7 @@ export function AiBar() {
           </label>
           <label className="f" htmlFor="ai_search">Web調査のやり方
             <select id="ai_search" value={ai.search} onChange={(e) => setAi({ search: e.target.value as 'builtin' | 'none' })}>
-              <option value="builtin">モデル内蔵のWeb検索（検索1000回あたり$10）</option>
+              <option value="builtin">モデル内蔵のWeb検索（検索1000回あたり${WEB_SEARCH_USD_PER_1000}）</option>
               <option value="none">検索なし（モデルの知識だけで書く）</option>
             </select>
           </label>

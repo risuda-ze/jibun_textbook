@@ -48,7 +48,7 @@ export function Pill({ tone, children }: { tone: PillTone; children: ReactNode }
  * カード。既定は白地に細い罫線（White Feature Card）。
  * tone を付けると色面のカード（Accent Feature Card）になる。色面は1画面に1つまで。
  */
-export type CardTone = 'white' | 'sky' | 'marigold' | 'peach' | 'midnight'
+export type CardTone = 'white' | 'sky' | 'marigold' | 'peach'
 
 type CardProps = HTMLAttributes<HTMLElement> & { tone?: CardTone; stack?: boolean; as?: 'section' | 'div' }
 
