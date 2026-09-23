@@ -306,3 +306,9 @@ pre code{background:none;padding:0;color:inherit}
   .book h2{font-size:24px;margin-top:var(--s32)}
   .lead{font-size:16px}
 }
+
+/* Help（#64）。問いと答えを縦に並べる */
+.help-list{margin:0;display:flex;flex-direction:column;gap:var(--s12)}
+.help-list dt{font-weight:600}
+.help-list dd{margin:4px 0 0;color:var(--ink-2);font-size:var(--text-body-sm)}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}

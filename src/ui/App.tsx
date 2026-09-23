@@ -4,6 +4,7 @@ import { Create } from "./Create";
 import { Roadmap } from "./Roadmap";
 import { LessonPage } from "./LessonPage";
 import { Book } from "./Book";
+import { Help } from "./Help";
 
 const TABS: [Screen, string, boolean][] = [
     ["shelf", "本棚", false],
@@ -58,6 +59,7 @@ export function App() {
                 {screen === "road" && tb && <Roadmap tb={tb} />}
                 {screen === "lesson" && tb && <LessonPage tb={tb} />}
                 {screen === "book" && tb && <Book tb={tb} />}
+                {screen === "help" && <Help />}
             </main>
             {s.toast && (
                 <div className="toast" role="status">

@@ -101,6 +101,9 @@ export function Shelf() {
                 lead="「学習計画を設計する」 → 「資料を一次作成」 → 「手を動かしながら、書き込む」"
                 actions={
                     <>
+                        <Button v="ghost" onClick={() => go("help")}>
+                            Help
+                        </Button>
                         <Button v="ghost" onClick={() => file.current?.click()}>
                             JSON読込
                         </Button>
@@ -126,9 +129,15 @@ export function Shelf() {
             />
 
             {error && (
-                <p className="err" role="alert">
-                    {error}
-                </p>
+                <div className="row" style={{ alignItems: "baseline" }}>
+                    <p className="err" role="alert">
+                        {error}
+                    </p>
+                    {/* 失敗文の近くから Help の対処へ（#64） */}
+                    <Button v="outline" sm onClick={() => go("help")}>
+                        読み込めない場合、まずはこちら
+                    </Button>
+                </div>
             )}
 
             {broken.length > 0 && (
