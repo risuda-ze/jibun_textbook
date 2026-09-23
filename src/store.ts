@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from 'react'
 import { del, get, keys, set } from 'idb-keyval'
-import { TextbookZ, findDuplicateIds, isDraftEmpty, nowIso, renumberDuplicateIds, type Lesson, type NoteDraft, type Textbook } from './types'
+import { isDraftEmpty, nowIso, type Lesson, type NoteDraft, type Textbook } from './types'
 import { DEFAULT_AI, type AiSettings } from './ai/types'
 import { currentLesson, findLesson } from './lib/status'
+import { migrate } from './lib/migrate'
 
 export type Screen = 'shelf' | 'new' | 'road' | 'lesson' | 'book' | 'help'
 export type Toast = { id: number; msg: string; undo?: () => void }
@@ -22,11 +23,13 @@ export type State = {
   drafts: Record<string, NoteDraft>
   /** 起動時に読めなかった教科書の生データ（#17）。本棚から書き出すか消せる */
   broken: { key: string; raw: unknown }[]
+  /** Help の「読み込めない場合、まずはこちら」に渡す生データ（本棚の「読めない教科書」から）（#65） */
+  repairTarget: { name: string; raw: unknown } | null
   toast: Toast | null
 }
 
 let state: State = {
-  ready: false, books: [], bookId: null, lessonId: null, screen: 'shelf', ai: DEFAULT_AI, lastExport: {}, wide: false, drafts: {}, broken: [], toast: null,
+  ready: false, books: [], bookId: null, lessonId: null, screen: 'shelf', ai: DEFAULT_AI, lastExport: {}, wide: false, drafts: {}, broken: [], repairTarget: null, toast: null,
 }
 const listeners = new Set<() => void>()
 const emit = () => listeners.forEach((l) => l())
@@ -43,26 +46,22 @@ const SETTINGS = 'settings'
 export async function init(): Promise<void> {
   const books: Textbook[] = []
   const broken: { key: string; raw: unknown }[] = []
-  let renumbered = 0
+  let repaired = 0
   try {
     for (const k of await keys()) {
       if (typeof k !== 'string' || !k.startsWith(TB)) continue
       const raw = await get(k)
-      const r = TextbookZ.safeParse(raw)
-      // 読めない教科書は黙って捨てず、本棚で知らせて生データを書き出せるようにする（#17）
-      if (!r.success) { broken.push({ key: k, raw }); continue }
-      // 端末内のデータは弾かず、重複した id を振り直して救済する（#36）
-      if (findDuplicateIds(r.data).length) {
-        const fixed = renumberDuplicateIds(r.data)
-        renumbered += fixed.count
-        await set(k, fixed.tb).catch(() => {})
-        books.push(fixed.tb)
-      } else books.push(r.data)
+      // 版の移行と既知の不整合の修復は migrate() に寄せ、JSON 読込と同じ結果にする（#65）
+      const r = migrate(raw)
+      // 直せない教科書は黙って捨てず、本棚で知らせて生データを書き出すか Help で直せるようにする（#17）
+      if (!r.ok) { broken.push({ key: k, raw }); continue }
+      if (r.steps.length) { repaired++; await set(k, r.tb).catch(() => {}) }
+      books.push(r.tb)
     }
     const s = (await get(SETTINGS)) as { ai?: AiSettings; lastExport?: Record<string, string>; wide?: boolean } | undefined
     books.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     setState({ ready: true, books, broken, ai: { ...DEFAULT_AI, ...s?.ai }, lastExport: s?.lastExport ?? {}, wide: s?.wide ?? false })
-    if (renumbered) toast(`重複していた id を ${renumbered} 件振り直しました。`)
+    if (repaired) toast(`古い形式か不整合のあった教科書 ${repaired} 冊を直しました。`)
     else if (broken.length) toast(`読み込めない教科書が ${broken.length} 冊あります。本棚から生データを書き出せます。`)
     // 端末の保存領域を勝手に消されないよう、永続化を要求する
     void navigator.storage?.persist?.()
@@ -116,6 +115,13 @@ export function putBook(tb: Textbook, touch = true): void {
 }
 
 /** 読めなかった教科書の生データを消す（#17） */
+/** 生データを Help の修復画面に渡して開く（#65） */
+export function openRepair(name: string, raw: unknown): void {
+  setState({ repairTarget: { name, raw }, screen: 'help' })
+  window.scrollTo(0, 0)
+}
+export const clearRepairTarget = (): void => setState({ repairTarget: null })
+
 export function dropBroken(key: string): void {
   // 端末から消えてから一覧を更新する（消える前に再読み込みされると復活するため）
   del(key)

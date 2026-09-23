@@ -36,13 +36,14 @@ src/
   lib/status.ts   節の状態（未作成/AIの下書き/書き込みあり/完了）の導出。保存はしない
   lib/protect.ts  「設計を直す」の反映と差分。守る対象の機械的な保証
   lib/io.ts       JSONの書き出し・読み込み・新旧の判定
+  lib/migrate.ts  版の移行（schemaVersion ごとの移行関数）と既知の不整合の修復。読み込みと起動時の両方が通る
   lib/image.ts    画像の縮小（長辺1600px・WebP）
   lib/md.ts       Markdown ⇔ HTML（見たまま編集の往復）
   ai/types.ts     AiProvider インターフェース。画面はこれだけを呼ぶ
   ai/anthropic.ts Anthropic API。調査（Web検索）→ 構造化 の2段構え
   ai/demo.ts      デモ応答。キーなしの試用と通しテストで使う
   ui/kit.tsx      共通コンポーネント（Button / Pill / Card / PageHead / Segmented）。画面に色や角丸を直接書かない
-  ui/             5画面（Shelf / Create / Roadmap / LessonPage / Book）と部品
+  ui/             5画面（Shelf / Create / Roadmap / LessonPage / Book）と Help、部品
   styles.css      DESIGN.md のトークンとクラス
 tests/            Vitest（データ・守る対象・Markdown往復・AI層）
 e2e/              Playwright（完了条件をPC幅とスマホ幅で）

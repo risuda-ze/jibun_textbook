@@ -1,4 +1,8 @@
-import { go } from '../store'
+import { useEffect, useRef, useState } from 'react'
+import { migrate, type MigrateResult } from '../lib/migrate'
+import { decideImport } from '../lib/io'
+import { clearRepairTarget, go, putBook, toast, useApp } from '../store'
+import { downloadBook } from './Shelf'
 import { Button, Card, PageHead } from './kit'
 
 const REPO = 'https://github.com/risuda-ze/jibun_textbook'
@@ -18,8 +22,8 @@ const TROUBLES: { when: string; next: string }[] = [
     next: '読み込む側のアプリが古いです。ページを再読み込みして最新にしてから、もう一度読み込んでください。',
   },
   {
-    when: '「同じ id の章・節・ノートが複数あるため読み込めません」と出る',
-    next: 'ファイルの中で id が重複しています。書き出した端末で教科書を開き直し、「JSON書出」をやり直してください。それでも直らない場合は、下の「問い合わせ」からファイルを添えて知らせてください。',
+    when: '読み込んだあとに「直した所: …」と出た',
+    next: '古い版の形式か、id の重複などの不整合があったので、読み込むときに自動で直しました。中身は変わっていません。念のため「JSON書出」で新しいファイルを作っておいてください。',
   },
   {
     when: '「形式が正しくありません（…）」と出る',
@@ -31,9 +35,78 @@ const TROUBLES: { when: string; next: string }[] = [
   },
   {
     when: '本棚に「読めない教科書」が出る',
-    next: '端末に保存されたデータが壊れています。カードの「生データを書き出す」で控えを取ってから消去し、書き出してあった JSON を読み込み直してください。',
+    next: '端末に保存されたデータが壊れています。カードの「Help で直す」で版の移行と修復を試せます。直らなければ「生データを書き出す」で控えを取ってから消去し、書き出してあった JSON を読み込み直してください。',
   },
 ]
+
+/** 版の移行と不整合の修復を手で試す道具（#65）。本棚の「読めない教科書」からも生データが渡ってくる */
+function Repair() {
+  const { books, repairTarget } = useApp()
+  const file = useRef<HTMLInputElement>(null)
+  const [res, setRes] = useState<{ name: string; r: MigrateResult } | null>(null)
+  useEffect(() => {
+    if (!repairTarget) return
+    setRes({ name: repairTarget.name, r: migrate(repairTarget.raw) })
+    clearRepairTarget()
+  }, [repairTarget])
+
+  async function onFile(f: File | undefined) {
+    if (!f) return
+    let raw: unknown
+    try {
+      raw = JSON.parse(await f.text())
+    } catch {
+      setRes({ name: f.name, r: { ok: false, reason: 'JSONとして読み込めませんでした。ファイルが壊れているか、別の種類のファイルの可能性があります。', from: null } })
+      return
+    }
+    setRes({ name: f.name, r: migrate(raw) })
+  }
+
+  function add() {
+    if (!res?.r.ok) return
+    const tb = res.r.tb
+    const fixed = res.r.steps.length ? `直した所: ${res.r.steps.join('、')}。` : ''
+    const existing = books.find((b) => b.id === tb.id)
+    const d = decideImport(existing, tb)
+    if (d === 'same') { toast('同じ内容が本棚にあります。'); return }
+    putBook(tb, false)
+    toast(existing ? `「${tb.title}」を本棚の内容と入れ替えました。${fixed}` : `「${tb.title}」を本棚に追加しました。${fixed}`, existing ? () => putBook(existing, false) : undefined)
+    go('shelf')
+  }
+
+  return (
+    <div className="stack">
+      <p className="sub">上の対処で直らない場合は、ここでファイルを選ぶと、版の移行と不整合の修復を試せます。元のファイルは変えません。</p>
+      <div className="row">
+        <Button v="soft" onClick={() => file.current?.click()}>ファイルを選ぶ</Button>
+        <input ref={file} type="file" id="repairfile" accept=".json,application/json" hidden onChange={(e) => { void onFile(e.target.files?.[0]); e.target.value = '' }} />
+      </div>
+      {res && (
+        <Card as="div" tone={res.r.ok ? 'sky' : 'peach'} aria-label="直した結果">
+          <p><b className="mono">{res.name}</b>{res.r.from !== null && <span className="sub">・schemaVersion {res.r.from}</span>}</p>
+          {res.r.ok ? (
+            <>
+              {res.r.steps.length ? (
+                <ul>{res.r.steps.map((s) => <li key={s}>{s}</li>)}</ul>
+              ) : (
+                <p className="sub">直す所はありませんでした。そのまま読み込めます。</p>
+              )}
+              <div className="row" style={{ marginTop: 8 }}>
+                <Button v="soft" onClick={add}>本棚に追加</Button>
+                <Button v="outline" sm onClick={() => res.r.ok && downloadBook(res.r.tb)}>直した JSON を書き出す</Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="err">{res.r.reason}</p>
+              <p className="sub">直せませんでした。<a href="#help-contact">問い合わせ</a>からファイルを添えて知らせてください。</p>
+            </>
+          )}
+        </Card>
+      )}
+    </div>
+  )
+}
 
 /** よくある質問（#64）。答えは README と docs/security.md の事実から起こす。作り込まない */
 const QA: { q: string; a: string }[] = [
@@ -113,6 +186,7 @@ export function Help() {
             </div>
           ))}
         </dl>
+        <Repair />
       </Card>
 
       <Card as="section" stack aria-labelledby="help-qa">

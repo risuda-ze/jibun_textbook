@@ -111,10 +111,13 @@ describe('id の一意性（#36）', () => {
     expect(findDuplicateIds(book())).toEqual([])
     expect(findDuplicateIds(dupBook())).toHaveLength(2)
   })
-  it('読み込みは理由つきで断る', () => {
+  it('読み込みは振り直して直し、直した所を返す（#65 で修復に変更）', () => {
     const r = parseImport(JSON.stringify(dupBook()))
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toContain('id が重複しています')
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(findDuplicateIds(r.tb)).toEqual([])
+      expect(r.steps).toEqual(['重複していた id を 2 件振り直しました'])
+    }
   })
   it('振り直すと重複が無くなり、中身は変わらない', () => {
     const src = dupBook()
