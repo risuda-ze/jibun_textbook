@@ -33,6 +33,12 @@ export function mdToHtml(md: string): string {
 
 const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', bulletListMarker: '-', emDelimiter: '*' })
 td.use(gfm)
+// 表のセルの中の <br> は <br> のまま出す（#48）。既定の「行末空白2つ＋改行」にすると表の行が途中で切れる。
+// GFM の表セルは HTML の <br> を許すので、marked が再び改行として描画する
+td.addRule('brInTableCell', {
+  filter: (node) => node.nodeName === 'BR' && !!node.closest('td, th'),
+  replacement: () => '<br>',
+})
 // contenteditable が作る <div> の改行を段落として扱う
 td.addRule('divAsParagraph', {
   filter: 'div',
