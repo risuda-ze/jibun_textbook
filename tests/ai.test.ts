@@ -268,3 +268,29 @@ describe('調査の状態を知らせる（#81）', () => {
     expect(r2.research).toBeUndefined()
   })
 })
+
+describe('デモ応答の設計を直す（#83）', () => {
+  const tb = newTextbook('t', { chapters: [newChapter('c', [newLesson('a'), newLesson('b', { done: true })])] })
+  const lessonId = tb.chapters[0].lessons[0].id
+  it('節だけ: 下書きが2つ', async () => {
+    const { plan } = await new DemoProvider().proposeRedesign(tb, 'lesson', lessonId, '', () => {})
+    expect(plan.scope).toBe('lesson')
+    if (plan.scope === 'lesson') expect(plan.blocks).toHaveLength(2)
+  })
+  it('章だけ: 守らない最初の節に注文を付け、id 無しの節を1つ足す。完了の節は変えない', async () => {
+    const { plan } = await new DemoProvider().proposeRedesign(tb, 'chapter', lessonId, '実践を先に', () => {})
+    expect(plan.scope).toBe('chapter')
+    if (plan.scope === 'chapter') {
+      expect(plan.lessons.map((l) => l.title)).toEqual(['a（実践を先に）', 'b', '注文から追加した節（実践を先に）'])
+      expect(plan.lessons.map((l) => l.id)).toEqual([tb.chapters[0].lessons[0].id, tb.chapters[0].lessons[1].id, null])
+    }
+  })
+  it('コース全体: 章を1つ足す', async () => {
+    const { plan } = await new DemoProvider().proposeRedesign(tb, 'course', lessonId, '', () => {})
+    expect(plan.scope).toBe('course')
+    if (plan.scope === 'course') {
+      expect(plan.chapters).toHaveLength(2)
+      expect(plan.chapters[1]).toMatchObject({ id: null, title: '追加の章（見直し）' })
+    }
+  })
+})
