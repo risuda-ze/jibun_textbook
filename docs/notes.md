@@ -87,6 +87,17 @@ GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`v*` タグ�
 注意: ワークフローは**タグ先のコミットに入っている定義**で動く。古いコミットにタグを打つと、その時点に
 `deploy.yml` の新しい定義が無いので自動では走らない。その場合は 4 の手動実行で `ref` にタグを指定する。
 リポジトリ名を変えるなら `vite.config.ts` の `base` も変える。
+- **`github-pages` 環境の配信ルールにタグの許可が要る**。環境の Deployment branches が「production ブランチだけ」だと、タグからの配信は `Tag "vX.Y.Z" is not allowed to deploy to github-pages due to environment protection rules` で失敗する（Release の方は環境を使わないので成功する）。v0.2.0 で起きたので、環境に「tag `v*`」の許可を足した。確認と追加は次のコマンド
+
+  ```bash
+  gh api repos/risuda-ze/jibun_textbook/environments/github-pages/deployment-branch-policies --jq '.branch_policies[] | "\(.type // "branch") \(.name)"'
+  ```
+
+  ```bash
+  gh api -X POST repos/risuda-ze/jibun_textbook/environments/github-pages/deployment-branch-policies -f name='v*' -f type=tag
+  ```
+
+  失敗した配信は `gh run rerun <run id> --failed` で再実行できる（タグは打ち直せない）
 
 ## 文言のルール（2026-09-22・#4）
 
