@@ -5,7 +5,7 @@ import type { CourseInput, Textbook } from '../types'
 import { findLesson, isProtectedLesson, lessonNo } from '../lib/status'
 import {
   AiError, abortError, throwIfAborted, zeroUsage, type AiOpts, type AiProvider, type Material, type AiSettings, type CourseDesign, type LessonDraft,
-  type Progress, type QA, type RedesignPlan, type RedesignScope, type Usage,
+  type Progress, type QA, type RedesignPlan, type RedesignScope, type ResearchInfo, type Usage,
 } from './types'
 
 /**
@@ -125,6 +125,8 @@ export class AnthropicProvider implements AiProvider {
         if (msg.stop_reason === 'max_tokens') out.truncated = true
         if (msg.stop_reason !== 'pause_turn') break
         messages.push({ role: 'assistant', content: msg.content })
+        // 上限まで pause_turn が続いた（続きを打ち切った）ことも「途中で切れた」として知らせる（#81）
+        if (i === MAX_PAUSE_CONTINUES) out.truncated = true
       }
     } catch (e) {
       const err = toAiError(e)
@@ -171,6 +173,7 @@ export class AnthropicProvider implements AiProvider {
     const who = describeInput(input) + describeQa(qa) + (note ? `\n\n設計への注文: ${note}` : '')
     onProgress(0, '学びたいことを分解している')
     let found = ''
+    let research: ResearchInfo | undefined
     if (this.settings.search === 'builtin') {
       onProgress(1, 'Webを調査している')
       const r = await this.research(
@@ -180,6 +183,7 @@ export class AnthropicProvider implements AiProvider {
         MAX_SEARCH_DESIGN, usage, (d) => onProgress(1, d), opts.signal,
       )
       found = `\n\n## 調査で分かったこと\n${r.text}`
+      research = { truncated: r.truncated, searchErrors: r.searchErrors }
     }
     onProgress(2, 'コース設計を作っている')
     const design = await this.structure(
@@ -189,7 +193,7 @@ export class AnthropicProvider implements AiProvider {
       DesignOutZ, usage, opts.signal,
     )
     onProgress(3, '設計ができた')
-    return { design: design as CourseDesign, usage }
+    return { design: design as CourseDesign, usage, research }
   }
 
   async generateLesson(tb: Textbook, lessonId: string, onProgress: Progress, opts: AiOpts = {}) {
@@ -200,6 +204,7 @@ export class AnthropicProvider implements AiProvider {
     let sources: Source[] = []
     let found = ''
     let truncated = false
+    let research: ResearchInfo | undefined
     // 渡された資料（#63）。「この資料だけから作る」なら Web 調査をしない
     const mats = opts.materials ?? []
     const sourceOnly = !!opts.sourceOnly && mats.length > 0
@@ -218,6 +223,7 @@ export class AnthropicProvider implements AiProvider {
       )
       sources = r.sources
       truncated = r.truncated
+      research = { truncated: r.truncated, searchErrors: r.searchErrors }
       found = `\n\n## 調査で分かったこと\n${r.text}\n\n## 見つけたページ\n${sources.map((s, i) => `[${i}] ${s.title} ${s.url}`).join('\n')}`
     }
     onProgress(1, sourceOnly ? '渡された資料から書いている' : '資料を書いている')
@@ -231,7 +237,7 @@ export class AnthropicProvider implements AiProvider {
     )
     const fetchedAt = new Date().toISOString().slice(0, 10)
     const links = d.linkIndexes.filter((i) => Number.isInteger(i) && sources[i]).slice(0, 6).map((i) => ({ ...sources[i], fetchedAt }))
-    const draft: LessonDraft = { blocks: d.blocks, tasks: d.tasks, clues: { queries: d.queries, how: d.how, links }, truncated }
+    const draft: LessonDraft = { blocks: d.blocks, tasks: d.tasks, clues: { queries: d.queries, how: d.how, links }, truncated, research }
     onProgress(2, '資料ができた')
     return { draft, usage }
   }

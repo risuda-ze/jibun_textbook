@@ -84,8 +84,10 @@ describe('調査（1段目）', () => {
   it('pause_turn が続いても打ち切る', async () => {
     const p: Msg = { stop_reason: 'pause_turn', content: [text('…')] }
     const { client, calls } = fake(Array.from({ length: 20 }, () => ({ ...p })))
-    await new AnthropicProvider(settings, client).research('s', 'p', 1, zeroUsage())
+    const r = await new AnthropicProvider(settings, client).research('s', 'p', 1, zeroUsage())
     expect(calls.stream.length).toBeLessThanOrEqual(6)
+    // 打ち切ったことは「途中で切れた」として返す（#81）
+    expect(r.truncated).toBe(true)
   })
 
   it('refusal は分かる言葉のエラーにする', async () => {
@@ -242,5 +244,27 @@ describe('渡された資料（#63）', () => {
     const { client, calls } = fake([], [out])
     await new AnthropicProvider({ ...settings, search: 'none' }, client).generateLesson(tb, lessonId, () => {}, { sourceOnly: true })
     expect(typeof (calls.parse[0].messages as { content: unknown }[])[0].content).toBe('string')
+  })
+})
+
+describe('調査の状態を知らせる（#81）', () => {
+  const tb = newTextbook('t', { chapters: [newChapter('c', [newLesson('l')])] })
+  const lessonId = tb.chapters[0].lessons[0].id
+  const out = { parsed_output: { blocks: ['a'], tasks: [], queries: [], how: [], linkIndexes: [] }, stop_reason: 'end_turn' }
+  const searchError = { type: 'web_search_tool_result', tool_use_id: 's', content: { type: 'web_search_tool_result_error', error_code: 'max_uses_exceeded' } }
+
+  it('節の生成: 検索の失敗と切り詰めを draft.research に載せる', async () => {
+    const { client } = fake([{ stop_reason: 'max_tokens', content: [searchError, text('途中')] }], [out])
+    const { draft } = await new AnthropicProvider(settings, client).generateLesson(tb, lessonId, () => {})
+    expect(draft.research).toEqual({ truncated: true, searchErrors: ['max_uses_exceeded'] })
+  })
+  it('設計: 同じ情報を research に載せる。検索なしなら undefined', async () => {
+    const design = { title: 't', goal: 'g', chapters: [{ title: 'c', lessons: [{ title: 'l', minutes: 30, isTask: false, summary: 's' }] }] }
+    const { client } = fake([{ stop_reason: 'end_turn', content: [searchError] }], [{ parsed_output: design, stop_reason: 'end_turn' }])
+    const r = await new AnthropicProvider(settings, client).designCourse({ prompt: 'p', can: '', time: '', env: '' }, [], '', () => {})
+    expect(r.research).toEqual({ truncated: false, searchErrors: ['max_uses_exceeded'] })
+    const { client: c2 } = fake([], [{ parsed_output: design, stop_reason: 'end_turn' }])
+    const r2 = await new AnthropicProvider({ ...settings, search: 'none' }, c2).designCourse({ prompt: 'p', can: '', time: '', env: '' }, [], '', () => {})
+    expect(r2.research).toBeUndefined()
   })
 })

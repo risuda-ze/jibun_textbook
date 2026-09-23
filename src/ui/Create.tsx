@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { researchNote } from './generate'
 import { getProvider, type AiError, type CourseDesign, type QA, type Usage } from '../ai'
 import { openBook, putBook, toast, useApp } from '../store'
 import { newChapter, newLesson, newTextbook, type CourseInput } from '../types'
@@ -48,6 +49,9 @@ export function Create() {
     try {
       const r = await getProvider(ai).designCourse(input, qa ?? [], extraNote, (s, d) => { setStep(s); setDetail(d) }, { signal: abort.start() })
       setDesign(r.design); setUsage(r.usage); setOff(new Set()); setStep(STEP_LABELS.length); setShowQa(false)
+      // 調査が切れた・検索が失敗した（#81）
+      const note = researchNote(r.usage, r.research)
+      if (note) toast(`設計を作りました${note}`)
     } catch (e) {
       // 自分でやめたときはエラーにせず短く知らせる（#14）
       if ((e as AiError).code === 'aborted') toast('生成をやめました'); else setError((e as Error).message)

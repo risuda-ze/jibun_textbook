@@ -1,4 +1,4 @@
-import { getProvider, type AiError, type AiSettings } from '../ai'
+import { getProvider, type AiError, type AiSettings, type ResearchInfo, type Usage } from '../ai'
 import { toast, updateLesson } from '../store'
 import { newBlock, type Textbook } from '../types'
 import { materialError, toMaterials, type MaterialInput } from './material'
@@ -10,6 +10,26 @@ export const GEN_STEPS = 2
 export type GenState = { step: number; detail: string; startedAt: number; endedAt: number | null }
 
 export const startGen = (): GenState => ({ step: 0, detail: '', startedAt: Date.now(), endedAt: null })
+
+/**
+ * Web 調査の状態を、完了の知らせに添える文にする（#81）。
+ * 検索が全部失敗したときは「モデルの知識だけで書いた」と明かす。途中で切れたら根拠が足りない可能性を伝える
+ */
+export function researchNote(usage: Usage, info: ResearchInfo | undefined): string {
+  if (!info) return ''
+  const parts: string[] = []
+  if (info.searchErrors.length) {
+    parts.push(usage.searches === 0
+      ? `Web検索ができなかったので（${info.searchErrors.join('・')}）、モデルの知識だけで書きました。根拠は自分で確かめてください`
+      : `Web検索が${info.searchErrors.length}回失敗しました（${[...new Set(info.searchErrors)].join('・')}）`)
+  }
+  if (info.truncated) parts.push('Web調査が長くなり途中で切れました。根拠が足りない所は自分で確かめてください')
+  return parts.length ? `。${parts.join('。')}` : ''
+}
+
+/** 使った量の文（検索回数・トークン）。無ければ空 */
+export const usageNote = (usage: Usage): string =>
+  usage.searches || usage.inputTokens ? `（検索${usage.searches}回・入力${usage.inputTokens.toLocaleString()}・出力${usage.outputTokens.toLocaleString()}トークン）` : ''
 
 /** 節の資料を生成して教科書に入れる。失敗しても教科書は変えない。 */
 export async function generateInto(tb: Textbook, lessonId: string, ai: AiSettings, onProgress: (step: number, detail: string) => void, signal?: AbortSignal, input?: MaterialInput): Promise<boolean> {
@@ -34,11 +54,9 @@ export async function generateInto(tb: Textbook, lessonId: string, ai: AiSetting
         how: [...new Set([...l.clues.how, ...draft.clues.how])],
       }
     })
-    // Web 調査が途中で切れていたら、そのことを知らせる（#17）。下書きは入るが、根拠が足りない可能性がある
-    const cut = draft.truncated ? '。Web調査が長くなり途中で切れました。根拠が足りない所は自分で確かめてください' : ''
-    toast(usage.searches || usage.inputTokens
-      ? `資料を生成しました（検索${usage.searches}回・入力${usage.inputTokens.toLocaleString()}・出力${usage.outputTokens.toLocaleString()}トークン）${cut}`
-      : '資料を生成しました' + cut)
+    // Web 調査の状態（途中で切れた・検索が失敗した）を知らせる（#17 #81）。下書きは入るが、根拠が足りない可能性がある
+    const info = draft.research ?? (draft.truncated ? { truncated: true, searchErrors: [] } : undefined)
+    toast(`資料を生成しました${usageNote(usage)}${researchNote(usage, info)}`)
     return true
   } catch (e) {
     const err = e as AiError
