@@ -59,6 +59,13 @@ npm run e2e        # 通し。初回は npx playwright install chromium
 npm run build      # dist/ を作る
 ```
 
+## 保存形式の規約（#65）
+
+- 保存形式の正は `src/types.ts`。互換性が無くなる変更（項目の削除・改名・意味の変更）をする時は `schemaVersion` を1つ上げ、旧版 → 新版の移行関数を `src/lib/migrate.ts` に足す。項目の追加だけで旧版も読めるなら版は上げず、zod の `default` で埋める
+- 移行は「元の版 → 次の版」を1段ずつ積む。版をまたぐ直行関数は作らない
+- 読み込み（JSON 読込・端末内データ）は版を見て新版まで自動で移行する。移行できない時は理由を出し、Help の「読み込めない場合、まずはこちら」で手動で試せるようにする
+- 移行関数には旧版の見本 JSON を使った単体テストを付ける。見本は `tests/fixtures/textbook_v<版>.json` に版ごとに残す
+
 ## AI層規約
 
 - 公式SDK `@anthropic-ai/sdk` をブラウザで使う（`dangerouslyAllowBrowser: true`）。モデルIDに日付を付けない
