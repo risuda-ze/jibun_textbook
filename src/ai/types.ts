@@ -23,8 +23,12 @@ export const MODELS: { id: string; label: string }[] = [
 
 export type Progress = (step: number, detail: string) => void
 
-/** 生成の中止（#14）。画面が AbortController を持ち、signal を渡す */
-export type AiOpts = { signal?: AbortSignal }
+/** 渡す資料（#63）。txt/md は文字、PDF は base64。教科書の JSON には入れない */
+export type MaterialKind = 'text' | 'pdf'
+export type Material = { kind: MaterialKind; name: string; size: number; text?: string; data?: string }
+
+/** 生成の追加指定。signal は中止（#14）、materials と sourceOnly は渡す資料（#63） */
+export type AiOpts = { signal?: AbortSignal; materials?: Material[]; sourceOnly?: boolean }
 
 export type Usage = { inputTokens: number; outputTokens: number; searches: number }
 export const zeroUsage = (): Usage => ({ inputTokens: 0, outputTokens: 0, searches: 0 })

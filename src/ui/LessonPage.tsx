@@ -6,6 +6,7 @@ import { BlockRow, Composer } from './blocks'
 import { StatusChip, Working, stepPercent, useAbort } from './common'
 import { isHttpUrl } from '../lib/safe'
 import { GEN_STEPS, generateInto, startGen, type GenState } from './generate'
+import { MaterialPanel, emptyMaterialInput, type MaterialInput } from './material'
 import { Button, Card } from './kit'
 
 const gq = (q: string) => 'https://www.google.com/search?q=' + encodeURIComponent(q)
@@ -103,11 +104,14 @@ export function LessonPage({ tb }: { tb: Textbook }) {
   }
 
   const abort = useAbort()
+  // 渡す資料（#63）
+  const [mat, setMat] = useState<MaterialInput>(emptyMaterialInput)
   async function generate() {
     const g = startGen()
     setGen(g)
-    await generateInto(tb, l.id, ai, (step, detail) => setGen({ ...g, step, detail }), abort.start())
+    const ok = await generateInto(tb, l.id, ai, (step, detail) => setGen({ ...g, step, detail }), abort.start(), mat)
     setGen(null)
+    if (ok) setMat(emptyMaterialInput())
   }
 
   const composerAt = insAt ?? l.blocks.length
@@ -120,6 +124,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
           <div className="eyebrow">{lessonNo(tb, l.id)}・{l.minutes}分{l.isTask && '・実践課題'}</div>
           <h1>{l.title}</h1>
           <div className="row" style={{ marginTop: 6 }}><StatusChip lesson={l} /></div>
+          {l.materials.length > 0 && <div className="sub" style={{ marginTop: 4 }}>元にした資料: {l.materials.join('、')}</div>}
         </div>
         <div className="row">
           {/* 表示領域の切り替え（#53）。スマホ幅では CSS で隠す（元から1列で画面いっぱい） */}
@@ -140,6 +145,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
                 {gen && <Button v="outline" sm onClick={abort.stop}>やめる</Button>}
                 {!gen && <span className="sub">使うAI: {ai.kind === 'anthropic' ? ai.model : ai.kind === 'demo' ? 'デモ応答' : '未対応の接続先'}（「つくる」画面で切り替え）</span>}
               </div>
+              <MaterialPanel value={mat} onChange={setMat} disabled={gen !== null} />
             </Card>
           )}
           <div className="row">

@@ -45,12 +45,18 @@ export class DemoProvider implements AiProvider {
 
   async generateLesson(tb: Textbook, lessonId: string, onProgress: Progress, opts: AiOpts = {}) {
     const f = findLesson(tb, lessonId)!
-    onProgress(0, 'デモ応答のためWeb調査はしません'); await wait(200, opts.signal)
+    // 渡された資料（#63）は本文に名前と先頭だけ写して、動線を確かめられるようにする
+    const mats = opts.materials ?? []
+    const sourceOnly = !!opts.sourceOnly && mats.length > 0
+    onProgress(0, sourceOnly ? '渡された資料だけで書きます（デモ応答）' : 'デモ応答のためWeb調査はしません'); await wait(200, opts.signal)
     onProgress(1, '資料を書いている'); await wait(200, opts.signal)
     const t = f.lesson.title
+    const matLine = mats.length
+      ? `\n\n（デモ）渡された資料: ${mats.map((m) => `${m.name}・${(m.text ?? 'PDF').replace(/\s+/g, ' ').slice(0, 40)}`).join(' ／ ')}${sourceOnly ? '（この資料だけから作る）' : ''}`
+      : ''
     const draft = {
       blocks: [
-        `### この節の狙い\n${f.lesson.summary || `${t}の要点をつかむ。`}\n\nこれは**デモ応答**の見本。実際のAIにつなぐと、Web調査をもとにした本文がここに入る。`,
+        `### この節の狙い\n${f.lesson.summary || `${t}の要点をつかむ。`}\n\nこれは**デモ応答**の見本。実際のAIにつなぐと、Web調査をもとにした本文がここに入る。${matLine}`,
         `### 要点\n- まず小さく試す\n- うまくいかなかった所をノートに残す\n- 自分の言葉で言い直す`,
         `### 例\n| 手順 | やること |\n|---|---|\n| 1 | お手本を1つ選ぶ |\n| 2 | 同じことを自分の環境でやる |\n| 3 | 違いを書き出す |`,
       ],

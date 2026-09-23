@@ -40,6 +40,7 @@
 
 | 要件 | 現状（該当箇所） | 判定 | 対応方針 |
 |---|---|---|---|
+| 渡した資料（#63）の扱い | txt/md の文字と PDF（base64）は API のリクエストにだけ入り、教科書の JSON には**名前だけ**残す（`Lesson.materials`）。上限は文字 200KB・PDF 10MB（`src/lib/material.ts`）。渡せる種類は拡張子と MIME で限定し、それ以外は断る。資料の内容は AI の下書きとして DOMPurify 経由で描画される | 済 | — |
 | AI が書いた URL をリンクにしない | 一次情報リンクは、調査で実際に返ってきた `sources[]` の**番号**を構造化出力で選ばせ、範囲外の番号は捨てる（`src/ai/anthropic.ts` 192行付近 `linkIndexes`）。AI が文中に書いた URL は Markdown のリンクとして表示されるだけで、手がかりには入らない | 済 | 維持 |
 | 構造化出力を検証する | `messages.parse()` + `zodOutputFormat(schema)` で受け取り、`parsed_output == null` は失敗扱い（`structure()`） | 済 | — |
 | AI 応答で教科書が壊れない | 失敗時は教科書を変えない（`src/ui/generate.ts`）。再設計は `src/lib/protect.ts` が守る対象（自分のノート・直した文・完了の節）を機械的に残し、`tests/protect.test.ts` が見張る | 済 | — |
