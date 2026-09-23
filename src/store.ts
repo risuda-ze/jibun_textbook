@@ -16,13 +16,15 @@ export type State = {
   ai: AiSettings
   /** 教科書ごとの最後に書き出した日時。端末内だけの情報 */
   lastExport: Record<string, string>
+  /** レッスン・通読の表示領域を画面幅の約 90% に広げるか。端末内だけの設定（#53） */
+  wide: boolean
   /** ノート入力欄の下書き（節idごと）。画面をまたいで残すが端末には保存しない（#12） */
   drafts: Record<string, NoteDraft>
   toast: Toast | null
 }
 
 let state: State = {
-  ready: false, books: [], bookId: null, lessonId: null, screen: 'shelf', ai: DEFAULT_AI, lastExport: {}, drafts: {}, toast: null,
+  ready: false, books: [], bookId: null, lessonId: null, screen: 'shelf', ai: DEFAULT_AI, lastExport: {}, wide: false, drafts: {}, toast: null,
 }
 const listeners = new Set<() => void>()
 const emit = () => listeners.forEach((l) => l())
@@ -52,9 +54,9 @@ export async function init(): Promise<void> {
         books.push(fixed.tb)
       } else books.push(r.data)
     }
-    const s = (await get(SETTINGS)) as { ai?: AiSettings; lastExport?: Record<string, string> } | undefined
+    const s = (await get(SETTINGS)) as { ai?: AiSettings; lastExport?: Record<string, string>; wide?: boolean } | undefined
     books.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    setState({ ready: true, books, ai: { ...DEFAULT_AI, ...s?.ai }, lastExport: s?.lastExport ?? {} })
+    setState({ ready: true, books, ai: { ...DEFAULT_AI, ...s?.ai }, lastExport: s?.lastExport ?? {}, wide: s?.wide ?? false })
     if (renumbered) toast(`重複していた id を ${renumbered} 件振り直しました。`)
     // 端末の保存領域を勝手に消されないよう、永続化を要求する
     void navigator.storage?.persist?.()
@@ -63,7 +65,7 @@ export async function init(): Promise<void> {
   }
 }
 
-const saveSettings = () => set(SETTINGS, { ai: state.ai, lastExport: state.lastExport }).catch(() => {})
+const saveSettings = () => set(SETTINGS, { ai: state.ai, lastExport: state.lastExport, wide: state.wide }).catch(() => {})
 
 let toastSeq = 0
 let toastTimer: ReturnType<typeof setTimeout> | undefined
@@ -129,6 +131,12 @@ export function removeBook(id: string): void {
   setState({ books: state.books.filter((x) => x.id !== id), bookId: state.bookId === id ? null : state.bookId, screen: 'shelf' })
   del(TB + id).catch(() => {})
   toast(`「${b.title}」を消しました`, () => putBook(b, false))
+}
+
+/** 表示領域の切り替え（#53）。端末内に保存する */
+export function setWide(wide: boolean): void {
+  setState({ wide })
+  void saveSettings()
 }
 
 export function setAi(p: Partial<AiSettings>): void {

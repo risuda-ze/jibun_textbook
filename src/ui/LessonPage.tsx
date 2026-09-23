@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { allLessons, findLesson, lessonNo, minePercent } from '../lib/status'
-import { go, openLesson, putBook, setDraft as storeDraft, snapshot, toast, updateLesson, useApp } from '../store'
+import { go, openLesson, putBook, setDraft as storeDraft, setWide, snapshot, toast, updateLesson, useApp } from '../store'
 import { emptyDraft, newBlock, uid, type Lesson, type NoteDraft, type Textbook } from '../types'
 import { BlockRow, Composer } from './blocks'
 import { StatusChip } from './common'
@@ -49,7 +49,7 @@ function Clues({ tb, lesson }: { tb: Textbook; lesson: Lesson }) {
 }
 
 export function LessonPage({ tb }: { tb: Textbook }) {
-  const { lessonId, ai, drafts } = useApp()
+  const { lessonId, ai, drafts, wide } = useApp()
   const f = (lessonId && findLesson(tb, lessonId)) || null
   const [insAt, setInsAt] = useState<number | null>(null)
   const [blame, setBlame] = useState(true)
@@ -117,6 +117,8 @@ export function LessonPage({ tb }: { tb: Textbook }) {
           <div className="row" style={{ marginTop: 6 }}><StatusChip lesson={l} /></div>
         </div>
         <div className="row">
+          {/* 表示領域の切り替え（#53）。スマホ幅では CSS で隠す（元から1列で画面いっぱい） */}
+          <Button v="ghost" className="widebtn" aria-pressed={wide} onClick={() => setWide(!wide)}>{wide ? '幅を戻す' : '広げる'}</Button>
           <Button v="ghost" onClick={() => go('road')}>ロードマップ</Button>
           {next && <Button v="ghost" onClick={() => openLesson(next.id)}>次へ {lessonNo(tb, next.id)}</Button>}
         </div>
