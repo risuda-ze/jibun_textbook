@@ -254,7 +254,7 @@ pre code{background:none;padding:0;color:inherit}
 .pen[aria-pressed="true"]{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--primary)}
 .qbtn{position:fixed;z-index:30;background:var(--color-charcoal);color:#fff;border:0;border-radius:var(--radius-buttons);padding:6px 12px;font-size:13px;font-weight:500}
 
-/* 調べる手がかり */
+/* 参考情報（旧: 調べる手がかり） */
 .qchip{display:inline-flex;align-items:center;border-radius:var(--radius-pills);padding:4px 12px;font-size:13px;font-weight:500;background:var(--primary-tint);color:var(--primary);transition:background var(--ease)}
 .qchip::before{content:"⌕";margin-right:6px;opacity:.7}
 .qchip:hover{background:#d5eafd;text-decoration:none}

@@ -1,36 +1,6 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
-
-// 1x1 の PNG
-const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
-
-const isPhone = (page: Page) => (page.viewportSize()?.width ?? 1000) < 820
-
-async function blankBook(page: Page) {
-  await page.goto('./')
-  await page.getByRole('button', { name: '白紙から作る' }).click()
-  await expect(page.getByLabel('教科書の名前')).toHaveValue('新しい教科書')
-}
-
-async function demoBook(page: Page) {
-  await page.goto('./')
-  await page.getByRole('button', { name: 'AIと新規作成' }).click()
-  await page.getByRole('button', { name: 'デモ応答' }).click()
-  await page.locator('#goal').fill('Rustで自分用の小さなツールを書けるようになりたい')
-  await page.locator('#env').fill('Windows、VS Code')
-  await page.getByRole('button', { name: '調べてコース設計を作る' }).click()
-  await expect(page.getByText('AIからの確認')).toBeVisible()
-  await page.getByRole('button', { name: 'スキップ' }).click()
-  await expect(page.getByText('Step 2 コース設計案')).toBeVisible()
-  await page.getByRole('button', { name: 'この設計で始める' }).click()
-  await expect(page.getByLabel('教科書の名前')).toBeVisible()
-}
-
-async function writeNote(page: Page, text: string) {
-  await page.locator('#note').fill(text)
-  await page.getByRole('button', { name: '書き込む' }).click()
-  await expect(page.locator('.doc [data-by="me"]').filter({ hasText: text })).toBeVisible()
-}
+import { PNG, blankBook, demoBook, isPhone, writeNote } from './helpers'
 
 test('完了条件1: 自由入力 → 確認質問 → 設計案 → ロードマップに並ぶ', async ({ page }) => {
   await demoBook(page)
@@ -54,12 +24,12 @@ test('スマホ幅は章ごとの一覧、PC幅はタイムライン', async ({ 
   }
 })
 
-test('完了条件2: 資料を生成すると本文と調べる手がかりが入る', async ({ page }) => {
+test('完了条件2: 資料を生成すると本文と参考情報が入る', async ({ page }) => {
   await demoBook(page)
   await page.getByRole('button', { name: 'この節の資料を生成' }).click()
   await expect(page.locator('.doc [data-by="ai"]')).toHaveCount(3)
   await expect(page.locator('.doc table')).toBeVisible()
-  const clues = page.getByLabel('調べる手がかり')
+  const clues = page.getByLabel('参考情報')
   await expect(clues.locator('a.qchip').first()).toHaveAttribute('href', /google\.com\/search\?q=/)
   await expect(clues.getByText('本文の例を自分の環境で再現する')).toBeVisible()
   await expect(page.locator('.rail').getByText('例を自分の環境で試す')).toBeVisible()
@@ -322,7 +292,7 @@ test('不正な URL と画像は無害化される（読み込んだ JSON 由来
   await page.locator('#importfile').setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tb)) })
   await page.getByRole('button', { name: '開く' }).click()
   await page.getByRole('button', { name: 'レッスンを開く' }).click()
-  const clues = page.getByLabel('調べる手がかり')
+  const clues = page.getByLabel('参考情報')
   await expect(clues.getByText('悪いリンク')).toBeVisible()
   await expect(clues.getByRole('link', { name: '悪いリンク' })).toHaveCount(0)
   await expect(clues.getByRole('link', { name: '良いリンク' })).toHaveAttribute('href', 'https://example.com/')

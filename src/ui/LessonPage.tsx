@@ -15,8 +15,8 @@ function Clues({ tb, lesson }: { tb: Textbook; lesson: Lesson }) {
   const [url, setUrl] = useState('')
   const c = lesson.clues
   return (
-    <Card stack className="clues" aria-label="調べる手がかり">
-      <div><h2 style={{ fontSize: 16 }}>調べる手がかり</h2><p className="sub">AIの文を鵜呑みにせず、自分で確かめるための入口です。</p></div>
+    <Card stack className="clues" aria-label="参考情報">
+      <h2 style={{ fontSize: 16 }}>参考情報</h2>
       <div>
         <div className="eyebrow">検索する</div>
         <div className="row" style={{ marginTop: 6 }}>
