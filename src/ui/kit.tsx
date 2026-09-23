@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, CSSProperties, HTMLAttributes, ReactNode } from 'react'
 
 /**
  * 共通コンポーネント。見た目の正は DESIGN.md（暖色の紙のキャンバス・白いカード・細い罫線・青は主操作だけ）。
@@ -16,10 +16,25 @@ import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react'
  */
 export type ButtonVariant = 'primary' | 'soft' | 'ghost' | 'outline' | 'danger'
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { v?: ButtonVariant; sm?: boolean }
+/**
+ * progress を渡すと「進行中のボタン」になる（#50）。押した瞬間に灰色になり、進んだ分（0〜100%）だけ左から青で塗る。
+ * null に戻すと元の色に戻る。時間の見積もりは出さず、段階が終わった分だけ進める。
+ */
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { v?: ButtonVariant; sm?: boolean; progress?: number | null }
 
-export function Button({ v = 'ghost', sm, className = '', type = 'button', ...rest }: ButtonProps) {
-  return <button type={type} className={`btn ${v}${sm ? ' sm' : ''}${className ? ' ' + className : ''}`} {...rest} />
+export function Button({ v = 'ghost', sm, className = '', type = 'button', progress = null, style, ...rest }: ButtonProps) {
+  const gauge = progress !== null
+  const pct = gauge ? Math.max(0, Math.min(100, Math.round(progress))) : 0
+  const st = gauge ? ({ ...style, '--gauge': pct + '%' } as CSSProperties) : style
+  return (
+    <button
+      type={type}
+      className={`btn ${v}${sm ? ' sm' : ''}${gauge ? ' gauge' : ''}${className ? ' ' + className : ''}`}
+      style={st}
+      aria-busy={gauge || undefined}
+      {...rest}
+    />
+  )
 }
 
 /** ピル（状態や種類のラベル）。tone は意味で選ぶ。色は styles.css が決める。 */

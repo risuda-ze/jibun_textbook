@@ -80,14 +80,8 @@ export function AiBar() {
   )
 }
 
-/**
- * AI の作業の進捗ゲージ（#50）。段階数に応じた幅、今していること（detail）、経過秒数。
- * 実 API の所要時間は事前に分からないので、段階ベースの幅と経過秒数で「動いている」ことを伝える。
- * step < 0 なら何も出さない。step >= labels.length で完了。
- */
-export function Progress({ labels, step, detail, running, startedAt, endedAt, compact }: {
-  labels: string[]; step: number; detail: string; running: boolean; startedAt: number | null; endedAt: number | null; compact?: boolean
-}) {
+/** 経過秒数（#50）。running の間は1秒ごとに更新し、終わったら止まる */
+export function useElapsed(running: boolean, startedAt: number | null, endedAt: number | null): number | null {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     if (!running) return
@@ -95,22 +89,17 @@ export function Progress({ labels, step, detail, running, startedAt, endedAt, co
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [running])
-  if (step < 0) return null
-  const total = labels.length
-  const done = step >= total
-  // 進行中の段階は半分まで進んだ扱いにする（1段階目でも 0% にしない）
-  const pct = done ? 100 : Math.round(((step + 0.5) / total) * 100)
-  const elapsed = startedAt ? Math.max(0, Math.floor(((endedAt ?? now) - startedAt) / 1000)) : null
-  return (
-    <div className={`progress${compact ? ' compact' : ''}`} role="progressbar" aria-label="AIの作業の進み具合" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-valuetext={done ? '完了' : `${step + 1} / ${total} ${labels[step]}`}>
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <span className="sub">{done ? '完了' : `${step + 1} / ${total}: ${labels[step]}`}</span>
-        {elapsed !== null && <span className="sub mono">{elapsed}秒</span>}
-      </div>
-      <div className="meter"><i className={running ? 'pulse' : ''} style={{ width: pct + '%', background: 'var(--primary)' }} /></div>
-      {running && <p className="sub" style={{ fontSize: 12 }}>{detail || '実行中…'}</p>}
-    </div>
-  )
+  return startedAt ? Math.max(0, Math.floor(((endedAt ?? now) - startedAt) / 1000)) : null
+}
+
+/** ボタンの塗りに使う進み具合（%）。段階が終わった分だけ進む（3段階なら 0 / 33 / 67 / 100） */
+export const stepPercent = (step: number, total: number): number => Math.round((Math.max(0, Math.min(step, total)) / total) * 100)
+
+/** 進行中の一言。今していること（検索語など）と経過秒数。ボタンの脇に置く */
+export function Working({ running, detail, startedAt, endedAt }: { running: boolean; detail: string; startedAt: number | null; endedAt: number | null }) {
+  const sec = useElapsed(running, startedAt, endedAt)
+  if (!running) return null
+  return <span className="sub working" role="status">{detail || '実行中…'}{sec !== null && <span className="mono">・{sec}秒</span>}</span>
 }
 
 export function Steps({ labels, step, detail }: { labels: string[]; step: number; detail: string }) {

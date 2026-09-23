@@ -4,7 +4,7 @@ import { applyChapterPlan, applyCoursePlan, applyLessonRegen, diffLessonRegen, d
 import { STATUS_LABEL, currentLesson, findLesson, lessonNo, lessonStatus } from '../lib/status'
 import { openLesson, putBook, selectLesson, snapshot, toast, updateBook, updateLesson, useApp } from '../store'
 import { newChapter, newLesson, type Lesson, type Textbook } from '../types'
-import { Meter, Progress, StatusChip } from './common'
+import { Meter, StatusChip, Working, stepPercent } from './common'
 import { UsageLine } from './Create'
 import { downloadBook } from './Shelf'
 import { generateInto } from './generate'
@@ -79,9 +79,9 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
       </div>
       <div className="row">
         <input type="text" id="redotext" value={order} onChange={(e) => setOrder(e.target.value)} placeholder="どう変えたいか（例: 理論は短く、実践を先に）" style={{ flex: '1 1 280px' }} />
-        <Button v="soft" disabled={busy} onClick={propose}>{busy ? '案を作成中…' : plan ? '別の案を出す' : '変更案を出してもらう'}</Button>
+        <Button v="soft" disabled={busy} onClick={propose} progress={busy ? stepPercent(step, 1) : null}>{busy ? '案を作成中…' : plan ? '別の案を出す' : '変更案を出してもらう'}</Button>
+        {busy && <Working running detail={detail} startedAt={startedAt} endedAt={endedAt} />}
       </div>
-      <Progress compact labels={['変更案を作成']} step={step} detail={detail} running={busy} startedAt={startedAt} endedAt={endedAt} />
       {error && <p className="err" role="alert">{error}</p>}
       {plan && (
         <>
