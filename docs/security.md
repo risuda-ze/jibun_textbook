@@ -19,9 +19,9 @@
 
 | 要件 | 現状（該当箇所） | 判定 | 対応方針 |
 |---|---|---|---|
-| スキーマ検証と `schemaVersion` チェック | `parseImport()` が `JSON.parse` → `schemaVersion === 1` → `TextbookZ.safeParse` の順に検証（`src/lib/io.ts`）。失敗理由を画面に出す | 済 | 版が上がったら移行処理を足す |
-| 起動時に IndexedDB から読むデータも検証する | `init()` が各教科書を `TextbookZ.safeParse` で検証し、失敗したものは読み込まない（`src/store.ts`） | 済（ただし黙って捨てる。#17） | — |
-| サイズ上限 | 書き出し側は 8MB 超で警告（`SIZE_WARN_BYTES`）。**読み込み側に上限が無い**。何十 MB でも `JSON.parse` する | 未 | 読み込み前に `File.size` を見て上限（例 16MB）を超えたら断る（#17 に記載） |
+| スキーマ検証と `schemaVersion` チェック | `parseImport()` が `JSON.parse` → `migrate()`（`src/lib/migrate.ts`。版を読んで移行関数を1段ずつ当て、日時の欠落と id の重複を直し、`TextbookZ.safeParse` で検証）の順に処理（`src/lib/io.ts`）。失敗理由を画面に出し、Help の「読み込めない場合、まずはこちら」で手動でも試せる（#65） | 済 | 版を上げるときは `migrations` に関数を足す（`CLAUDE.md`「保存形式の規約」） |
+| 起動時に IndexedDB から読むデータも検証する | `init()` が各教科書を同じ `migrate()` に通す。直したものは書き戻し、直せないものは本棚で知らせて Help で直すか、生データを書き出すか消せる（#17 #65） | 済 | — |
+| サイズ上限 | 書き出し側は 8MB 超で警告（`SIZE_WARN_BYTES`）。読み込み側は 16MB（`IMPORT_LIMIT_BYTES`）を超えたら `JSON.parse` の前に断る（#17） | 済 | — |
 | 不正な `id` / 重複 / 循環 | 読み込み（`parseImport`）は `TextbookStrictZ`（`superRefine` で章・節・ブロック・画像の id の一意性を検証）で弾き、どの id が重複しているかを理由に出す。端末内のデータは `store.init` が `renumberDuplicateIds` で振り直して救済し、件数をトーストで知らせる。木構造なので循環は起きない（#36） | 済 | — |
 | URL 項目のスキーム検証 | スキーマ（`LinkZ.url`・`Block.source`・`Image.dataUrl`）は `z.string()` のまま弾かない（古い JSON を読めなくしないため）。描画時に `src/lib/safe.ts` の `isHttpUrl` / `isImageDataUrl` で無害化する（#35） | 済 | 描画経路を増やすときは必ずこの2関数を通す |
 | 同じ `id` の教科書との衝突 | `updatedAt` を比べて新しければ自動上書き、古ければ確認（`decideImport()`）。上書きは元に戻せる | 済 | — |
@@ -32,7 +32,7 @@
 |---|---|---|---|
 | 表示する HTML を必ずサニタイズする | `mdToHtml()` が marked の出力を `DOMPurify.sanitize()` に通す（`src/lib/md.ts`）。通読・レッスンとも `dangerouslySetInnerHTML` の入力はこの関数の戻り値だけ | 済 | 維持 |
 | 編集で確定する HTML もサニタイズする | `htmlToMd()` が turndown の前に `DOMPurify.sanitize()` を通す | 済 | — |
-| 貼り付けた HTML が確定前に生のまま DOM に入らない | **未対応**。`Editable` に `onPaste` が無く、貼り付け直後は貼った HTML がそのまま contenteditable に入る（blur で確定するまで）。自分の貼り付けなので第三者の入力ではないが、外部サイトからコピーした HTML が一時的に生で入る | 未 | `onPaste` で `text/plain` に落とすか、貼り付け時に sanitize（#17） |
+| 貼り付けた HTML が確定前に生のまま DOM に入らない | `Editable` の `onPaste` で `text/plain` だけを挿入する。画像の貼り付けは断る（#17） | 済 | — |
 | 外部リンクの `rel="noopener noreferrer"` | 自分のコードが作る `<a target="_blank">`（出典・手がかり・一次情報）には付いている（`blocks.tsx` `LessonPage.tsx`）。Markdown 内のリンクは marked が `target` を付けないので同一タブで開く | 済 | — |
 | `javascript:` / `data:` スキーム | Markdown 内のリンクは DOMPurify が `javascript:` を除去する。JSON 由来の `clues.links[].url` と出典 `b.source` は `isHttpUrl` を通ったときだけ `<a>` にし、それ以外は文字として出す。画像 `dataUrl` は `isImageDataUrl`（`data:image/…`）を通ったときだけ `<img>` にし、それ以外は「表示できない画像です」と出す（`src/lib/safe.ts`・#35） | 済 | `tests/safe.test.ts` と e2e「不正な URL と画像は無害化される」が見張る |
 
@@ -40,17 +40,18 @@
 
 | 要件 | 現状（該当箇所） | 判定 | 対応方針 |
 |---|---|---|---|
+| 渡した資料（#63）の扱い | txt/md の文字と PDF（base64）は API のリクエストにだけ入り、教科書の JSON には**名前だけ**残す（`Lesson.materials`）。上限は文字 200KB・PDF 10MB（`src/lib/material.ts`）。渡せる種類は拡張子と MIME で限定し、それ以外は断る。資料の内容は AI の下書きとして DOMPurify 経由で描画される | 済 | — |
 | AI が書いた URL をリンクにしない | 一次情報リンクは、調査で実際に返ってきた `sources[]` の**番号**を構造化出力で選ばせ、範囲外の番号は捨てる（`src/ai/anthropic.ts` 192行付近 `linkIndexes`）。AI が文中に書いた URL は Markdown のリンクとして表示されるだけで、手がかりには入らない | 済 | 維持 |
 | 構造化出力を検証する | `messages.parse()` + `zodOutputFormat(schema)` で受け取り、`parsed_output == null` は失敗扱い（`structure()`） | 済 | — |
 | AI 応答で教科書が壊れない | 失敗時は教科書を変えない（`src/ui/generate.ts`）。再設計は `src/lib/protect.ts` が守る対象（自分のノート・直した文・完了の節）を機械的に残し、`tests/protect.test.ts` が見張る | 済 | — |
 | Web 検索の結果が入力トークンとして課金される・上限を切る | `max_uses` を渡している。`pause_turn` の続行は最大5回（`MAX_PAUSE_CONTINUES`） | 済 | 実 API で検索回数を1回実測する（`docs/notes.md`「実 API で分かったこと」） |
-| 応答の切り詰め（`max_tokens`）を知らせる | `truncated` フラグは立つが画面に出ない | 未 | #17 |
+| 応答の切り詰め（`max_tokens`）を知らせる | 節の生成で Web 調査が切れたら、生成完了のトーストで知らせる（`LessonDraft.truncated`・#17） | 済 | 設計（`designCourse`）の調査は未対応。必要なら同じ形で足す |
 
 ## 5. 配信・ブラウザ側
 
 | 要件 | 現状（該当箇所） | 判定 | 対応方針 |
 |---|---|---|---|
-| CSP（Content-Security-Policy） | `index.html` に `meta http-equiv` は無い。GitHub Pages はヘッダを設定できないので `meta` で入れるしかない。外部への接続先は Anthropic API と Google Fonts（`fonts.googleapis.com` / `fonts.gstatic.com`）だけ | 未 | `connect-src 'self' https://api.anthropic.com; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'` を `meta` で入れる。Vite のインライン script と PWA の登録が動くか e2e で確かめる（候補 Issue） |
+| CSP（Content-Security-Policy） | 本番ビルドの `index.html` に `meta http-equiv` で入れる（`vite.config.ts` の `cspMeta` プラグイン・#37）。`default-src 'self'`、`script-src 'self'`（本番ビルドにインライン script は無い）、`style-src 'self' 'unsafe-inline' fonts.googleapis.com`（React の style 属性のため）、`font-src fonts.gstatic.com`、`img-src 'self' data: blob:`、`connect-src 'self' api.anthropic.com`、`worker-src 'self'`、`object-src 'none'`、`base-uri 'self'`、`form-action 'none'`。開発サーバーには入れない（HMR と React preamble がインライン script を使う） | 済 | e2e「CSP 違反が出ない」が見張る。接続先を増やすときは `connect-src` に足す。`frame-ancestors` は meta では効かない（Pages では設定不可） |
 | Service Worker のキャッシュに教科書データやキーが入らない | `vite-plugin-pwa` の `workbox.globPatterns` はビルド成果物（js/css/html/svg/png/woff2）だけ（`vite.config.ts`）。IndexedDB は対象外。API 応答の runtime caching は設定していない | 済 | Anthropic API を runtime cache に入れない設定を維持 |
 | HTTPS 前提 | GitHub Pages は HTTPS。混在コンテンツ（`http://` のローカルモデル）は Phase 2 の課題として認識済み | 済 | — |
 | 保存領域が勝手に消されない | `navigator.storage.persist()` を起動時に要求（`src/store.ts`）。許可されるかはブラウザ次第 | 要確認 | Android Chrome で「ホーム画面に追加」後に `navigator.storage.persisted()` を確認する |
@@ -82,7 +83,7 @@
 |---|---|---|---|
 | 誤操作で消したものを戻せる | 教科書・節・ノート・文・画像の削除は直後のトーストの「元に戻す」で戻せる（`snapshot()` + `putBook()`）。トーストは 7 秒で消える | 済（範囲は限定） | 7 秒を過ぎると戻せない。書き出し JSON からの復元が唯一の手段なので、書き出し忘れの知らせ（#16）が効く |
 | 端末の消去に備える | 書き出し JSON が唯一のバックアップ。本棚に「7 日以上書き出していない」知らせを出す | 済（本棚のみ） | レッスン画面にも出す（#16） |
-| 保存失敗を見逃さない | `putBook()` は IndexedDB への書き込み失敗をトーストで出すが、画面の状態は更新済みのまま | 未 | #17 |
+| 保存失敗を見逃さない | `putBook()` は書き込み失敗で画面の変更も取り消し、トーストで知らせる（#17） | 済 | — |
 | 「別の本として追加」で元を壊さない | `asCopy()` が `id` を振り直す | 済 | — |
 
 ## 「未」「要確認」のまとめ（別 Issue の候補）
@@ -97,7 +98,7 @@
 
 1. ~~URL のスキーム検証~~ → #35 で対応済み（描画時に無害化）
 2. ~~`id` の一意性検証~~ → #36 で対応済み
-3. **CSP の導入**: `index.html` の `meta` で `connect-src` を Anthropic API に限定。PWA の登録と Google Fonts が動くことを e2e で確認
+3. ~~CSP の導入~~ → #37 で対応済み（本番ビルドの meta）
 4. **実 API での確認**（人が行う）: エラー文にキーが混ざらないこと、検索回数の実測、`navigator.storage.persisted()` の結果
 
 ## 根拠

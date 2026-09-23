@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { getProvider, type CourseDesign, type QA, type Usage } from '../ai'
+import { getProvider, type AiError, type CourseDesign, type QA, type Usage } from '../ai'
 import { openBook, putBook, toast, useApp } from '../store'
 import { newChapter, newLesson, newTextbook, type CourseInput } from '../types'
-import { AiBar, Steps } from './common'
+import { AiBar, Steps, Working, stepPercent, useAbort } from './common'
 import { Button, Card, PageHead } from './kit'
 
 const STEP_LABELS = ['学びたいことを分解', 'Webを調査', 'コース設計を作成']
@@ -20,6 +20,10 @@ export function Create() {
   const [busy, setBusy] = useState<'ask' | 'design' | null>(null)
   const [step, setStep] = useState(-1)
   const [detail, setDetail] = useState('')
+  const [startedAt, setStartedAt] = useState<number | null>(null)
+  const [endedAt, setEndedAt] = useState<number | null>(null)
+  // 「設計を直してもらう」から始めたか（どのボタンを進行中にするかを決める）
+  const [redoing, setRedoing] = useState(false)
   const [design, setDesign] = useState<CourseDesign | null>(null)
   const [usage, setUsage] = useState<Usage | null>(null)
   const [off, setOff] = useState<Set<number>>(new Set())
@@ -38,12 +42,18 @@ export function Create() {
     setBusy(null)
   }
 
+  const abort = useAbort()
   async function run(extraNote = '') {
-    setError(''); setBusy('design'); setStep(0); setDetail('')
+    setError(''); setBusy('design'); setStep(0); setDetail(''); setStartedAt(Date.now()); setEndedAt(null); setRedoing(!!extraNote)
     try {
-      const r = await getProvider(ai).designCourse(input, qa ?? [], extraNote, (s, d) => { setStep(s); setDetail(d) })
+      const r = await getProvider(ai).designCourse(input, qa ?? [], extraNote, (s, d) => { setStep(s); setDetail(d) }, { signal: abort.start() })
       setDesign(r.design); setUsage(r.usage); setOff(new Set()); setStep(STEP_LABELS.length); setShowQa(false)
-    } catch (e) { setError((e as Error).message); setStep(-1) }
+    } catch (e) {
+      // 自分でやめたときはエラーにせず短く知らせる（#14）
+      if ((e as AiError).code === 'aborted') toast('生成をやめました'); else setError((e as Error).message)
+      setStep(-1)
+    }
+    setEndedAt(Date.now())
     setBusy(null)
   }
 
@@ -74,8 +84,14 @@ export function Create() {
             <label className="f" htmlFor="env">道具・環境<input type="text" id="env" value={input.env} onChange={field('env')} placeholder="ソフト、言語、機材など。未定でも構いません" /></label>
           </div>
           <div className="row">
-            <Button v={design ? 'soft' : 'primary'} onClick={ask} disabled={busy !== null}>{busy === 'ask' ? '質問を考えている…' : design ? 'もう一度調べ直す' : '調べてコース設計を作る'}</Button>
-            <span className="sub">全部自由入力です。先に設計だけ作り、資料は節ごとに後で生成します。</span>
+            {/* 押すと灰色になり、段階が進んだ分だけ青で塗られる（#50）。設計を作る間はこのボタンが進行中になる */}
+            <Button v={design ? 'soft' : 'primary'} onClick={ask} disabled={busy !== null}
+              progress={busy === 'ask' ? 0 : busy === 'design' && !redoing ? stepPercent(step, STEP_LABELS.length) : null}>
+              {busy === 'ask' ? '質問を考えている…' : busy === 'design' && !redoing ? '設計しています…' : design ? 'もう一度調べ直す' : '調べてコース設計を作る'}
+            </Button>
+            {busy === 'design' && !redoing
+              ? <><Working running detail={detail} startedAt={startedAt} endedAt={endedAt} /><Button v="outline" sm onClick={abort.stop}>やめる</Button></>
+              : <span className="sub">全部自由入力です。先に設計だけ作り、資料は節ごとに後で生成します。</span>}
           </div>
           {error && <p className="err" role="alert">{error}</p>}
         </Card>
@@ -106,9 +122,10 @@ export function Create() {
         <Card stack>
           <div className="pagehead">
             <div><div className="eyebrow">Step 2 コース設計案</div><h2>{design.title}</h2><p className="sub">{design.goal}</p></div>
-            <Button v="primary" onClick={adopt}>この設計で始める</Button>
+            <Button v="primary" onClick={adopt} disabled={busy !== null}>この設計で始める</Button>
           </div>
-          <ul className="outline">
+          {/* 設計を直してもらっている間は一覧を薄くして触れなくする（#50） */}
+          <ul className={`outline${busy === 'design' ? ' dim' : ''}`} aria-disabled={busy === 'design'}>
             {design.chapters.map((c, i) => (
               <li key={i}>
                 <input type="checkbox" id={`oc${i}`} checked={!off.has(i)} aria-label={`${c.title}を含める`}
@@ -120,7 +137,11 @@ export function Create() {
           </ul>
           <div className="row">
             <input type="text" id="tweak" value={note} onChange={(e) => setNote(e.target.value)} placeholder="設計への注文（例: 基礎は短く、実践課題を増やして）" style={{ flex: '1 1 280px' }} />
-            <Button v="ghost" disabled={busy !== null || !note.trim()} onClick={() => run(note)}>設計を直してもらう</Button>
+            <Button v="ghost" disabled={busy !== null || !note.trim()} onClick={() => run(note)}
+              progress={busy === 'design' && redoing ? stepPercent(step, STEP_LABELS.length) : null}>
+              {busy === 'design' && redoing ? '直しています…' : '設計を直してもらう'}
+            </Button>
+            {busy === 'design' && redoing && <><Working running detail={detail} startedAt={startedAt} endedAt={endedAt} /><Button v="outline" sm onClick={abort.stop}>やめる</Button></>}
           </div>
           <p className="sub">あとからでも、ロードマップの「設計を直す」で節・章・全体を選んで直せます。</p>
         </Card>

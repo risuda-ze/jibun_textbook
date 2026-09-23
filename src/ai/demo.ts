@@ -1,12 +1,18 @@
 import type { CourseInput, Textbook } from '../types'
 import { findLesson, isProtectedLesson } from '../lib/status'
-import { zeroUsage, type AiProvider, type Progress, type QA, type RedesignPlan, type RedesignScope } from './types'
+import { abortError, zeroUsage, type AiOpts, type AiProvider, type Progress, type QA, type RedesignPlan, type RedesignScope } from './types'
 
 /**
  * デモ応答。APIキーなしで動線を試すためのサンプルを返す。通しテストもこれを使う。
  * 内容は入力から機械的に組み立てた見本で、調査はしていない。
  */
-const wait = (ms = 200) => new Promise((r) => setTimeout(r, ms))
+/** 見本の待ち時間。signal で中止できる（#14。e2e で「やめる」を確かめるため） */
+const wait = (ms = 200, signal?: AbortSignal) => new Promise<void>((res, rej) => {
+  if (signal?.aborted) return rej(abortError())
+  const onAbort = () => { clearTimeout(t); rej(abortError()) }
+  const t = setTimeout(() => { signal?.removeEventListener('abort', onAbort); res() }, ms)
+  signal?.addEventListener('abort', onAbort, { once: true })
+})
 
 const topicOf = (i: CourseInput): string => (i.prompt.trim().split(/[。\n、,.]/)[0] || '学びたいこと').slice(0, 24)
 
@@ -16,11 +22,11 @@ export class DemoProvider implements AiProvider {
     return ['「できるようになった」と言えるのはどんな状態？ 成果物の例があると設計しやすい。', '好きな学び方、避けたい学び方はある？']
   }
 
-  async designCourse(input: CourseInput, _qa: QA[], note: string, onProgress: Progress) {
+  async designCourse(input: CourseInput, _qa: QA[], note: string, onProgress: Progress, opts: AiOpts = {}) {
     const t = topicOf(input)
-    onProgress(0, '学びたいことを分解している'); await wait()
-    onProgress(1, 'デモ応答のためWeb調査はしません'); await wait()
-    onProgress(2, 'コース設計を作っている'); await wait()
+    onProgress(0, '学びたいことを分解している'); await wait(200, opts.signal)
+    onProgress(1, 'デモ応答のためWeb調査はしません'); await wait(200, opts.signal)
+    onProgress(2, 'コース設計を作っている'); await wait(200, opts.signal)
     const L = (title: string, minutes = 45, isTask = false) => ({ title, minutes, isTask, summary: `${title}ができるようになる。` })
     const design = {
       title: t,
@@ -37,14 +43,20 @@ export class DemoProvider implements AiProvider {
     return { design, usage: zeroUsage() }
   }
 
-  async generateLesson(tb: Textbook, lessonId: string, onProgress: Progress) {
+  async generateLesson(tb: Textbook, lessonId: string, onProgress: Progress, opts: AiOpts = {}) {
     const f = findLesson(tb, lessonId)!
-    onProgress(0, 'デモ応答のためWeb調査はしません'); await wait()
-    onProgress(1, '資料を書いている'); await wait()
+    // 渡された資料（#63）は本文に名前と先頭だけ写して、動線を確かめられるようにする
+    const mats = opts.materials ?? []
+    const sourceOnly = !!opts.sourceOnly && mats.length > 0
+    onProgress(0, sourceOnly ? '渡された資料だけで書きます（デモ応答）' : 'デモ応答のためWeb調査はしません'); await wait(200, opts.signal)
+    onProgress(1, '資料を書いている'); await wait(200, opts.signal)
     const t = f.lesson.title
+    const matLine = mats.length
+      ? `\n\n（デモ）渡された資料: ${mats.map((m) => `${m.name}・${(m.text ?? 'PDF').replace(/\s+/g, ' ').slice(0, 40)}`).join(' ／ ')}${sourceOnly ? '（この資料だけから作る）' : ''}`
+      : ''
     const draft = {
       blocks: [
-        `### この節の狙い\n${f.lesson.summary || `${t}の要点をつかむ。`}\n\nこれは**デモ応答**の見本。実際のAIにつなぐと、Web調査をもとにした本文がここに入る。`,
+        `### この節の狙い\n${f.lesson.summary || `${t}の要点をつかむ。`}\n\nこれは**デモ応答**の見本。実際のAIにつなぐと、Web調査をもとにした本文がここに入る。${matLine}`,
         `### 要点\n- まず小さく試す\n- うまくいかなかった所をノートに残す\n- 自分の言葉で言い直す`,
         `### 例\n| 手順 | やること |\n|---|---|\n| 1 | お手本を1つ選ぶ |\n| 2 | 同じことを自分の環境でやる |\n| 3 | 違いを書き出す |`,
       ],
@@ -59,9 +71,9 @@ export class DemoProvider implements AiProvider {
     return { draft, usage: zeroUsage() }
   }
 
-  async proposeRedesign(tb: Textbook, scope: RedesignScope, lessonId: string, order: string, onProgress: Progress) {
+  async proposeRedesign(tb: Textbook, scope: RedesignScope, lessonId: string, order: string, onProgress: Progress, opts: AiOpts = {}) {
     const f = findLesson(tb, lessonId)!
-    onProgress(0, '変更案を作っている'); await wait()
+    onProgress(0, '変更案を作っている'); await wait(200, opts.signal)
     const tag = order ? `（${order.slice(0, 16)}）` : '（見直し）'
     let plan: RedesignPlan
     const keepOrChange = (l: Textbook['chapters'][number]['lessons'][number], first: boolean) => ({

@@ -23,6 +23,13 @@ export const MODELS: { id: string; label: string }[] = [
 
 export type Progress = (step: number, detail: string) => void
 
+/** 渡す資料（#63）。txt/md は文字、PDF は base64。教科書の JSON には入れない */
+export type MaterialKind = 'text' | 'pdf'
+export type Material = { kind: MaterialKind; name: string; size: number; text?: string; data?: string }
+
+/** 生成の追加指定。signal は中止（#14）、materials と sourceOnly は渡す資料（#63） */
+export type AiOpts = { signal?: AbortSignal; materials?: Material[]; sourceOnly?: boolean }
+
 export type Usage = { inputTokens: number; outputTokens: number; searches: number }
 export const zeroUsage = (): Usage => ({ inputTokens: 0, outputTokens: 0, searches: 0 })
 
@@ -34,7 +41,7 @@ export type CourseDesign = {
   chapters: { title: string; lessons: { title: string; minutes: number; isTask: boolean; summary: string }[] }[]
 }
 
-export type LessonDraft = { blocks: string[]; tasks: string[]; clues: Clues }
+export type LessonDraft = { blocks: string[]; tasks: string[]; clues: Clues; /** Web 調査が max_tokens で途中で切れた（#17） */ truncated?: boolean }
 
 export type RedesignScope = 'lesson' | 'chapter' | 'course'
 export type RedesignPlan =
@@ -43,19 +50,27 @@ export type RedesignPlan =
   | { scope: 'course'; chapters: PlanChapter[] }
 
 export interface AiProvider {
-  askQuestions(input: CourseInput): Promise<string[]>
-  designCourse(input: CourseInput, qa: QA[], note: string, onProgress: Progress): Promise<{ design: CourseDesign; usage: Usage }>
-  generateLesson(tb: Textbook, lessonId: string, onProgress: Progress): Promise<{ draft: LessonDraft; usage: Usage }>
-  proposeRedesign(tb: Textbook, scope: RedesignScope, lessonId: string, order: string, onProgress: Progress): Promise<{ plan: RedesignPlan; usage: Usage }>
+  askQuestions(input: CourseInput, opts?: AiOpts): Promise<string[]>
+  designCourse(input: CourseInput, qa: QA[], note: string, onProgress: Progress, opts?: AiOpts): Promise<{ design: CourseDesign; usage: Usage }>
+  generateLesson(tb: Textbook, lessonId: string, onProgress: Progress, opts?: AiOpts): Promise<{ draft: LessonDraft; usage: Usage }>
+  proposeRedesign(tb: Textbook, scope: RedesignScope, lessonId: string, order: string, onProgress: Progress, opts?: AiOpts): Promise<{ plan: RedesignPlan; usage: Usage }>
 }
 
-export type AiErrorCode = 'nokey' | 'auth' | 'rate' | 'network' | 'refusal' | 'parse' | 'unsupported' | 'api'
+export type AiErrorCode = 'nokey' | 'auth' | 'rate' | 'network' | 'refusal' | 'parse' | 'unsupported' | 'api' | 'aborted'
 
 export class AiError extends Error {
   code: AiErrorCode
+  /** 途中まで使った分（中止時など）。分かるときだけ入る（#14） */
+  usage?: Usage
   constructor(code: AiErrorCode, message: string) {
     super(message)
     this.code = code
     this.name = 'AiError'
   }
+}
+
+/** 自分でやめたときのエラー（#14） */
+export const abortError = (): AiError => new AiError('aborted', '生成をやめました。')
+export function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw abortError()
 }

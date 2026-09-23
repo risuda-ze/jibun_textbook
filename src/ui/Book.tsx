@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { allLessons, isMine, reviewCount } from '../lib/status'
-import { openLesson } from '../store'
+import { openLesson, setWide, updateLesson, useApp } from '../store'
 import type { Block, Lesson, Textbook } from '../types'
 import { BlockRow } from './blocks'
 import { downloadBook } from './Shelf'
@@ -10,6 +10,7 @@ type Filter = 'all' | 'me' | 'review'
 const FILTERS: [Filter, string][] = [['all', 'すべて'], ['me', '自分のノートだけ'], ['review', '再確認の節だけ']]
 
 export function Book({ tb }: { tb: Textbook }) {
+  const { wide } = useApp()
   const [filter, setFilter] = useState<Filter>('all')
   const [blame, setBlame] = useState(false)
   const lessonOk = (l: Lesson) => l.blocks.length > 0 && (filter !== 'review' || l.review)
@@ -21,7 +22,10 @@ export function Book({ tb }: { tb: Textbook }) {
   return (
     <>
       <PageHead eyebrow="教科書（通読）" title={tb.title} lead="全レッスンを1冊につなげた、読み返すための表示です。書くのはレッスン側で行います。"
-        actions={<Button v="ghost" onClick={() => downloadBook(tb)}>JSONを書き出す</Button>} />
+        actions={<>
+          <Button v="ghost" className="widebtn" aria-pressed={wide} onClick={() => setWide(!wide)}>{wide ? '幅を戻す' : '広げる'}</Button>
+          <Button v="ghost" onClick={() => downloadBook(tb)}>JSONを書き出す</Button>
+        </>} />
       <div className="row">
         {chapters.map(({ c, ci }) => (
           <Button key={c.id} v="outline" sm onClick={() => document.getElementById(`bkch${c.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>{ci + 1}. {c.title}</Button>
@@ -43,7 +47,7 @@ export function Book({ tb }: { tb: Textbook }) {
                   {l.done && <Pill tone="done">完了</Pill>}{l.review && <Pill tone="review">再確認</Pill>}
                   <button className="linkbtn" onClick={() => openLesson(l.id)}>このページに書く</button>
                 </h3>
-                {bs.map((b) => <BlockRow key={b.id} block={b} read />)}
+                {bs.map((b) => <BlockRow key={b.id} block={b} read onCheck={(md) => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) x.md = md })} />)}
               </div>
             ))}
           </section>

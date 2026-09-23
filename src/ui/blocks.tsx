@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { htmlToMd, mdToHtml } from '../lib/md'
+import { htmlToMd, mdToHtml, toggleTask } from '../lib/md'
 import { shrinkImage } from '../lib/image'
 import { isHttpUrl, isImageDataUrl } from '../lib/safe'
+import { applyMarkdown, type MdKind } from '../lib/mdedit'
 import { toast } from '../store'
 import type { Block, NoteDraft } from '../types'
 import { Button } from './kit'
@@ -24,6 +25,14 @@ export function Editable({ md, onCommit }: { md: string; onCommit: (md: string) 
       role="textbox"
       aria-multiline="true"
       aria-label="本文（直接編集できる）"
+      onPaste={(e) => {
+        // 貼り付けは文字だけ受け付ける（#17）。装飾つき HTML は確定まで生のまま入り、画像は縮小を通らず元サイズで md に入るため
+        const files = [...e.clipboardData.files]
+        e.preventDefault()
+        if (files.some((f) => f.type.startsWith('image/'))) return toast('本文には画像を貼れません。ノートの「画像を入れる」を使ってください')
+        const text = e.clipboardData.getData('text/plain')
+        if (text) document.execCommand('insertText', false, text)
+      }}
       onFocus={(e) => { before.current = e.currentTarget.innerHTML }}
       onBlur={(e) => {
         // 触っていないのに md が正規化で変わって「自分で修正」になるのを防ぐため、HTMLの変化で判定する
@@ -41,16 +50,31 @@ type RowProps = {
   block: Block
   read?: boolean
   onCommit?: (md: string) => void
+  /** 本文のチェックリストを切り替えたとき。onCommit と違い「自分で修正」にはしない（#56） */
+  onCheck?: (md: string) => void
   onDelete?: () => void
   onRemoveImage?: (imageId: string) => void
 }
 
-export function BlockRow({ block: b, read, onCommit, onDelete, onRemoveImage }: RowProps) {
+export function BlockRow({ block: b, read, onCommit, onCheck, onDelete, onRemoveImage }: RowProps) {
   const [cls, mk, tt] = MARK(b)
+  // 本文のチェックボックスのクリックを拾い、Markdown 側を反転して保存する。DOM の切り替えは保存後の再描画に任せる
+  const onBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const t = e.target
+    if (!(t instanceof HTMLInputElement) || t.type !== 'checkbox') return
+    e.preventDefault()
+    const body = t.closest('.blk-body') as HTMLElement | null
+    if (!body || !onCheck) return
+    const i = [...body.querySelectorAll('input[type="checkbox"]')].indexOf(t)
+    if (i < 0) return
+    // 見たまま編集の中では、フォーカスが残っていると再描画が反映されないので外す
+    if (body.isContentEditable) body.blur()
+    onCheck(toggleTask(b.md, i))
+  }
   return (
     <div className={`ln ${cls}`} data-block={b.id} data-by={b.by}>
       <span className="gut" title={tt}>{mk}</span>
-      <div>
+      <div onClick={onBodyClick}>
         {!read && <div className="ln-acts"><Button v="outline" sm onClick={onDelete}>消す</Button></div>}
         {b.quote && <blockquote>{b.quote}</blockquote>}
         {read ? <div className="blk-body" dangerouslySetInnerHTML={{ __html: mdToHtml(b.md) }} /> : <Editable md={b.md} onCommit={(m) => onCommit?.(m)} />}
@@ -130,12 +154,38 @@ export function Composer({ draft, onChange, onSubmit }: { draft: NoteDraft; onCh
     setPad(false)
   }
 
+  // Markdown の挿入ボタン（#52）。textarea の選択範囲に記法を当て、当てた範囲を選び直す。
+  // 選び直しは再描画（value の反映）の後でないと末尾へ飛ぶので、effect で行う
+  const pendingSel = useRef<{ start: number; end: number } | null>(null)
+  useEffect(() => {
+    const el = note.current, p = pendingSel.current
+    if (!el || !p) return
+    pendingSel.current = null
+    el.focus()
+    el.setSelectionRange(p.start, p.end)
+  }, [md])
+  function insertMd(kind: MdKind) {
+    const el = note.current
+    if (!el) return
+    const r = applyMarkdown(latest.current.md, el.selectionStart, el.selectionEnd, kind)
+    pendingSel.current = { start: r.start, end: r.end }
+    set({ md: r.md })
+  }
+  const MD_BUTTONS: [MdKind, string, string][] = [
+    ['bold', '太字', '**太字**'], ['bullet', '箇条書き', '- 項目'], ['number', '番号', '1. 項目'],
+    ['heading', '見出し', '## 見出し'], ['code', 'コード', '`コード`'], ['link', 'リンク', '[文](URL)'],
+  ]
+
   return (
     <div className="addnote" onPaste={(e) => {
       const fs = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'))
       if (fs.length) { e.preventDefault(); void addFiles(fs); toast('画像を貼り付けました') }
     }}>
       {quote && <blockquote>{quote} <button className="linkbtn" onClick={() => set({ quote: '' })}>引用をやめる</button></blockquote>}
+      <div className="row mdtools" role="toolbar" aria-label="Markdown の挿入">
+        {MD_BUTTONS.map(([k, label, hint]) => <Button key={k} v="outline" sm title={hint} onMouseDown={(e) => e.preventDefault()} onClick={() => insertMd(k)}>{label}</Button>)}
+        <span className="sub">Markdown が使えます。書き込むと整形されます</span>
+      </div>
       <textarea ref={note} id="note" value={md} onChange={(e) => set({ md: e.target.value })} placeholder="自分の言葉で。やってみた結果、調べて分かったこと、引っかかった点など。スクショは Ctrl+V で貼れます" />
       {images.length > 0 && (
         <div className="atts">

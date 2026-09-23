@@ -4,6 +4,7 @@ import { Create } from "./Create";
 import { Roadmap } from "./Roadmap";
 import { LessonPage } from "./LessonPage";
 import { Book } from "./Book";
+import { Help } from "./Help";
 
 const TABS: [Screen, string, boolean][] = [
     ["shelf", "本棚", false],
@@ -27,8 +28,10 @@ export function App() {
         (s.screen === "road" || s.screen === "lesson" || s.screen === "book")
             ? "shelf"
             : s.screen;
+    // レッスンと通読では、設定に応じて画面幅の約 90% まで広げる（#53）
+    const wide = s.wide && (screen === "lesson" || screen === "book");
     return (
-        <div className="app">
+        <div className={`app${wide ? " wide" : ""}`}>
             <header className="bar">
                 <div className="brand">じぶん教科書</div>
                 <nav className="tabs" role="tablist">
@@ -56,6 +59,7 @@ export function App() {
                 {screen === "road" && tb && <Roadmap tb={tb} />}
                 {screen === "lesson" && tb && <LessonPage tb={tb} />}
                 {screen === "book" && tb && <Book tb={tb} />}
+                {screen === "help" && <Help />}
             </main>
             {s.toast && (
                 <div className="toast" role="status">

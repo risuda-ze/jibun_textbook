@@ -36,13 +36,14 @@ src/
   lib/status.ts   節の状態（未作成/AIの下書き/書き込みあり/完了）の導出。保存はしない
   lib/protect.ts  「設計を直す」の反映と差分。守る対象の機械的な保証
   lib/io.ts       JSONの書き出し・読み込み・新旧の判定
+  lib/migrate.ts  版の移行（schemaVersion ごとの移行関数）と既知の不整合の修復。読み込みと起動時の両方が通る
   lib/image.ts    画像の縮小（長辺1600px・WebP）
   lib/md.ts       Markdown ⇔ HTML（見たまま編集の往復）
   ai/types.ts     AiProvider インターフェース。画面はこれだけを呼ぶ
   ai/anthropic.ts Anthropic API。調査（Web検索）→ 構造化 の2段構え
   ai/demo.ts      デモ応答。キーなしの試用と通しテストで使う
   ui/kit.tsx      共通コンポーネント（Button / Pill / Card / PageHead / Segmented）。画面に色や角丸を直接書かない
-  ui/             5画面（Shelf / Create / Roadmap / LessonPage / Book）と部品
+  ui/             5画面（Shelf / Create / Roadmap / LessonPage / Book）と Help、部品
   styles.css      DESIGN.md のトークンとクラス
 tests/            Vitest（データ・守る対象・Markdown往復・AI層）
 e2e/              Playwright（完了条件をPC幅とスマホ幅で）
@@ -58,6 +59,13 @@ npm test           # 単体とAI層
 npm run e2e        # 通し。初回は npx playwright install chromium
 npm run build      # dist/ を作る
 ```
+
+## 保存形式の規約（#65）
+
+- 保存形式の正は `src/types.ts`。互換性が無くなる変更（項目の削除・改名・意味の変更）をする時は `schemaVersion` を1つ上げ、旧版 → 新版の移行関数を `src/lib/migrate.ts` に足す。項目の追加だけで旧版も読めるなら版は上げず、zod の `default` で埋める
+- 移行は「元の版 → 次の版」を1段ずつ積む。版をまたぐ直行関数は作らない
+- 読み込み（JSON 読込・端末内データ）は版を見て新版まで自動で移行する。移行できない時は理由を出し、Help の「読み込めない場合、まずはこちら」で手動で試せるようにする
+- 移行関数には旧版の見本 JSON を使った単体テストを付ける。見本は `tests/fixtures/textbook_v<版>.json` に版ごとに残す
 
 ## AI層規約
 

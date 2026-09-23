@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
-import { getProvider, type RedesignPlan, type RedesignScope, type Usage } from '../ai'
+import { getProvider, type AiError, type RedesignPlan, type RedesignScope, type Usage } from '../ai'
 import { applyChapterPlan, applyCoursePlan, applyLessonRegen, diffLessonRegen, diffTextbooks, DIFF_LABEL, type DiffRow } from '../lib/protect'
 import { STATUS_LABEL, currentLesson, findLesson, lessonNo, lessonStatus } from '../lib/status'
 import { openLesson, putBook, selectLesson, snapshot, toast, updateBook, updateLesson, useApp } from '../store'
 import { newChapter, newLesson, type Lesson, type Textbook } from '../types'
-import { Meter, StatusChip } from './common'
+import { Meter, StatusChip, Working, stepPercent, useAbort } from './common'
 import { UsageLine } from './Create'
 import { downloadBook } from './Shelf'
-import { generateInto } from './generate'
+import { GEN_STEPS, generateInto, startGen, type GenState } from './generate'
+import { MaterialPanel, emptyMaterialInput, type MaterialInput } from './material'
 import { Button, Card, Pill, Segmented, type PillTone } from './kit'
 
 const PXMIN = 1.6
@@ -37,6 +38,10 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
   const [plan, setPlan] = useState<RedesignPlan | null>(null)
   const [usage, setUsage] = useState<Usage | null>(null)
   const [error, setError] = useState('')
+  const [step, setStep] = useState(-1)
+  const [detail, setDetail] = useState('')
+  const [startedAt, setStartedAt] = useState<number | null>(null)
+  const [endedAt, setEndedAt] = useState<number | null>(null)
   const scopes: [RedesignScope, string][] = [['lesson', `この節だけ ${lessonNo(tb, lesson.id)}`], ['chapter', `この章だけ 第${f.ci + 1}章`], ['course', 'コース全体']]
 
   const after = useMemo(() => (plan ? applyPlan(tb, lesson.id, plan) : null), [plan, tb, lesson.id])
@@ -44,12 +49,18 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
     : plan.scope === 'lesson' ? diffLessonRegen(lesson, plan.blocks)
     : diffTextbooks(tb, after, plan.scope === 'chapter' ? f.chapter.id : undefined)
 
+  const abort = useAbort()
   async function propose() {
-    setBusy(true); setError(''); setPlan(null)
+    setBusy(true); setError(''); setPlan(null); setStep(0); setDetail(''); setStartedAt(Date.now()); setEndedAt(null)
     try {
-      const r = await getProvider(ai).proposeRedesign(tb, scope, lesson.id, order, () => {})
-      setPlan(r.plan); setUsage(r.usage)
-    } catch (e) { setError((e as Error).message) }
+      const r = await getProvider(ai).proposeRedesign(tb, scope, lesson.id, order, (s, d) => { setStep(s); setDetail(d) }, { signal: abort.start() })
+      setPlan(r.plan); setUsage(r.usage); setStep(1)
+    } catch (e) {
+      // 自分でやめたときはエラーにせず短く知らせる（#14）
+      if ((e as AiError).code === 'aborted') toast('生成をやめました'); else setError((e as Error).message)
+      setStep(-1)
+    }
+    setEndedAt(Date.now())
     setBusy(false)
   }
 
@@ -74,7 +85,9 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
       </div>
       <div className="row">
         <input type="text" id="redotext" value={order} onChange={(e) => setOrder(e.target.value)} placeholder="どう変えたいか（例: 理論は短く、実践を先に）" style={{ flex: '1 1 280px' }} />
-        <Button v="soft" disabled={busy} onClick={propose}>{busy ? '案を作成中…' : plan ? '別の案を出す' : '変更案を出してもらう'}</Button>
+        <Button v="soft" disabled={busy} onClick={propose} progress={busy ? stepPercent(step, 1) : null}>{busy ? '案を作成中…' : plan ? '別の案を出す' : '変更案を出してもらう'}</Button>
+        {busy && <Working running detail={detail} startedAt={startedAt} endedAt={endedAt} />}
+        {busy && <Button v="outline" sm onClick={abort.stop}>やめる</Button>}
       </div>
       {error && <p className="err" role="alert">{error}</p>}
       {plan && (
@@ -107,7 +120,8 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
 export function Roadmap({ tb }: { tb: Textbook }) {
   const { lessonId, ai } = useApp()
   const [redo, setRedo] = useState(false)
-  const [gen, setGen] = useState<{ id: string; detail: string } | null>(null)
+  // 資料を生成の進行中（#55）。押したボタンが進んだ分だけ塗られ、脇に今していることと経過秒数が出る
+  const [gen, setGen] = useState<({ id: string } & GenState) | null>(null)
   const cur = currentLesson(tb)
   const sel = (lessonId && findLesson(tb, lessonId)) || (cur && findLesson(tb, cur.id)) || (tb.chapters[0]?.lessons[0] && findLesson(tb, tb.chapters[0].lessons[0].id))
 
@@ -126,11 +140,15 @@ export function Roadmap({ tb }: { tb: Textbook }) {
   const units = Math.max(1, Math.ceil(cursor / UNIT))
   const W = units * UNIT * PXMIN
 
+  const abort = useAbort()
+  // 渡す資料（#63）。選んでいる節の生成に使う
+  const [mat, setMat] = useState<MaterialInput>(emptyMaterialInput)
   async function generate(id: string) {
-    setGen({ id, detail: '' })
-    const ok = await generateInto(tb, id, ai, (d) => setGen({ id, detail: d }))
+    const g = { id, ...startGen() }
+    setGen(g)
+    const ok = await generateInto(tb, id, ai, (step, detail) => setGen({ ...g, step, detail }), abort.start(), mat)
     setGen(null)
-    if (ok) openLesson(id)
+    if (ok) { setMat(emptyMaterialInput()); openLesson(id) }
   }
 
   function addLesson(chapterId: string) {
@@ -145,8 +163,10 @@ export function Roadmap({ tb }: { tb: Textbook }) {
   }
   function removeLesson(id: string) {
     const before = snapshot(tb.id)
+    // 最後の1節を消すと章ごと消える。そのことをトーストで伝える（#17）。元に戻すで章も戻る
+    const last = tb.chapters.some((c) => c.lessons.length === 1 && c.lessons[0].id === id)
     updateBook(tb.id, (d) => { for (const c of d.chapters) c.lessons = c.lessons.filter((l) => l.id !== id); d.chapters = d.chapters.filter((c) => c.lessons.length) })
-    toast('節を消しました', before ? () => putBook(before) : undefined)
+    toast(last ? '節を消しました。節が無くなった章も消しました' : '節を消しました', before ? () => putBook(before) : undefined)
   }
 
   return (
@@ -227,11 +247,18 @@ export function Roadmap({ tb }: { tb: Textbook }) {
             <p className="sub">{sel.lesson.summary || (sel.lesson.blocks.length ? '本文あり。' : 'まだ資料がありません。AIに生成させるか、自分で書き始めてください。')}</p>
             <div className="row">
               {sel.lesson.blocks.length === 0 && (
-                <Button v="soft" disabled={gen !== null} onClick={() => generate(sel.lesson.id)}>{gen?.id === sel.lesson.id ? gen.detail || '生成中…' : 'この節の資料を生成'}</Button>
+                <Button v="soft" disabled={gen !== null} onClick={() => generate(sel.lesson.id)} progress={gen?.id === sel.lesson.id ? stepPercent(gen.step, GEN_STEPS) : null}>{gen?.id === sel.lesson.id ? '生成中…' : 'この節の資料を生成'}</Button>
+              )}
+              {gen?.id === sel.lesson.id && (
+                <>
+                  <Working running detail={gen.detail} startedAt={gen.startedAt} endedAt={gen.endedAt} />
+                  <Button v="outline" sm onClick={abort.stop}>やめる</Button>
+                </>
               )}
               <Button v={sel.lesson.blocks.length ? 'soft' : 'ghost'} onClick={() => openLesson(sel.lesson.id)}>{sel.lesson.blocks.length ? 'レッスンを開く' : '自分で書き始める'}</Button>
               <Button v="outline" sm onClick={() => removeLesson(sel.lesson.id)}>この節を消す</Button>
             </div>
+            {sel.lesson.blocks.length === 0 && <MaterialPanel value={mat} onChange={setMat} disabled={gen !== null} />}
             <div><div className="sub" style={{ marginBottom: 4 }}>教科書の育ち具合</div><Meter tb={tb} /></div>
           </div>
           <div className="chapterpane">

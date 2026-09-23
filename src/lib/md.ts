@@ -6,7 +6,25 @@ import { gfm } from 'turndown-plugin-gfm'
 
 /** 保存はMarkdown、編集は見たまま。表示時に md→HTML、編集確定時に HTML→md。 */
 
-marked.setOptions({ gfm: true, breaks: true })
+// チェックリストの箱は disabled を付けずに描画し、クリックで切り替えられるようにする（#56）。切り替えは BlockRow が拾って toggleTask で保存する
+const renderer = new marked.Renderer()
+renderer.checkbox = ({ checked }) => `<input type="checkbox"${checked ? ' checked=""' : ''}>`
+marked.setOptions({ gfm: true, breaks: true, renderer })
+
+/** Markdown の中の index 番目（0 始まり）のチェック項目（- [ ] / - [x]）を反転する。無ければそのまま */
+export function toggleTask(md: string, index: number): string {
+  let n = -1
+  return md
+    .split('\n')
+    .map((line) => {
+      const m = /^(\s*(?:[-*+]|\d+[.)])\s+)\[( |x|X)\]/.exec(line)
+      if (!m) return line
+      n++
+      if (n !== index) return line
+      return line.replace(/\[( |x|X)\]/, m[2] === ' ' ? '[x]' : '[ ]')
+    })
+    .join('\n')
+}
 
 export function mdToHtml(md: string): string {
   const html = marked.parse(md, { async: false }) as string
@@ -15,6 +33,12 @@ export function mdToHtml(md: string): string {
 
 const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', bulletListMarker: '-', emDelimiter: '*' })
 td.use(gfm)
+// 表のセルの中の <br> は <br> のまま出す（#48）。既定の「行末空白2つ＋改行」にすると表の行が途中で切れる。
+// GFM の表セルは HTML の <br> を許すので、marked が再び改行として描画する
+td.addRule('brInTableCell', {
+  filter: (node) => node.nodeName === 'BR' && !!node.closest('td, th'),
+  replacement: () => '<br>',
+})
 // contenteditable が作る <div> の改行を段落として扱う
 td.addRule('divAsParagraph', {
   filter: 'div',

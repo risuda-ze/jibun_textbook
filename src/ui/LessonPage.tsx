@@ -1,11 +1,12 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { allLessons, findLesson, lessonNo, minePercent } from '../lib/status'
-import { go, openLesson, putBook, setDraft as storeDraft, snapshot, toast, updateLesson, useApp } from '../store'
+import { go, openLesson, putBook, setDraft as storeDraft, setWide, snapshot, toast, updateLesson, useApp } from '../store'
 import { emptyDraft, newBlock, uid, type Lesson, type NoteDraft, type Textbook } from '../types'
 import { BlockRow, Composer } from './blocks'
-import { StatusChip } from './common'
+import { StatusChip, Working, stepPercent, useAbort } from './common'
 import { isHttpUrl } from '../lib/safe'
-import { generateInto } from './generate'
+import { GEN_STEPS, generateInto, startGen, type GenState } from './generate'
+import { MaterialPanel, emptyMaterialInput, type MaterialInput } from './material'
 import { Button, Card } from './kit'
 
 const gq = (q: string) => 'https://www.google.com/search?q=' + encodeURIComponent(q)
@@ -13,10 +14,11 @@ const gq = (q: string) => 'https://www.google.com/search?q=' + encodeURIComponen
 function Clues({ tb, lesson }: { tb: Textbook; lesson: Lesson }) {
   const [q, setQ] = useState('')
   const [url, setUrl] = useState('')
+  const [linkTitle, setLinkTitle] = useState('')
   const c = lesson.clues
   return (
-    <Card stack className="clues" aria-label="調べる手がかり">
-      <div><h2 style={{ fontSize: 16 }}>調べる手がかり</h2><p className="sub">AIの文を鵜呑みにせず、自分で確かめるための入口です。</p></div>
+    <Card stack className="clues" aria-label="参考情報">
+      <h2 style={{ fontSize: 16 }}>参考情報</h2>
       <div>
         <div className="eyebrow">検索する</div>
         <div className="row" style={{ marginTop: 6 }}>
@@ -39,9 +41,10 @@ function Clues({ tb, lesson }: { tb: Textbook; lesson: Lesson }) {
       </div>
       <div className="row">
         <input type="text" id="cluelink" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="読んだページのURLを足す" style={{ flex: '1 1 200px' }} />
+        <input type="text" id="cluetitle" value={linkTitle} onChange={(e) => setLinkTitle(e.target.value)} placeholder="題名（任意）" style={{ flex: '1 1 120px' }} />
         <Button v="ghost" onClick={() => {
           const u = url.trim(); if (!isHttpUrl(u)) return toast('http から始まるURLを入れてください')
-          updateLesson(tb.id, lesson.id, (l) => { l.clues.links.push({ title: u, url: u, fetchedAt: new Date().toISOString().slice(0, 10) }) }); setUrl('')
+          updateLesson(tb.id, lesson.id, (l) => { l.clues.links.push({ title: linkTitle.trim() || u, url: u, fetchedAt: new Date().toISOString().slice(0, 10) }) }); setUrl(''); setLinkTitle('')
         }}>リンクを足す</Button>
       </div>
     </Card>
@@ -49,11 +52,12 @@ function Clues({ tb, lesson }: { tb: Textbook; lesson: Lesson }) {
 }
 
 export function LessonPage({ tb }: { tb: Textbook }) {
-  const { lessonId, ai, drafts } = useApp()
+  const { lessonId, ai, drafts, wide } = useApp()
   const f = (lessonId && findLesson(tb, lessonId)) || null
   const [insAt, setInsAt] = useState<number | null>(null)
   const [blame, setBlame] = useState(true)
-  const [genDetail, setGenDetail] = useState<string | null>(null)
+  // 資料を生成の進行中（#55）
+  const [gen, setGen] = useState<GenState | null>(null)
   const [task, setTask] = useState('')
   const qbtn = useRef<HTMLButtonElement>(null)
   const pending = useRef<{ text: string; blockId: string } | null>(null)
@@ -99,10 +103,15 @@ export function LessonPage({ tb }: { tb: Textbook }) {
     toast('書き込みました')
   }
 
+  const abort = useAbort()
+  // 渡す資料（#63）
+  const [mat, setMat] = useState<MaterialInput>(emptyMaterialInput)
   async function generate() {
-    setGenDetail('')
-    await generateInto(tb, l.id, ai, setGenDetail)
-    setGenDetail(null)
+    const g = startGen()
+    setGen(g)
+    const ok = await generateInto(tb, l.id, ai, (step, detail) => setGen({ ...g, step, detail }), abort.start(), mat)
+    setGen(null)
+    if (ok) setMat(emptyMaterialInput())
   }
 
   const composerAt = insAt ?? l.blocks.length
@@ -115,8 +124,11 @@ export function LessonPage({ tb }: { tb: Textbook }) {
           <div className="eyebrow">{lessonNo(tb, l.id)}・{l.minutes}分{l.isTask && '・実践課題'}</div>
           <h1>{l.title}</h1>
           <div className="row" style={{ marginTop: 6 }}><StatusChip lesson={l} /></div>
+          {l.materials.length > 0 && <div className="sub" style={{ marginTop: 4 }}>元にした資料: {l.materials.join('、')}</div>}
         </div>
         <div className="row">
+          {/* 表示領域の切り替え（#53）。スマホ幅では CSS で隠す（元から1列で画面いっぱい） */}
+          <Button v="ghost" className="widebtn" aria-pressed={wide} onClick={() => setWide(!wide)}>{wide ? '幅を戻す' : '広げる'}</Button>
           <Button v="ghost" onClick={() => go('road')}>ロードマップ</Button>
           {next && <Button v="ghost" onClick={() => openLesson(next.id)}>次へ {lessonNo(tb, next.id)}</Button>}
         </div>
@@ -128,9 +140,12 @@ export function LessonPage({ tb }: { tb: Textbook }) {
             <Card stack>
               <p>この節はまだ資料がありません。AIに下書きを作らせるか、下の欄から自分で書き始めてください。</p>
               <div className="row">
-                <Button v="soft" disabled={genDetail !== null} onClick={generate}>{genDetail !== null ? genDetail || '生成中…' : '資料を生成'}</Button>
-                <span className="sub">使うAI: {ai.kind === 'anthropic' ? ai.model : ai.kind === 'demo' ? 'デモ応答' : '未対応の接続先'}（「つくる」画面で切り替え）</span>
+                <Button v="soft" disabled={gen !== null} onClick={generate} progress={gen ? stepPercent(gen.step, GEN_STEPS) : null}>{gen ? '生成中…' : '資料を生成'}</Button>
+                {gen && <Working running detail={gen.detail} startedAt={gen.startedAt} endedAt={gen.endedAt} />}
+                {gen && <Button v="outline" sm onClick={abort.stop}>やめる</Button>}
+                {!gen && <span className="sub">使うAI: {ai.kind === 'anthropic' ? ai.model : ai.kind === 'demo' ? 'デモ応答' : '未対応の接続先'}（「つくる」画面で切り替え）</span>}
               </div>
+              <MaterialPanel value={mat} onChange={setMat} disabled={gen !== null} />
             </Card>
           )}
           <div className="row">
@@ -144,6 +159,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
                 <BlockRow
                   block={b}
                   onCommit={(md) => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) { x.md = md; if (x.by === 'ai') x.edited = true } })}
+                  onCheck={(md) => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) x.md = md })}
                   onDelete={() => withUndo(b.by === 'me' ? 'ノートを消しました' : '文を消しました', () => updateLesson(tb.id, l.id, (d) => { d.blocks = d.blocks.filter((y) => y.id !== b.id) }))}
                   onRemoveImage={(imgId) => withUndo('画像を外しました', () => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) x.images = x.images.filter((im) => im.id !== imgId) }))}
                 />

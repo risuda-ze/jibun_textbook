@@ -1,6 +1,9 @@
-import { TextbookStrictZ, TextbookZ, type Textbook, uid, nowIso } from '../types'
+import { TextbookZ, type Textbook, uid, nowIso } from '../types'
+import { migrate } from './migrate'
 
 export const SIZE_WARN_BYTES = 8 * 1024 * 1024
+/** 読み込む JSON の上限（#17）。これを超えるファイルは JSON.parse する前に断る */
+export const IMPORT_LIMIT_BYTES = 16 * 1024 * 1024
 
 /** 書き出し。スキーマを通すので、教科書以外の項目（APIキー等）は構造上入らない。 */
 export function exportJson(tb: Textbook): string {
@@ -18,7 +21,8 @@ export function formatSize(bytes: number): string {
 export const fileName = (tb: Textbook): string =>
   `${tb.title.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40) || 'textbook'}.textbook.json`
 
-export type ParseResult = { ok: true; tb: Textbook } | { ok: false; reason: string }
+/** steps は読み込むときに直した所（版の移行・不整合の修復）。空なら手を入れていない */
+export type ParseResult = { ok: true; tb: Textbook; steps: string[] } | { ok: false; reason: string }
 
 export function parseImport(text: string): ParseResult {
   let raw: unknown
@@ -27,17 +31,11 @@ export function parseImport(text: string): ParseResult {
   } catch {
     return { ok: false, reason: 'JSONとして読み込めませんでした。ファイルが壊れているか、別の種類のファイルの可能性があります。' }
   }
-  if (!raw || typeof raw !== 'object') return { ok: false, reason: '教科書のJSONではありません。' }
-  const v = (raw as { schemaVersion?: unknown }).schemaVersion
-  if (v !== 1) return { ok: false, reason: `このアプリでは読み込めない形式のファイルです（schemaVersion: ${String(v)}）。アプリを更新してから読み込んでください。` }
-  // 読み込みは id の一意性まで検証する（#36）。端末内の既存データは store.init が振り直して救済する
-  const r = TextbookStrictZ.safeParse(raw)
-  if (!r.success) {
-    const i = r.error.issues[0]
-    if (i.code === 'custom') return { ok: false, reason: `${i.message}。同じ id の章・節・ノートが複数あるため読み込めません。` }
-    return { ok: false, reason: `形式が正しくありません（${i.path.join('.') || 'root'}: ${i.message}）。` }
-  }
-  return { ok: true, tb: r.data }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, reason: '教科書のJSONではありません。' }
+  // 版の移行と既知の不整合（id の重複・日時の欠落）の修復は migrate() に寄せる（#65）。端末内のデータも同じ道を通る
+  const r = migrate(raw)
+  if (!r.ok) return { ok: false, reason: r.reason }
+  return { ok: true, tb: r.tb, steps: r.steps }
 }
 
 /**

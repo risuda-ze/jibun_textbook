@@ -2,7 +2,7 @@ import type { Lesson, Textbook } from '../types'
 import { STATUS_LABEL, lessonStatus, statusCounts, type Status } from '../lib/status'
 import { MODELS, type AiKind } from '../ai/types'
 import { setAi, toast, useApp } from '../store'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, Card, Pill, Segmented } from './kit'
 
 export function StatusChip({ lesson }: { lesson: Lesson }) {
@@ -80,6 +80,28 @@ export function AiBar() {
   )
 }
 
+/** 経過秒数（#50）。running の間は1秒ごとに更新し、終わったら止まる */
+export function useElapsed(running: boolean, startedAt: number | null, endedAt: number | null): number | null {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!running) return
+    setNow(Date.now())
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [running])
+  return startedAt ? Math.max(0, Math.floor(((endedAt ?? now) - startedAt) / 1000)) : null
+}
+
+/** ボタンの塗りに使う進み具合（%）。段階が終わった分だけ進む（3段階なら 0 / 33 / 67 / 100） */
+export const stepPercent = (step: number, total: number): number => Math.round((Math.max(0, Math.min(step, total)) / total) * 100)
+
+/** 進行中の一言。今していること（検索語など）と経過秒数。ボタンの脇に置く */
+export function Working({ running, detail, startedAt, endedAt }: { running: boolean; detail: string; startedAt: number | null; endedAt: number | null }) {
+  const sec = useElapsed(running, startedAt, endedAt)
+  if (!running) return null
+  return <span className="sub working" role="status">{detail || '実行中…'}{sec !== null && <span className="mono">・{sec}秒</span>}</span>
+}
+
 export function Steps({ labels, step, detail }: { labels: string[]; step: number; detail: string }) {
   return (
     <ol className="steps">
@@ -91,4 +113,17 @@ export function Steps({ labels, step, detail }: { labels: string[]; step: number
       ))}
     </ol>
   )
+}
+
+/**
+ * 生成の中止（#14）。start() で新しい AbortController を作って signal を返し、stop() で中止する。
+ * 画面を離れる（unmount）ときも自動で中止する。
+ */
+export function useAbort(): { start: () => AbortSignal; stop: () => void } {
+  const ref = useRef<AbortController | null>(null)
+  useEffect(() => () => ref.current?.abort(), [])
+  return {
+    start: () => { ref.current?.abort(); const c = new AbortController(); ref.current = c; return c.signal },
+    stop: () => ref.current?.abort(),
+  }
 }

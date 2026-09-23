@@ -51,6 +51,8 @@ export const LessonZ = z.object({
   tasks: z.array(TaskZ).default([]),
   clues: CluesZ.default({ queries: [], links: [], how: [] }),
   blocks: z.array(BlockZ).default([]),
+  /** 生成のときに渡した資料の名前（#63）。本文は持たない */
+  materials: z.array(z.string()).default([]),
 })
 
 export const ChapterZ = z.object({
@@ -156,7 +158,7 @@ export function newBlock(by: Block['by'], md: string, extra: Partial<Block> = {}
 export function newLesson(title: string, extra: Partial<Lesson> = {}): Lesson {
   return {
     id: uid(), title, minutes: 45, isTask: false, done: false, review: false, summary: '',
-    tasks: [], clues: { queries: [], links: [], how: [] }, blocks: [], ...extra,
+    tasks: [], clues: { queries: [], links: [], how: [] }, blocks: [], materials: [], ...extra,
   }
 }
 

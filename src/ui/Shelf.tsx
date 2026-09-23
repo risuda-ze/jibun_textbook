@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import {
+    dropBroken,
     go,
+    openRepair,
     markExported,
     openBook,
     putBook,
@@ -10,6 +12,7 @@ import {
 } from "../store";
 import { newChapter, newLesson, newTextbook, type Textbook } from "../types";
 import {
+    IMPORT_LIMIT_BYTES,
     SIZE_WARN_BYTES,
     asCopy,
     byteSize,
@@ -53,7 +56,7 @@ const daysSince = (iso?: string): number | null =>
     iso ? Math.floor((Date.now() - Date.parse(iso)) / 86400000) : null;
 
 export function Shelf() {
-    const { books, lastExport } = useApp();
+    const { books, lastExport, broken } = useApp();
     const file = useRef<HTMLInputElement>(null);
     const [older, setOlder] = useState<{
         incoming: Textbook;
@@ -64,17 +67,21 @@ export function Shelf() {
     async function onFile(f: File | undefined) {
         if (!f) return;
         setError("");
+        if (f.size > IMPORT_LIMIT_BYTES)
+            return setError(`「${f.name}」は大きすぎて読み込めません（${formatSize(f.size)}。上限は ${formatSize(IMPORT_LIMIT_BYTES)}）。`);
         const r = parseImport(await f.text());
         if (!r.ok)
             return setError(`「${f.name}」は読み込めませんでした。${r.reason}`);
         const existing = books.find((b) => b.id === r.tb.id);
         const d = decideImport(existing, r.tb);
+        // 版の移行や不整合の修復をしたら、何を直したかを知らせる（#65）
+        const fixed = r.steps.length ? `直した所: ${r.steps.join("、")}。` : "";
         if (d === "add") {
             putBook(r.tb, false);
-            toast(`「${r.tb.title}」を読み込みました。`);
+            toast(`「${r.tb.title}」を読み込みました。${fixed}`);
         } else if (d === "overwrite") {
             putBook(r.tb, false);
-            toast(`「${r.tb.title}」を新しい内容で上書きしました。`, () =>
+            toast(`「${r.tb.title}」を新しい内容で上書きしました。${fixed}`, () =>
                 putBook(existing!, false),
             );
         } else if (d === "same") toast("同じ内容が存在します。");
@@ -97,6 +104,9 @@ export function Shelf() {
                 lead="「学習計画を設計する」 → 「資料を一次作成」 → 「手を動かしながら、書き込む」"
                 actions={
                     <>
+                        <Button v="ghost" onClick={() => go("help")}>
+                            Help
+                        </Button>
                         <Button v="ghost" onClick={() => file.current?.click()}>
                             JSON読込
                         </Button>
@@ -122,9 +132,40 @@ export function Shelf() {
             />
 
             {error && (
-                <p className="err" role="alert">
-                    {error}
-                </p>
+                <div className="row" style={{ alignItems: "baseline" }}>
+                    <p className="err" role="alert">
+                        {error}
+                    </p>
+                    {/* 失敗文の近くから Help の対処へ（#64） */}
+                    <Button v="outline" sm onClick={() => go("help")}>
+                        読み込めない場合、まずはこちら
+                    </Button>
+                </div>
+            )}
+
+            {broken.length > 0 && (
+                <Card stack tone="peach" aria-label="読めない教科書">
+                    <p>
+                        <b>読み込めない教科書が {broken.length} 冊あります。</b>
+                        形式が壊れているか、古い版のデータです。「Help で直す」で版の移行と修復を試せます。生データを書き出して保管するか、消すこともできます。
+                    </p>
+                    <div className="row">
+                        {broken.map((b) => (
+                            <span className="row" key={b.key}>
+                                <span className="mono sub">{b.key}</span>
+                                <Button v="outline" sm onClick={() => {
+                                    const a = document.createElement("a");
+                                    a.href = URL.createObjectURL(new Blob([JSON.stringify(b.raw ?? null, null, 1)], { type: "application/json" }));
+                                    a.download = `${b.key.replace(/[^a-z0-9_-]/gi, "_")}.raw.json`;
+                                    document.body.appendChild(a); a.click(); a.remove();
+                                    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+                                }}>生データを書き出す</Button>
+                                <Button v="outline" sm onClick={() => openRepair(b.key, b.raw)}>Help で直す</Button>
+                                <Button v="danger" sm onClick={() => { if (confirm("この生データを端末から消しますか？")) dropBroken(b.key); }}>消去</Button>
+                            </span>
+                        ))}
+                    </div>
+                </Card>
             )}
 
             {older && (

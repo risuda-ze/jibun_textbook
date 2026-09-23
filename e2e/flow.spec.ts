@@ -1,36 +1,6 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
-
-// 1x1 の PNG
-const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
-
-const isPhone = (page: Page) => (page.viewportSize()?.width ?? 1000) < 820
-
-async function blankBook(page: Page) {
-  await page.goto('./')
-  await page.getByRole('button', { name: '白紙から作る' }).click()
-  await expect(page.getByLabel('教科書の名前')).toHaveValue('新しい教科書')
-}
-
-async function demoBook(page: Page) {
-  await page.goto('./')
-  await page.getByRole('button', { name: 'AIと新規作成' }).click()
-  await page.getByRole('button', { name: 'デモ応答' }).click()
-  await page.locator('#goal').fill('Rustで自分用の小さなツールを書けるようになりたい')
-  await page.locator('#env').fill('Windows、VS Code')
-  await page.getByRole('button', { name: '調べてコース設計を作る' }).click()
-  await expect(page.getByText('AIからの確認')).toBeVisible()
-  await page.getByRole('button', { name: 'スキップ' }).click()
-  await expect(page.getByText('Step 2 コース設計案')).toBeVisible()
-  await page.getByRole('button', { name: 'この設計で始める' }).click()
-  await expect(page.getByLabel('教科書の名前')).toBeVisible()
-}
-
-async function writeNote(page: Page, text: string) {
-  await page.locator('#note').fill(text)
-  await page.getByRole('button', { name: '書き込む' }).click()
-  await expect(page.locator('.doc [data-by="me"]').filter({ hasText: text })).toBeVisible()
-}
+import { PNG, blankBook, demoBook, isPhone, writeNote } from './helpers'
 
 test('完了条件1: 自由入力 → 確認質問 → 設計案 → ロードマップに並ぶ', async ({ page }) => {
   await demoBook(page)
@@ -54,12 +24,12 @@ test('スマホ幅は章ごとの一覧、PC幅はタイムライン', async ({ 
   }
 })
 
-test('完了条件2: 資料を生成すると本文と調べる手がかりが入る', async ({ page }) => {
+test('完了条件2: 資料を生成すると本文と参考情報が入る', async ({ page }) => {
   await demoBook(page)
   await page.getByRole('button', { name: 'この節の資料を生成' }).click()
   await expect(page.locator('.doc [data-by="ai"]')).toHaveCount(3)
   await expect(page.locator('.doc table')).toBeVisible()
-  const clues = page.getByLabel('調べる手がかり')
+  const clues = page.getByLabel('参考情報')
   await expect(clues.locator('a.qchip').first()).toHaveAttribute('href', /google\.com\/search\?q=/)
   await expect(clues.getByText('本文の例を自分の環境で再現する')).toBeVisible()
   await expect(page.locator('.rail').getByText('例を自分の環境で試す')).toBeVisible()
@@ -322,7 +292,7 @@ test('不正な URL と画像は無害化される（読み込んだ JSON 由来
   await page.locator('#importfile').setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tb)) })
   await page.getByRole('button', { name: '開く' }).click()
   await page.getByRole('button', { name: 'レッスンを開く' }).click()
-  const clues = page.getByLabel('調べる手がかり')
+  const clues = page.getByLabel('参考情報')
   await expect(clues.getByText('悪いリンク')).toBeVisible()
   await expect(clues.getByRole('link', { name: '悪いリンク' })).toHaveCount(0)
   await expect(clues.getByRole('link', { name: '良いリンク' })).toHaveAttribute('href', 'https://example.com/')
@@ -330,4 +300,84 @@ test('不正な URL と画像は無害化される（読み込んだ JSON 由来
   await expect(page.locator('.doc').getByText('表示できない画像です')).toBeVisible()
   await expect(page.locator('.doc').getByRole('link', { name: 'javascript:alert(2)' })).toHaveCount(0)
   await expect(page.locator('.doc').getByText('javascript:alert(2)')).toBeVisible()
+})
+
+test('CSP 違反が出ない（本番ビルドの meta CSP）', async ({ page }) => {
+  const violations: string[] = []
+  page.on('console', (m) => { if (/Content Security Policy|CSP/i.test(m.text())) violations.push(m.text()) })
+  page.on('pageerror', (e) => violations.push('pageerror: ' + e.message))
+  await demoBook(page)
+  await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveAttribute('content', /connect-src 'self' https:\/\/api\.anthropic\.com/)
+  await page.getByRole('button', { name: 'この節の資料を生成' }).click()
+  await page.locator('.doc [data-by="ai"]').first().waitFor()
+  // 画像（data URL）と手描きの図（canvas → data URL）
+  await page.locator('#imgf').setInputFiles({ name: 'csp.png', mimeType: 'image/png', buffer: PNG })
+  await expect(page.locator('.atts img')).toHaveCount(1)
+  await writeNote(page, 'CSP の確認')
+  await expect(page.locator('.doc [data-by="me"] img')).toHaveCount(1)
+  // 書き出し（blob URL のダウンロード）
+  await page.getByRole('button', { name: 'ロードマップ', exact: true }).click()
+  await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'JSONを書き出す' }).click()])
+  expect(violations).toEqual([])
+})
+
+test('AI の作業中は押したボタンが進行中の色になり、終わると元に戻る（つくる・設計を直す）', async ({ page }) => {
+  await page.goto('./')
+  await page.getByRole('button', { name: 'AIと新規作成' }).click()
+  await page.getByRole('button', { name: 'デモ応答' }).click()
+  await page.locator('#goal').fill('ゲージの確認')
+  await page.getByRole('button', { name: '調べてコース設計を作る' }).click()
+  await page.getByRole('button', { name: 'スキップ' }).click()
+  // 設計を作っている間、上のボタンが進行中（灰色→青で塗られる）
+  const making = page.getByRole('button', { name: '設計しています…' })
+  await expect(making).toHaveClass(/gauge/)
+  await expect(making).toHaveAttribute('aria-busy', 'true')
+  await expect(page.getByRole('status')).toContainText(/秒/)
+  await expect(page.getByText('Step 2 コース設計案')).toBeVisible()
+  // 終わると元に戻る
+  const again = page.getByRole('button', { name: 'もう一度調べ直す' })
+  await expect(again).not.toHaveClass(/gauge/)
+  await expect(again).toBeEnabled()
+
+  // 設計を直してもらう: そのボタンが進行中になり、一覧が薄くなる
+  await page.locator('#tweak').fill('実践を先に')
+  await page.getByRole('button', { name: '設計を直してもらう' }).click()
+  const redoing = page.getByRole('button', { name: '直しています…' })
+  await expect(redoing).toHaveClass(/gauge/)
+  await expect(page.locator('.outline.dim')).toBeVisible()
+  await expect(page.getByRole('button', { name: '設計を直してもらう' })).not.toHaveClass(/gauge/)
+  await expect(page.locator('.outline.dim')).toHaveCount(0)
+
+  // ロードマップの「設計を直す」も同じ
+  await page.getByRole('button', { name: 'この設計で始める' }).click()
+  await page.getByRole('button', { name: '設計を直す' }).click()
+  const redo = page.getByLabel('設計を直す', { exact: true })
+  await redo.getByRole('button', { name: '変更案を出してもらう' }).click()
+  await expect(redo.getByRole('button', { name: '案を作成中…' })).toHaveClass(/gauge/)
+  await expect(redo.getByRole('button', { name: '別の案を出す' })).not.toHaveClass(/gauge/)
+})
+
+test('本文のチェックリストはクリックで切り替わり、保存される（レッスン・通読）', async ({ page }) => {
+  await blankBook(page)
+  await page.getByRole('button', { name: '自分で書き始める' }).click()
+  await page.locator('#note').fill('- [ ] 未\n- [x] 済')
+  await page.getByRole('button', { name: '書き込む' }).click()
+  const boxes = page.locator('.doc [data-by="me"] input[type="checkbox"]')
+  await expect(boxes).toHaveCount(2)
+  await expect(boxes.nth(0)).not.toBeChecked()
+  await expect(boxes.nth(1)).toBeChecked()
+  await boxes.nth(0).click()
+  await expect(boxes.nth(0)).toBeChecked()
+  // 別の画面へ行って戻っても残る
+  await page.getByRole('button', { name: 'ロードマップ', exact: true }).click()
+  await page.getByRole('button', { name: /続きから 1-1/ }).click()
+  await expect(page.locator('.doc [data-by="me"] input[type="checkbox"]').nth(0)).toBeChecked()
+  // 通読でも切り替えられる
+  await page.getByRole('tab', { name: /教科書/ }).click()
+  const bookBoxes = page.locator('.book input[type="checkbox"]')
+  await expect(bookBoxes).toHaveCount(2)
+  await bookBoxes.nth(1).click()
+  await expect(bookBoxes.nth(1)).not.toBeChecked()
+  await page.getByRole('button', { name: 'このページに書く' }).click()
+  await expect(page.locator('.doc [data-by="me"] input[type="checkbox"]').nth(1)).not.toBeChecked()
 })
