@@ -4,7 +4,7 @@ import { applyChapterPlan, applyCoursePlan, applyLessonRegen, diffLessonRegen, d
 import { STATUS_LABEL, currentLesson, findLesson, lessonNo, lessonStatus } from '../lib/status'
 import { openLesson, putBook, selectLesson, snapshot, toast, updateBook, updateLesson, useApp } from '../store'
 import { newChapter, newLesson, type Lesson, type Textbook } from '../types'
-import { Meter, StatusChip, Working, stepPercent, useAbort } from './common'
+import { Meter, StatusChip, TitleInput, Working, stepPercent, useAbort } from './common'
 import { UsageLine } from './Create'
 import { downloadBook } from './Shelf'
 import { GEN_STEPS, generateInto, startGen, type GenState } from './generate'
@@ -174,7 +174,7 @@ export function Roadmap({ tb }: { tb: Textbook }) {
       <div className="pagehead">
         <div>
           <div className="eyebrow">コース</div>
-          <input className="titleinput" aria-label="教科書の名前" value={tb.title} onChange={(e) => updateBook(tb.id, (d) => { d.title = e.target.value })} />
+          <TitleInput className="titleinput" aria-label="教科書の名前" value={tb.title} onCommit={(v) => updateBook(tb.id, (d) => { d.title = v })} />
           {tb.goal && <p className="lead">{tb.goal}</p>}
         </div>
         <div className="row">
@@ -241,7 +241,7 @@ export function Roadmap({ tb }: { tb: Textbook }) {
           <div className="stack">
             <div>
               <div className="eyebrow">選択中 {lessonNo(tb, sel.lesson.id)}・{sel.lesson.minutes}分</div>
-              <input className="titleinput" aria-label="節の名前" value={sel.lesson.title} onChange={(e) => updateLesson(tb.id, sel.lesson.id, (l) => { l.title = e.target.value })} />
+              <TitleInput key={sel.lesson.id} className="titleinput" aria-label="節の名前" value={sel.lesson.title} onCommit={(v) => updateLesson(tb.id, sel.lesson.id, (l) => { l.title = v })} />
             </div>
             <div className="row"><StatusChip lesson={sel.lesson} /></div>
             <p className="sub">{sel.lesson.summary || (sel.lesson.blocks.length ? '本文あり。' : 'まだ資料がありません。AIに生成させるか、自分で書き始めてください。')}</p>
@@ -263,7 +263,7 @@ export function Roadmap({ tb }: { tb: Textbook }) {
           </div>
           <div className="chapterpane">
             <div className="eyebrow">CH{sel.ci + 1}</div>
-            <input className="titleinput" aria-label="章の名前" value={sel.chapter.title} onChange={(e) => updateBook(tb.id, (d) => { d.chapters[sel.ci].title = e.target.value })} />
+            <TitleInput key={sel.chapter.id} className="titleinput" aria-label="章の名前" value={sel.chapter.title} onCommit={(v) => updateBook(tb.id, (d) => { d.chapters[sel.ci].title = v })} />
             <ul className="lessonlist">
               {sel.chapter.lessons.map((l, li) => (
                 <li key={l.id}>

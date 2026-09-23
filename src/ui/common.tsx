@@ -3,7 +3,7 @@ import { STATUS_LABEL, lessonStatus, statusCounts, type Status } from '../lib/st
 import { MODELS, type AiKind } from '../ai/types'
 import { WEB_SEARCH_USD_PER_1000 } from '../ai/anthropic'
 import { setAi, toast, useApp } from '../store'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type InputHTMLAttributes } from 'react'
 import { Button, Card, Pill, Segmented } from './kit'
 
 export function StatusChip({ lesson }: { lesson: Lesson }) {
@@ -56,7 +56,7 @@ export function AiBar() {
       {ai.kind === 'anthropic' && editKey && (
         <div className="row">
           <input type="password" id="ai_key" autoComplete="off" placeholder="sk-ant-…" value={key} onChange={(e) => setKey(e.target.value)} style={{ flex: '1 1 260px' }} aria-label="APIキー" />
-          <Button v="soft" onClick={() => { setAi({ apiKey: key.trim() }); setKey(''); setEditKey(false); toast(key.trim() ? 'キーをこの端末に保存しました' : 'キーを消しました') }}>保存</Button>
+          <Button v="soft" onClick={() => { const k = key.trim(); setKey(''); setEditKey(false); void setAi({ apiKey: k }).then((ok) => { if (ok) toast(k ? 'キーをこの端末に保存しました' : 'キーを消しました') }) }}>保存</Button>
           <span className="sub">この端末の中にだけ保存します。書き出すJSONには入りません。</span>
         </div>
       )}
@@ -127,4 +127,35 @@ export function useAbort(): { start: () => AbortSignal; stop: () => void } {
     start: () => { ref.current?.abort(); const c = new AbortController(); ref.current = c; return c.signal },
     stop: () => ref.current?.abort(),
   }
+}
+
+/**
+ * 題名などの入力欄（#80）。文字は手元で持ち、300ms 打鍵が止まるか欄を離れたときだけ確定する。
+ * 1文字ごとに教科書全体をクローンして IndexedDB に書かないため
+ */
+export function TitleInput({ value, onCommit, ...rest }: { value: string; onCommit: (v: string) => void } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'onBlur'>) {
+  const [v, setV] = useState(value)
+  const dirty = useRef(false)
+  const latest = useRef(value)
+  const commitRef = useRef(onCommit)
+  commitRef.current = onCommit
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  // 外から値が変わったら（別の節を選んだなど）、打ちかけでなければ追随する
+  useEffect(() => { if (!dirty.current) { setV(value); latest.current = value } }, [value])
+  const commit = () => {
+    clearTimeout(timer.current)
+    if (!dirty.current) return
+    dirty.current = false
+    commitRef.current(latest.current)
+  }
+  // 画面を離れるときも打ちかけを確定する
+  useEffect(() => () => { if (dirty.current) commitRef.current(latest.current) }, [])
+  return (
+    <input
+      {...rest}
+      value={v}
+      onChange={(e) => { setV(e.target.value); latest.current = e.target.value; dirty.current = true; clearTimeout(timer.current); timer.current = setTimeout(commit, 300) }}
+      onBlur={commit}
+    />
+  )
 }
