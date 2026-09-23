@@ -155,6 +155,11 @@ label.f{display:flex;flex-direction:column;gap:var(--s4);font-size:var(--text-ca
 .steps li.done .dot{background:var(--primary);border-color:var(--primary)}
 .steps small{display:block;font-size:var(--text-caption);color:var(--color-stone)}
 @keyframes spin{to{transform:rotate(360deg)}}
+/* 進行中のボタン（kit.tsx の Button progress）。押すと灰色になり、進んだ分だけ左から青で塗る。終わると元の色に戻る */
+.btn.gauge,.btn.gauge:disabled{opacity:1;cursor:progress;color:#fff;border-color:transparent;background-color:var(--color-stone);
+  background-image:linear-gradient(var(--primary),var(--primary));background-repeat:no-repeat;background-size:var(--gauge,0%) 100%;transition:background-size .4s ease}
+.working{font-size:var(--text-caption)}
+.outline.dim{opacity:.5;pointer-events:none}
 @media (prefers-reduced-motion:reduce){.steps li.run .dot{animation:none}*{transition:none!important}}
 .outline{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .outline li{display:grid;grid-template-columns:20px 1fr auto;gap:var(--s12);align-items:center;padding:var(--s12) 0;border-top:1px solid var(--hairline)}

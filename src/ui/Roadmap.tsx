@@ -4,7 +4,7 @@ import { applyChapterPlan, applyCoursePlan, applyLessonRegen, diffLessonRegen, d
 import { STATUS_LABEL, currentLesson, findLesson, lessonNo, lessonStatus } from '../lib/status'
 import { openLesson, putBook, selectLesson, snapshot, toast, updateBook, updateLesson, useApp } from '../store'
 import { newChapter, newLesson, type Lesson, type Textbook } from '../types'
-import { Meter, StatusChip } from './common'
+import { Meter, StatusChip, Working, stepPercent } from './common'
 import { UsageLine } from './Create'
 import { downloadBook } from './Shelf'
 import { generateInto } from './generate'
@@ -37,6 +37,10 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
   const [plan, setPlan] = useState<RedesignPlan | null>(null)
   const [usage, setUsage] = useState<Usage | null>(null)
   const [error, setError] = useState('')
+  const [step, setStep] = useState(-1)
+  const [detail, setDetail] = useState('')
+  const [startedAt, setStartedAt] = useState<number | null>(null)
+  const [endedAt, setEndedAt] = useState<number | null>(null)
   const scopes: [RedesignScope, string][] = [['lesson', `この節だけ ${lessonNo(tb, lesson.id)}`], ['chapter', `この章だけ 第${f.ci + 1}章`], ['course', 'コース全体']]
 
   const after = useMemo(() => (plan ? applyPlan(tb, lesson.id, plan) : null), [plan, tb, lesson.id])
@@ -45,11 +49,12 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
     : diffTextbooks(tb, after, plan.scope === 'chapter' ? f.chapter.id : undefined)
 
   async function propose() {
-    setBusy(true); setError(''); setPlan(null)
+    setBusy(true); setError(''); setPlan(null); setStep(0); setDetail(''); setStartedAt(Date.now()); setEndedAt(null)
     try {
-      const r = await getProvider(ai).proposeRedesign(tb, scope, lesson.id, order, () => {})
-      setPlan(r.plan); setUsage(r.usage)
-    } catch (e) { setError((e as Error).message) }
+      const r = await getProvider(ai).proposeRedesign(tb, scope, lesson.id, order, (s, d) => { setStep(s); setDetail(d) })
+      setPlan(r.plan); setUsage(r.usage); setStep(1)
+    } catch (e) { setError((e as Error).message); setStep(-1) }
+    setEndedAt(Date.now())
     setBusy(false)
   }
 
@@ -74,7 +79,8 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
       </div>
       <div className="row">
         <input type="text" id="redotext" value={order} onChange={(e) => setOrder(e.target.value)} placeholder="どう変えたいか（例: 理論は短く、実践を先に）" style={{ flex: '1 1 280px' }} />
-        <Button v="soft" disabled={busy} onClick={propose}>{busy ? '案を作成中…' : plan ? '別の案を出す' : '変更案を出してもらう'}</Button>
+        <Button v="soft" disabled={busy} onClick={propose} progress={busy ? stepPercent(step, 1) : null}>{busy ? '案を作成中…' : plan ? '別の案を出す' : '変更案を出してもらう'}</Button>
+        {busy && <Working running detail={detail} startedAt={startedAt} endedAt={endedAt} />}
       </div>
       {error && <p className="err" role="alert">{error}</p>}
       {plan && (

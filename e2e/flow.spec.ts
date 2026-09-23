@@ -350,3 +350,39 @@ test('CSP 違反が出ない（本番ビルドの meta CSP）', async ({ page })
   await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'JSONを書き出す' }).click()])
   expect(violations).toEqual([])
 })
+
+test('AI の作業中は押したボタンが進行中の色になり、終わると元に戻る（つくる・設計を直す）', async ({ page }) => {
+  await page.goto('./')
+  await page.getByRole('button', { name: 'AIと新規作成' }).click()
+  await page.getByRole('button', { name: 'デモ応答' }).click()
+  await page.locator('#goal').fill('ゲージの確認')
+  await page.getByRole('button', { name: '調べてコース設計を作る' }).click()
+  await page.getByRole('button', { name: 'スキップ' }).click()
+  // 設計を作っている間、上のボタンが進行中（灰色→青で塗られる）
+  const making = page.getByRole('button', { name: '設計しています…' })
+  await expect(making).toHaveClass(/gauge/)
+  await expect(making).toHaveAttribute('aria-busy', 'true')
+  await expect(page.getByRole('status')).toContainText(/秒/)
+  await expect(page.getByText('Step 2 コース設計案')).toBeVisible()
+  // 終わると元に戻る
+  const again = page.getByRole('button', { name: 'もう一度調べ直す' })
+  await expect(again).not.toHaveClass(/gauge/)
+  await expect(again).toBeEnabled()
+
+  // 設計を直してもらう: そのボタンが進行中になり、一覧が薄くなる
+  await page.locator('#tweak').fill('実践を先に')
+  await page.getByRole('button', { name: '設計を直してもらう' }).click()
+  const redoing = page.getByRole('button', { name: '直しています…' })
+  await expect(redoing).toHaveClass(/gauge/)
+  await expect(page.locator('.outline.dim')).toBeVisible()
+  await expect(page.getByRole('button', { name: '設計を直してもらう' })).not.toHaveClass(/gauge/)
+  await expect(page.locator('.outline.dim')).toHaveCount(0)
+
+  // ロードマップの「設計を直す」も同じ
+  await page.getByRole('button', { name: 'この設計で始める' }).click()
+  await page.getByRole('button', { name: '設計を直す' }).click()
+  const redo = page.getByLabel('設計を直す', { exact: true })
+  await redo.getByRole('button', { name: '変更案を出してもらう' }).click()
+  await expect(redo.getByRole('button', { name: '案を作成中…' })).toHaveClass(/gauge/)
+  await expect(redo.getByRole('button', { name: '別の案を出す' })).not.toHaveClass(/gauge/)
+})
