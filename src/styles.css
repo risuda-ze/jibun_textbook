@@ -155,7 +155,15 @@ label.f{display:flex;flex-direction:column;gap:var(--s4);font-size:var(--text-ca
 .steps li.done .dot{background:var(--primary);border-color:var(--primary)}
 .steps small{display:block;font-size:var(--text-caption);color:var(--color-stone)}
 @keyframes spin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.steps li.run .dot{animation:none}*{transition:none!important}}
+/* 進捗ゲージ（common.tsx の Progress） */
+.progress{display:flex;flex-direction:column;gap:var(--s4)}
+.progress .meter{margin-bottom:0}
+.progress .meter i{transition:width var(--ease)}
+.progress .meter i.pulse{animation:pulse 1.2s ease-in-out infinite}
+.progress.compact{padding:var(--s8) var(--s12);border:1px solid var(--hairline);border-radius:var(--radius-buttons);background:var(--wash)}
+.outline.dim{opacity:.5;pointer-events:none}
+@keyframes pulse{50%{opacity:.5}}
+@media (prefers-reduced-motion:reduce){.steps li.run .dot{animation:none}.progress .meter i.pulse{animation:none}*{transition:none!important}}
 .outline{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .outline li{display:grid;grid-template-columns:20px 1fr auto;gap:var(--s12);align-items:center;padding:var(--s12) 0;border-top:1px solid var(--hairline)}
 .outline li:first-child{border-top:0}

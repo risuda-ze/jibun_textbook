@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { getProvider, type CourseDesign, type QA, type Usage } from '../ai'
 import { openBook, putBook, toast, useApp } from '../store'
 import { newChapter, newLesson, newTextbook, type CourseInput } from '../types'
-import { AiBar, Steps } from './common'
+import { AiBar, Progress, Steps } from './common'
 import { Button, Card, PageHead } from './kit'
 
 const STEP_LABELS = ['学びたいことを分解', 'Webを調査', 'コース設計を作成']
@@ -20,6 +20,8 @@ export function Create() {
   const [busy, setBusy] = useState<'ask' | 'design' | null>(null)
   const [step, setStep] = useState(-1)
   const [detail, setDetail] = useState('')
+  const [startedAt, setStartedAt] = useState<number | null>(null)
+  const [endedAt, setEndedAt] = useState<number | null>(null)
   const [design, setDesign] = useState<CourseDesign | null>(null)
   const [usage, setUsage] = useState<Usage | null>(null)
   const [off, setOff] = useState<Set<number>>(new Set())
@@ -39,11 +41,12 @@ export function Create() {
   }
 
   async function run(extraNote = '') {
-    setError(''); setBusy('design'); setStep(0); setDetail('')
+    setError(''); setBusy('design'); setStep(0); setDetail(''); setStartedAt(Date.now()); setEndedAt(null)
     try {
       const r = await getProvider(ai).designCourse(input, qa ?? [], extraNote, (s, d) => { setStep(s); setDetail(d) })
       setDesign(r.design); setUsage(r.usage); setOff(new Set()); setStep(STEP_LABELS.length); setShowQa(false)
     } catch (e) { setError((e as Error).message); setStep(-1) }
+    setEndedAt(Date.now())
     setBusy(null)
   }
 
@@ -97,6 +100,7 @@ export function Create() {
             </>
           )}
           <div className="eyebrow">AIの作業</div>
+          <Progress labels={STEP_LABELS} step={step} detail={detail} running={busy === 'design'} startedAt={startedAt} endedAt={endedAt} />
           <Steps labels={STEP_LABELS} step={step} detail={detail} />
           <UsageLine usage={usage} />
         </Card>
@@ -106,9 +110,10 @@ export function Create() {
         <Card stack>
           <div className="pagehead">
             <div><div className="eyebrow">Step 2 コース設計案</div><h2>{design.title}</h2><p className="sub">{design.goal}</p></div>
-            <Button v="primary" onClick={adopt}>この設計で始める</Button>
+            <Button v="primary" onClick={adopt} disabled={busy !== null}>この設計で始める</Button>
           </div>
-          <ul className="outline">
+          {/* 設計を直してもらっている間は一覧を薄くして触れなくし、ボタンの近くにもゲージを出す（#50） */}
+          <ul className={`outline${busy === 'design' ? ' dim' : ''}`} aria-disabled={busy === 'design'}>
             {design.chapters.map((c, i) => (
               <li key={i}>
                 <input type="checkbox" id={`oc${i}`} checked={!off.has(i)} aria-label={`${c.title}を含める`}
@@ -120,8 +125,9 @@ export function Create() {
           </ul>
           <div className="row">
             <input type="text" id="tweak" value={note} onChange={(e) => setNote(e.target.value)} placeholder="設計への注文（例: 基礎は短く、実践課題を増やして）" style={{ flex: '1 1 280px' }} />
-            <Button v="ghost" disabled={busy !== null || !note.trim()} onClick={() => run(note)}>設計を直してもらう</Button>
+            <Button v="ghost" disabled={busy !== null || !note.trim()} onClick={() => run(note)}>{busy === 'design' ? '直しています…' : '設計を直してもらう'}</Button>
           </div>
+          {busy === 'design' && <Progress compact labels={STEP_LABELS} step={step} detail={detail} running startedAt={startedAt} endedAt={endedAt} />}
           <p className="sub">あとからでも、ロードマップの「設計を直す」で節・章・全体を選んで直せます。</p>
         </Card>
       )}
