@@ -1,25 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
-import { migrate, type MigrateResult } from '../lib/migrate'
-import { decideImport } from '../lib/io'
-import { clearRepairTarget, go, putBook, toast, useApp } from '../store'
+import { migrate } from '../lib/migrate'
+import { readTextbookFile, type ParseResult } from '../lib/io'
+import { KEY } from '../lib/messages'
+import { clearRepairTarget, go, useApp } from '../store'
 import { downloadBook } from './Shelf'
+import { OlderCard, importTextbook, type Older } from './import'
 import { MAX_SEARCH_DESIGN, MAX_SEARCH_LESSON, WEB_SEARCH_USD_PER_1000 } from '../ai/anthropic'
 import { Button, Card, PageHead } from './kit'
 
 const REPO = 'https://github.com/risuda-ze/jibun_textbook'
 
-/** JSON が読み込めない時に出る文と、次に試すこと（#64）。文は `src/lib/io.ts` と `Shelf.tsx` の失敗文に合わせる。版の移行と修復の道具は #65 でこの章に入る */
-const TROUBLES: { when: string; next: string }[] = [
+/**
+ * JSON が読み込めない時に出る文と、次に試すこと（#64）。
+ * 「…と出る」の行は `src/lib/messages.ts` の KEY から組み、実際の失敗文と必ず一致させる（#78・`tests/messages.test.ts`）。
+ */
+export const TROUBLES: { when: string; next: string }[] = [
   {
-    when: '「JSONとして読み込めませんでした」と出る',
+    when: `「${KEY.notJson}」と出る`,
     next: 'ファイルが途中で切れているか、JSON 以外のファイルです。書き出した端末でもう一度「JSON書出」を押し、新しいファイルを送り直してください。',
   },
   {
-    when: '「教科書のJSONではありません」と出る',
+    when: `「${KEY.notTextbook}」「${KEY.noVersion}」と出る`,
     next: 'このアプリが書き出したファイルではありません。ファイル名が「<題名>.textbook.json」になっているか確かめてください。',
   },
   {
-    when: '「このアプリでは読み込めない形式のファイルです（schemaVersion: …）」と出る',
+    when: `「${KEY.newer}（schemaVersion: …）」「版 … ${KEY.noMigration}」と出る`,
     next: '読み込む側のアプリが古いです。ページを再読み込みして最新にしてから、もう一度読み込んでください。',
   },
   {
@@ -27,11 +32,11 @@ const TROUBLES: { when: string; next: string }[] = [
     next: '古い版の形式か、id の重複などの不整合があったので、読み込むときに自動で直しました。中身は変わっていません。念のため「JSON書出」で新しいファイルを作っておいてください。',
   },
   {
-    when: '「形式が正しくありません（…）」と出る',
+    when: `「${KEY.badShape}（…）」と出る`,
     next: 'ファイルの一部が壊れています。括弧の中に壊れている場所が出ます。手で直せない場合は、書き出した端末から新しいファイルを送り直してください。',
   },
   {
-    when: '「大きすぎて読み込めません」と出る',
+    when: `「${KEY.tooBig}」と出る`,
     next: '上限は 16MB です。画像を減らしてから書き出し直してください。',
   },
   {
@@ -44,35 +49,27 @@ const TROUBLES: { when: string; next: string }[] = [
 function Repair() {
   const { books, repairTarget } = useApp()
   const file = useRef<HTMLInputElement>(null)
-  const [res, setRes] = useState<{ name: string; r: MigrateResult } | null>(null)
+  const [res, setRes] = useState<{ name: string; r: ParseResult } | null>(null)
+  const [older, setOlder] = useState<Older | null>(null)
   useEffect(() => {
     if (!repairTarget) return
     setRes({ name: repairTarget.name, r: migrate(repairTarget.raw) })
     clearRepairTarget()
   }, [repairTarget])
 
+  // 本棚の「JSON読込」と同じ道（16MB の上限・JSON の検証・版の移行）を通す（#78）
   async function onFile(f: File | undefined) {
     if (!f) return
-    let raw: unknown
-    try {
-      raw = JSON.parse(await f.text())
-    } catch {
-      setRes({ name: f.name, r: { ok: false, reason: 'JSONとして読み込めませんでした。ファイルが壊れているか、別の種類のファイルの可能性があります。', from: null } })
-      return
-    }
-    setRes({ name: f.name, r: migrate(raw) })
+    setOlder(null)
+    setRes({ name: f.name, r: await readTextbookFile(f) })
   }
 
+  // 本棚と同じ判定（新しければ上書き・同じなら何もしない・古ければ確認）（#78）
   function add() {
     if (!res?.r.ok) return
-    const tb = res.r.tb
-    const fixed = res.r.steps.length ? `直した所: ${res.r.steps.join('、')}。` : ''
-    const existing = books.find((b) => b.id === tb.id)
-    const d = decideImport(existing, tb)
-    if (d === 'same') { toast('同じ内容が本棚にあります。'); return }
-    putBook(tb, false)
-    toast(existing ? `「${tb.title}」を本棚の内容と入れ替えました。${fixed}` : `「${tb.title}」を本棚に追加しました。${fixed}`, existing ? () => putBook(existing, false) : undefined)
-    go('shelf')
+    const o = importTextbook(res.r.tb, res.r.steps, books)
+    if (o.done) go('shelf')
+    else setOlder(o.older)
   }
 
   return (
@@ -96,6 +93,7 @@ function Repair() {
                 <Button v="soft" onClick={add}>本棚に追加</Button>
                 <Button v="outline" sm onClick={() => res.r.ok && downloadBook(res.r.tb)}>直した JSON を書き出す</Button>
               </div>
+              {older && <OlderCard older={older} onDone={() => { setOlder(null); go('shelf') }} />}
             </>
           ) : (
             <>

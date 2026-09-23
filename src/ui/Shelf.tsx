@@ -12,16 +12,14 @@ import {
 } from "../store";
 import { newChapter, newLesson, newTextbook, type Textbook } from "../types";
 import {
-    IMPORT_LIMIT_BYTES,
     SIZE_WARN_BYTES,
-    asCopy,
     byteSize,
-    decideImport,
     exportJson,
     fileName,
     formatSize,
-    parseImport,
+    readTextbookFile,
 } from "../lib/io";
+import { OlderCard, importTextbook, type Older } from "./import";
 import {
     allLessons,
     currentLesson,
@@ -58,34 +56,17 @@ const daysSince = (iso?: string): number | null =>
 export function Shelf() {
     const { books, lastExport, broken } = useApp();
     const file = useRef<HTMLInputElement>(null);
-    const [older, setOlder] = useState<{
-        incoming: Textbook;
-        existing: Textbook;
-    } | null>(null);
+    const [older, setOlder] = useState<Older | null>(null);
     const [error, setError] = useState("");
 
     async function onFile(f: File | undefined) {
         if (!f) return;
         setError("");
-        if (f.size > IMPORT_LIMIT_BYTES)
-            return setError(`「${f.name}」は大きすぎて読み込めません（${formatSize(f.size)}。上限は ${formatSize(IMPORT_LIMIT_BYTES)}）。`);
-        const r = parseImport(await f.text());
-        if (!r.ok)
-            return setError(`「${f.name}」は読み込めませんでした。${r.reason}`);
-        const existing = books.find((b) => b.id === r.tb.id);
-        const d = decideImport(existing, r.tb);
-        // 版の移行や不整合の修復をしたら、何を直したかを知らせる（#65）
-        const fixed = r.steps.length ? `直した所: ${r.steps.join("、")}。` : "";
-        if (d === "add") {
-            putBook(r.tb, false);
-            toast(`「${r.tb.title}」を読み込みました。${fixed}`);
-        } else if (d === "overwrite") {
-            putBook(r.tb, false);
-            toast(`「${r.tb.title}」を新しい内容で上書きしました。${fixed}`, () =>
-                putBook(existing!, false),
-            );
-        } else if (d === "same") toast("同じ内容が存在します。");
-        else setOlder({ incoming: r.tb, existing: existing! });
+        // 読み込みの判定は Help の「本棚に追加」と同じ道を通す（#78）
+        const r = await readTextbookFile(f);
+        if (!r.ok) return setError(`「${f.name}」は読み込めませんでした。${r.reason}`);
+        const o = importTextbook(r.tb, r.steps, books);
+        if (!o.done) setOlder(o.older);
     }
 
     function blank() {
@@ -168,57 +149,7 @@ export function Shelf() {
                 </Card>
             )}
 
-            {older && (
-                <Card
-                    stack
-                    tone="marigold"
-                    role="alertdialog"
-                    aria-label="古いファイルの読み込み"
-                >
-                    <p>
-                        <b>読み込もうとしたファイルの方が古いです。</b>「
-                        {older.existing.title}」
-                    </p>
-                    <p className="sub mono">
-                        端末:{" "}
-                        {new Date(older.existing.updatedAt).toLocaleString(
-                            "ja-JP",
-                        )}{" "}
-                        / ファイル:{" "}
-                        {new Date(older.incoming.updatedAt).toLocaleString(
-                            "ja-JP",
-                        )}
-                    </p>
-                    <div className="row">
-                        <Button
-                            v="ghost"
-                            onClick={() => {
-                                const prev = older.existing;
-                                putBook(older.incoming, false);
-                                setOlder(null);
-                                toast("古い内容で上書きしました", () =>
-                                    putBook(prev, false),
-                                );
-                            }}
-                        >
-                            古い内容で上書き
-                        </Button>
-                        <Button
-                            v="ghost"
-                            onClick={() => {
-                                putBook(asCopy(older.incoming), false);
-                                setOlder(null);
-                                toast("別の本として追加しました");
-                            }}
-                        >
-                            別の本として追加
-                        </Button>
-                        <Button v="soft" onClick={() => setOlder(null)}>
-                            やめる
-                        </Button>
-                    </div>
-                </Card>
-            )}
+            {older && <OlderCard older={older} onDone={() => setOlder(null)} />}
 
             {books.length === 0 ? (
                 <Card className="empty">
