@@ -1,3 +1,4 @@
+import { L } from './labels'
 import { useState, type ReactNode } from 'react'
 import type { AiSettings } from '../ai'
 import type { Textbook } from '../types'
@@ -40,7 +41,7 @@ export function GenerateControls({ g, lessonId, label, show = true, note, action
       <div className="row">
         {show && (
           <Button v="soft" disabled={g.gen !== null} onClick={() => { void g.start(lessonId).then((ok) => { if (ok) onDone?.() }) }} progress={running ? stepPercent(running.step, GEN_STEPS) : null}>
-            {running ? '生成中…' : label}
+            {running ? L.generating : label}
           </Button>
         )}
         {running && <RunControls detail={running.detail} startedAt={running.startedAt} endedAt={running.endedAt} onStop={g.stop} />}

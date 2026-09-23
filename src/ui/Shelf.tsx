@@ -1,3 +1,4 @@
+import { L } from "./labels";
 import { useRef, useState } from "react";
 import {
     dropBroken,
@@ -58,7 +59,7 @@ export function Shelf() {
                 actions={
                     <>
                         <Button v="ghost" onClick={() => go("help")}>
-                            Help
+                            {L.help}
                         </Button>
                         <Button v="ghost" onClick={() => file.current?.click()}>
                             JSON読込
@@ -67,7 +68,7 @@ export function Shelf() {
                             白紙から作る
                         </Button>
                         <Button v="primary" onClick={() => go("new")}>
-                            AIと新規作成
+                            {L.newWithAi}
                         </Button>
                         <input
                             ref={file}

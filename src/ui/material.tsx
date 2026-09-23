@@ -1,3 +1,4 @@
+import { L } from './labels'
 import { useRef, useState } from 'react'
 import type { Material } from '../ai/types'
 import { PDF_LIMIT_BYTES, TEXT_LIMIT_BYTES, pastedMaterial, pastedSize, readMaterial } from '../lib/material'
@@ -41,7 +42,7 @@ export function MaterialPanel({ value, onChange, disabled }: { value: MaterialIn
   return (
     <div className="stack" style={{ gap: 8 }}>
       <div className="row">
-        <Button v="ghost" sm aria-expanded={open} onClick={() => setOpen((v) => !v)}>資料を渡す{count ? `（${count}）` : ''}</Button>
+        <Button v="ghost" sm aria-expanded={open} onClick={() => setOpen((v) => !v)}>{L.material}{count ? `（${count}）` : ''}</Button>
         {!open && value.file && <span className="sub mono">{value.file.name}</span>}
         {!open && count > 0 && value.sourceOnly && <span className="sub">この資料だけから作る</span>}
       </div>

@@ -1,3 +1,4 @@
+import { L } from './labels'
 import type { Lesson, Textbook } from '../types'
 import { STATUS_LABEL, lessonStatus, statusCounts, type Status } from '../lib/status'
 import { MODELS, type AiKind } from '../ai/types'
@@ -185,7 +186,7 @@ export function RunControls({ detail, startedAt, endedAt, onStop }: { detail: st
   return (
     <>
       <Working running detail={detail} startedAt={startedAt} endedAt={endedAt} />
-      <Button v="outline" sm onClick={onStop}>やめる</Button>
+      <Button v="outline" sm onClick={onStop}>{L.stop}</Button>
     </>
   )
 }

@@ -1,3 +1,4 @@
+import { L } from '../src/ui/labels'
 import { expect, test } from '@playwright/test'
 import { blankBook } from './helpers'
 
@@ -10,7 +11,7 @@ test('大きすぎる JSON は読み込む前に断る（#17）', async ({ page 
 
 test('一次情報リンクに題名を付けられる（#17）', async ({ page }) => {
   await blankBook(page)
-  await page.getByRole('button', { name: '自分で書き始める' }).click()
+  await page.getByRole('button', { name: L.startWriting }).click()
   const clues = page.getByLabel('参考情報')
   await clues.locator('#cluelink').fill('https://example.com/doc')
   await clues.locator('#cluetitle').fill('公式ドキュメント')
