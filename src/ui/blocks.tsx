@@ -25,6 +25,14 @@ export function Editable({ md, onCommit }: { md: string; onCommit: (md: string) 
       role="textbox"
       aria-multiline="true"
       aria-label="本文（直接編集できる）"
+      onPaste={(e) => {
+        // 貼り付けは文字だけ受け付ける（#17）。装飾つき HTML は確定まで生のまま入り、画像は縮小を通らず元サイズで md に入るため
+        const files = [...e.clipboardData.files]
+        e.preventDefault()
+        if (files.some((f) => f.type.startsWith('image/'))) return toast('本文には画像を貼れません。ノートの「画像を入れる」を使ってください')
+        const text = e.clipboardData.getData('text/plain')
+        if (text) document.execCommand('insertText', false, text)
+      }}
       onFocus={(e) => { before.current = e.currentTarget.innerHTML }}
       onBlur={(e) => {
         // 触っていないのに md が正規化で変わって「自分で修正」になるのを防ぐため、HTMLの変化で判定する

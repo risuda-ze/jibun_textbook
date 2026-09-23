@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import {
+    dropBroken,
     go,
     markExported,
     openBook,
@@ -10,6 +11,7 @@ import {
 } from "../store";
 import { newChapter, newLesson, newTextbook, type Textbook } from "../types";
 import {
+    IMPORT_LIMIT_BYTES,
     SIZE_WARN_BYTES,
     asCopy,
     byteSize,
@@ -53,7 +55,7 @@ const daysSince = (iso?: string): number | null =>
     iso ? Math.floor((Date.now() - Date.parse(iso)) / 86400000) : null;
 
 export function Shelf() {
-    const { books, lastExport } = useApp();
+    const { books, lastExport, broken } = useApp();
     const file = useRef<HTMLInputElement>(null);
     const [older, setOlder] = useState<{
         incoming: Textbook;
@@ -64,6 +66,8 @@ export function Shelf() {
     async function onFile(f: File | undefined) {
         if (!f) return;
         setError("");
+        if (f.size > IMPORT_LIMIT_BYTES)
+            return setError(`「${f.name}」は大きすぎて読み込めません（${formatSize(f.size)}。上限は ${formatSize(IMPORT_LIMIT_BYTES)}）。`);
         const r = parseImport(await f.text());
         if (!r.ok)
             return setError(`「${f.name}」は読み込めませんでした。${r.reason}`);
@@ -125,6 +129,30 @@ export function Shelf() {
                 <p className="err" role="alert">
                     {error}
                 </p>
+            )}
+
+            {broken.length > 0 && (
+                <Card stack tone="peach" aria-label="読めない教科書">
+                    <p>
+                        <b>読み込めない教科書が {broken.length} 冊あります。</b>
+                        形式が壊れているか、古い版のデータです。生データを書き出して保管するか、消してください。
+                    </p>
+                    <div className="row">
+                        {broken.map((b) => (
+                            <span className="row" key={b.key}>
+                                <span className="mono sub">{b.key}</span>
+                                <Button v="outline" sm onClick={() => {
+                                    const a = document.createElement("a");
+                                    a.href = URL.createObjectURL(new Blob([JSON.stringify(b.raw ?? null, null, 1)], { type: "application/json" }));
+                                    a.download = `${b.key.replace(/[^a-z0-9_-]/gi, "_")}.raw.json`;
+                                    document.body.appendChild(a); a.click(); a.remove();
+                                    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+                                }}>生データを書き出す</Button>
+                                <Button v="danger" sm onClick={() => { if (confirm("この生データを端末から消しますか？")) dropBroken(b.key); }}>消去</Button>
+                            </span>
+                        ))}
+                    </div>
+                </Card>
             )}
 
             {older && (

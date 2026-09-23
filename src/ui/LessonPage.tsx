@@ -13,6 +13,7 @@ const gq = (q: string) => 'https://www.google.com/search?q=' + encodeURIComponen
 function Clues({ tb, lesson }: { tb: Textbook; lesson: Lesson }) {
   const [q, setQ] = useState('')
   const [url, setUrl] = useState('')
+  const [linkTitle, setLinkTitle] = useState('')
   const c = lesson.clues
   return (
     <Card stack className="clues" aria-label="参考情報">
@@ -39,9 +40,10 @@ function Clues({ tb, lesson }: { tb: Textbook; lesson: Lesson }) {
       </div>
       <div className="row">
         <input type="text" id="cluelink" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="読んだページのURLを足す" style={{ flex: '1 1 200px' }} />
+        <input type="text" id="cluetitle" value={linkTitle} onChange={(e) => setLinkTitle(e.target.value)} placeholder="題名（任意）" style={{ flex: '1 1 120px' }} />
         <Button v="ghost" onClick={() => {
           const u = url.trim(); if (!isHttpUrl(u)) return toast('http から始まるURLを入れてください')
-          updateLesson(tb.id, lesson.id, (l) => { l.clues.links.push({ title: u, url: u, fetchedAt: new Date().toISOString().slice(0, 10) }) }); setUrl('')
+          updateLesson(tb.id, lesson.id, (l) => { l.clues.links.push({ title: linkTitle.trim() || u, url: u, fetchedAt: new Date().toISOString().slice(0, 10) }) }); setUrl(''); setLinkTitle('')
         }}>リンクを足す</Button>
       </div>
     </Card>

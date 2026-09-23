@@ -34,7 +34,7 @@ export type CourseDesign = {
   chapters: { title: string; lessons: { title: string; minutes: number; isTask: boolean; summary: string }[] }[]
 }
 
-export type LessonDraft = { blocks: string[]; tasks: string[]; clues: Clues }
+export type LessonDraft = { blocks: string[]; tasks: string[]; clues: Clues; /** Web 調査が max_tokens で途中で切れた（#17） */ truncated?: boolean }
 
 export type RedesignScope = 'lesson' | 'chapter' | 'course'
 export type RedesignPlan =

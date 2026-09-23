@@ -20,11 +20,13 @@ export type State = {
   wide: boolean
   /** ノート入力欄の下書き（節idごと）。画面をまたいで残すが端末には保存しない（#12） */
   drafts: Record<string, NoteDraft>
+  /** 起動時に読めなかった教科書の生データ（#17）。本棚から書き出すか消せる */
+  broken: { key: string; raw: unknown }[]
   toast: Toast | null
 }
 
 let state: State = {
-  ready: false, books: [], bookId: null, lessonId: null, screen: 'shelf', ai: DEFAULT_AI, lastExport: {}, wide: false, drafts: {}, toast: null,
+  ready: false, books: [], bookId: null, lessonId: null, screen: 'shelf', ai: DEFAULT_AI, lastExport: {}, wide: false, drafts: {}, broken: [], toast: null,
 }
 const listeners = new Set<() => void>()
 const emit = () => listeners.forEach((l) => l())
@@ -40,12 +42,15 @@ const SETTINGS = 'settings'
 
 export async function init(): Promise<void> {
   const books: Textbook[] = []
+  const broken: { key: string; raw: unknown }[] = []
   let renumbered = 0
   try {
     for (const k of await keys()) {
       if (typeof k !== 'string' || !k.startsWith(TB)) continue
-      const r = TextbookZ.safeParse(await get(k))
-      if (!r.success) continue
+      const raw = await get(k)
+      const r = TextbookZ.safeParse(raw)
+      // 読めない教科書は黙って捨てず、本棚で知らせて生データを書き出せるようにする（#17）
+      if (!r.success) { broken.push({ key: k, raw }); continue }
       // 端末内のデータは弾かず、重複した id を振り直して救済する（#36）
       if (findDuplicateIds(r.data).length) {
         const fixed = renumberDuplicateIds(r.data)
@@ -56,8 +61,9 @@ export async function init(): Promise<void> {
     }
     const s = (await get(SETTINGS)) as { ai?: AiSettings; lastExport?: Record<string, string>; wide?: boolean } | undefined
     books.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    setState({ ready: true, books, ai: { ...DEFAULT_AI, ...s?.ai }, lastExport: s?.lastExport ?? {}, wide: s?.wide ?? false })
+    setState({ ready: true, books, broken, ai: { ...DEFAULT_AI, ...s?.ai }, lastExport: s?.lastExport ?? {}, wide: s?.wide ?? false })
     if (renumbered) toast(`重複していた id を ${renumbered} 件振り直しました。`)
+    else if (broken.length) toast(`読み込めない教科書が ${broken.length} 冊あります。本棚から生データを書き出せます。`)
     // 端末の保存領域を勝手に消されないよう、永続化を要求する
     void navigator.storage?.persist?.()
   } catch {
@@ -98,10 +104,21 @@ export function openLesson(lessonId: string): void { setState({ lessonId, screen
 /** 教科書を置き換えて保存する。touch=false は読み込み時など updatedAt を保ちたいとき。 */
 export function putBook(tb: Textbook, touch = true): void {
   const next = touch ? { ...tb, updatedAt: nowIso() } : tb
-  const i = state.books.findIndex((b) => b.id === next.id)
-  const books = i >= 0 ? state.books.map((b) => (b.id === next.id ? next : b)) : [next, ...state.books]
+  const prev = state.books
+  const i = prev.findIndex((b) => b.id === next.id)
+  const books = i >= 0 ? prev.map((b) => (b.id === next.id ? next : b)) : [next, ...prev]
   setState({ books })
-  set(TB + next.id, next).catch(() => toast('端末に保存できませんでした。空き容量を確認してください。'))
+  // 端末に書けなかったら画面も元に戻す。画面だけ書けたように見えて再読み込みで消える、を防ぐ（#17）
+  set(TB + next.id, next).catch(() => {
+    setState({ books: prev })
+    toast('端末に保存できませんでした。今の変更は取り消しました。空き容量を確認してください。')
+  })
+}
+
+/** 読めなかった教科書の生データを消す（#17） */
+export function dropBroken(key: string): void {
+  setState({ broken: state.broken.filter((b) => b.key !== key) })
+  del(key).catch(() => {})
 }
 
 export function updateBook(id: string, fn: (draft: Textbook) => void): void {
