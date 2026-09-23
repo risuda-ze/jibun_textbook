@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { allLessons, findLesson, lessonNo, minePercent } from '../lib/status'
-import { go, openLesson, putBook, setDraft as storeDraft, setWide, snapshot, toast, updateLesson, useApp } from '../store'
+import { allLessons, exportWarning, findLesson, lessonNo, localDay, minePercent } from '../lib/status'
+import { closeExportNotice, go, openLesson, putBook, setDraft as storeDraft, setWide, snapshot, toast, updateLesson, useApp } from '../store'
 import { emptyDraft, newBlock, uid, type Lesson, type NoteDraft, type Textbook } from '../types'
 import { BlockRow, Composer } from './blocks'
-import { StatusChip } from './common'
+import { StatusChip, downloadBook } from './common'
 import { isHttpUrl } from '../lib/safe'
 import { generateInto } from './generate'
 import { Button, Card } from './kit'
@@ -160,6 +160,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
         </div>
 
         <aside className="rail">
+          <ExportNotice tb={tb} />
           <Card as="div">
             <h2>この節の印</h2>
             <div className="marks">
@@ -202,5 +203,25 @@ export function LessonPage({ tb }: { tb: Textbook }) {
         e.currentTarget.hidden = true
       }}>引用してノートを書く</button>
     </>
+  )
+}
+
+/** 書き出し忘れの知らせ（#16）。本棚と同じ判定。書き出すか閉じると消え、閉じた日はその日の間は出さない */
+function ExportNotice({ tb }: { tb: Textbook }) {
+  const { lastExport, exportNoticeClosed } = useApp()
+  const warn = exportWarning(tb, lastExport[tb.id])
+  const today = localDay()
+  if (!warn || exportNoticeClosed[tb.id] === today) return null
+  return (
+    <Card as="div" tone="marigold" aria-label="書き出しの知らせ">
+      <p style={{ fontSize: 'var(--text-body-sm)' }}>
+        {warn.days === null ? 'この教科書はまだ一度も書き出していません。' : `最後の書き出しから${warn.days}日たっています。`}
+        端末が変わっても続きを書けるように、JSON を書き出しておいてください。
+      </p>
+      <div className="row" style={{ marginTop: 8 }}>
+        <Button v="soft" sm onClick={() => downloadBook(tb)}>JSON書出</Button>
+        <Button v="ghost" sm onClick={() => closeExportNotice(tb.id, today)}>閉じる</Button>
+      </div>
+    </Card>
   )
 }

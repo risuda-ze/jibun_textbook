@@ -18,6 +18,8 @@ export type State = {
   lastExport: Record<string, string>
   /** レッスン・通読の表示領域を画面幅の約 90% に広げるか。端末内だけの設定（#53） */
   wide: boolean
+  /** 書き出し忘れの知らせを閉じた日（教科書 id → YYYY-MM-DD）。その日の間は出さない（#16） */
+  exportNoticeClosed: Record<string, string>
   /** ノート入力欄の下書き（節idごと）。画面をまたいで残すが端末には保存しない（#12） */
   drafts: Record<string, NoteDraft>
   /** 起動時に読めなかった教科書の生データ（#17）。本棚から書き出すか消せる */
@@ -26,7 +28,7 @@ export type State = {
 }
 
 let state: State = {
-  ready: false, books: [], bookId: null, lessonId: null, screen: 'shelf', ai: DEFAULT_AI, lastExport: {}, wide: false, drafts: {}, broken: [], toast: null,
+  ready: false, books: [], bookId: null, lessonId: null, screen: 'shelf', ai: DEFAULT_AI, lastExport: {}, exportNoticeClosed: {}, wide: false, drafts: {}, broken: [], toast: null,
 }
 const listeners = new Set<() => void>()
 const emit = () => listeners.forEach((l) => l())
@@ -59,9 +61,9 @@ export async function init(): Promise<void> {
         books.push(fixed.tb)
       } else books.push(r.data)
     }
-    const s = (await get(SETTINGS)) as { ai?: AiSettings; lastExport?: Record<string, string>; wide?: boolean } | undefined
+    const s = (await get(SETTINGS)) as { ai?: AiSettings; lastExport?: Record<string, string>; exportNoticeClosed?: Record<string, string>; wide?: boolean } | undefined
     books.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    setState({ ready: true, books, broken, ai: { ...DEFAULT_AI, ...s?.ai }, lastExport: s?.lastExport ?? {}, wide: s?.wide ?? false })
+    setState({ ready: true, books, broken, ai: { ...DEFAULT_AI, ...s?.ai }, lastExport: s?.lastExport ?? {}, exportNoticeClosed: s?.exportNoticeClosed ?? {}, wide: s?.wide ?? false })
     if (renumbered) toast(`重複していた id を ${renumbered} 件振り直しました。`)
     else if (broken.length) toast(`読み込めない教科書が ${broken.length} 冊あります。本棚から生データを書き出せます。`)
     // 端末の保存領域を勝手に消されないよう、永続化を要求する
@@ -71,7 +73,7 @@ export async function init(): Promise<void> {
   }
 }
 
-const saveSettings = () => set(SETTINGS, { ai: state.ai, lastExport: state.lastExport, wide: state.wide }).catch(() => {})
+const saveSettings = () => set(SETTINGS, { ai: state.ai, lastExport: state.lastExport, exportNoticeClosed: state.exportNoticeClosed, wide: state.wide }).catch(() => {})
 
 let toastSeq = 0
 let toastTimer: ReturnType<typeof setTimeout> | undefined
@@ -167,6 +169,11 @@ export function setAi(p: Partial<AiSettings>): void {
 export function setDraft(lessonId: string, d: NoteDraft): void {
   const { [lessonId]: _drop, ...rest } = state.drafts
   setState({ drafts: isDraftEmpty(d) ? rest : { ...rest, [lessonId]: d } })
+}
+
+export function closeExportNotice(id: string, day: string): void {
+  setState({ exportNoticeClosed: { ...state.exportNoticeClosed, [id]: day } })
+  void saveSettings()
 }
 
 export function markExported(id: string): void {

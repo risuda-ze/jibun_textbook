@@ -1,9 +1,31 @@
 import type { Lesson, Textbook } from '../types'
 import { STATUS_LABEL, lessonStatus, statusCounts, type Status } from '../lib/status'
 import { MODELS, type AiKind } from '../ai/types'
-import { setAi, toast, useApp } from '../store'
+import { markExported, setAi, toast, useApp } from '../store'
+import { SIZE_WARN_BYTES, byteSize, exportJson, fileName, formatSize } from '../lib/io'
 import { useEffect, useState } from 'react'
 import { Button, Card, Pill, Segmented } from './kit'
+
+/** 教科書を JSON で書き出す。本棚・ロードマップ・通読・レッスンの知らせ（#16）で共用 */
+export function downloadBook(tb: Textbook): void {
+  const json = exportJson(tb)
+  const size = byteSize(json)
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(
+    new Blob([json], { type: 'application/json' }),
+  )
+  a.download = fileName(tb)
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  markExported(tb.id)
+  toast(
+    size > SIZE_WARN_BYTES
+      ? `書き出しました（${formatSize(size)}）。8MBを超えているので、添付上限に注意してください。`
+      : `書き出しました（${formatSize(size)}）`,
+  )
+}
 
 export function StatusChip({ lesson }: { lesson: Lesson }) {
   const s = lessonStatus(lesson)

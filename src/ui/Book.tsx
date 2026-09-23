@@ -3,7 +3,7 @@ import { allLessons, isMine, reviewCount } from '../lib/status'
 import { openLesson, setWide, updateLesson, useApp } from '../store'
 import type { Block, Lesson, Textbook } from '../types'
 import { BlockRow } from './blocks'
-import { downloadBook } from './Shelf'
+import { downloadBook } from './common'
 import { Button, PageHead, Pill, Segmented } from './kit'
 
 type Filter = 'all' | 'me' | 'review'

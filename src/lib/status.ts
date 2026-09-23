@@ -60,3 +60,18 @@ export function minePercent(l: Lesson): number {
   const mine = l.blocks.filter(isMine).reduce((a, b) => a + plain(b.md) + b.images.length * 40, 0)
   return Math.round((mine / total) * 100)
 }
+
+/** 書き出し忘れの知らせを出すか（#16）。自分の書き込みがあり、7日以上書き出していない（または一度も無い）。不要なら null */
+export const EXPORT_WARN_DAYS = 7
+export function exportWarning(tb: Textbook, lastExportIso: string | undefined, now: number = Date.now()): { days: number | null } | null {
+  if (!allLessons(tb).some((l) => l.blocks.some(isMine))) return null
+  if (!lastExportIso) return { days: null }
+  const days = Math.floor((now - Date.parse(lastExportIso)) / 86400000)
+  return days >= EXPORT_WARN_DAYS ? { days } : null
+}
+
+/** 端末のローカル日付（YYYY-MM-DD）。知らせを「その日の間は閉じる」の単位に使う */
+export function localDay(now: number = Date.now()): string {
+  const d = new Date(now)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}

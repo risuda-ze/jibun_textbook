@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import {
     dropBroken,
     go,
-    markExported,
     openBook,
     putBook,
     removeBook,
@@ -12,47 +11,19 @@ import {
 import { newChapter, newLesson, newTextbook, type Textbook } from "../types";
 import {
     IMPORT_LIMIT_BYTES,
-    SIZE_WARN_BYTES,
     asCopy,
-    byteSize,
     decideImport,
-    exportJson,
-    fileName,
     formatSize,
     parseImport,
 } from "../lib/io";
 import {
-    allLessons,
     currentLesson,
-    isMine,
+    exportWarning,
     lessonNo,
     reviewCount,
 } from "../lib/status";
-import { Meter } from "./common";
+import { Meter, downloadBook } from "./common";
 import { Button, Card, PageHead, Pill } from "./kit";
-
-export function downloadBook(tb: Textbook): void {
-    const json = exportJson(tb);
-    const size = byteSize(json);
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(
-        new Blob([json], { type: "application/json" }),
-    );
-    a.download = fileName(tb);
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    markExported(tb.id);
-    toast(
-        size > SIZE_WARN_BYTES
-            ? `書き出しました（${formatSize(size)}）。8MBを超えているので、添付上限に注意してください。`
-            : `書き出しました（${formatSize(size)}）`,
-    );
-}
-
-const daysSince = (iso?: string): number | null =>
-    iso ? Math.floor((Date.now() - Date.parse(iso)) / 86400000) : null;
 
 export function Shelf() {
     const { books, lastExport, broken } = useApp();
@@ -215,11 +186,8 @@ export function Shelf() {
                 <div className="shelf">
                     {books.map((b) => {
                         const cur = currentLesson(b);
-                        const d = daysSince(lastExport[b.id]);
-                        const hasMine = allLessons(b).some((l) =>
-                            l.blocks.some(isMine),
-                        );
-                        const warn = hasMine && (d === null || d >= 7);
+                        // 書き出し忘れの判定は status.ts に切り出し、レッスン画面と共用（#16）
+                        const warn = exportWarning(b, lastExport[b.id]);
                         const rv = reviewCount(b);
                         return (
                             <Card stack key={b.id}>
@@ -267,9 +235,9 @@ export function Shelf() {
                                         <>
                                             <br />
                                             <Pill tone="review">
-                                                {d === null
+                                                {warn.days === null
                                                     ? "まだ一度も書き出していません"
-                                                    : `最後の書き出しから${d}日`}
+                                                    : `最後の書き出しから${warn.days}日`}
                                             </Pill>
                                         </>
                                     )}

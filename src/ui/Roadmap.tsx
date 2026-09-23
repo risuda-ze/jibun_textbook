@@ -4,9 +4,8 @@ import { applyChapterPlan, applyCoursePlan, applyLessonRegen, diffLessonRegen, d
 import { STATUS_LABEL, currentLesson, findLesson, lessonNo, lessonStatus } from '../lib/status'
 import { openLesson, putBook, selectLesson, snapshot, toast, updateBook, updateLesson, useApp } from '../store'
 import { newChapter, newLesson, type Lesson, type Textbook } from '../types'
-import { Meter, StatusChip, Working, stepPercent } from './common'
+import { Meter, StatusChip, Working, downloadBook, stepPercent } from './common'
 import { UsageLine } from './Create'
-import { downloadBook } from './Shelf'
 import { generateInto } from './generate'
 import { Button, Card, Pill, Segmented, type PillTone } from './kit'
 
