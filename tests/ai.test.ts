@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import Anthropic from '@anthropic-ai/sdk'
 import { AnthropicProvider, type MessagesLike } from '../src/ai/anthropic'
+import { DemoProvider } from '../src/ai/demo'
 import { getProvider } from '../src/ai'
 import { AiError, DEFAULT_AI, zeroUsage, type AiSettings } from '../src/ai/types'
 import { newChapter, newLesson, newTextbook } from '../src/types'
@@ -11,15 +12,15 @@ type Msg = { content: Record<string, unknown>[]; stop_reason: string; usage?: Re
 
 /** stream() と parse() の応答を順に返す偽クライアント。呼ばれた引数も記録する。 */
 function fake(streams: (Msg | Error)[], parses: (Record<string, unknown> | Error)[] = []) {
-  const calls = { stream: [] as Record<string, unknown>[], parse: [] as Record<string, unknown>[] }
+  const calls = { stream: [] as Record<string, unknown>[], parse: [] as Record<string, unknown>[], opts: [] as unknown[] }
   const client: MessagesLike = {
-    stream(params) {
-      calls.stream.push(structuredClone(params))
+    stream(params, options) {
+      calls.stream.push(structuredClone(params)); calls.opts.push(options)
       const next = streams.shift()
       return { finalMessage: async () => { if (!next) throw new Error('no more'); if (next instanceof Error) throw next; return next as never } }
     },
-    async parse(params) {
-      calls.parse.push(params)
+    async parse(params, options) {
+      calls.parse.push(params); calls.opts.push(options)
       const next = parses.shift()
       if (!next) throw new Error('no more')
       if (next instanceof Error) throw next
@@ -171,5 +172,35 @@ describe('接続先の切り替え', () => {
     expect(() => getProvider({ ...DEFAULT_AI, apiKey: '' })).toThrowError(AiError)
     expect(() => getProvider({ ...DEFAULT_AI, kind: 'local' })).toThrowError(/まだ使用できません/)
     expect(getProvider({ ...DEFAULT_AI, kind: 'demo' })).toBeTruthy()
+  })
+})
+
+describe('生成の中止（#14）', () => {
+  const tb = newTextbook('t', { chapters: [newChapter('c', [newLesson('l')])] })
+  const lessonId = tb.chapters[0].lessons[0].id
+
+  it('中止済みの signal なら API を呼ばずに aborted で終わる', async () => {
+    const { client, calls } = fake([], [])
+    const c = new AbortController(); c.abort()
+    await expect(new AnthropicProvider(settings, client).generateLesson(tb, lessonId, () => {}, { signal: c.signal })).rejects.toMatchObject({ code: 'aborted' })
+    expect(calls.stream).toHaveLength(0)
+    expect(calls.parse).toHaveLength(0)
+  })
+  it('signal を SDK に渡し、SDK の中止エラーは aborted にする。途中まで使った分を返す', async () => {
+    const c = new AbortController()
+    const { client, calls } = fake([
+      { stop_reason: 'pause_turn', content: [text('途中')], usage: { input_tokens: 10, output_tokens: 1, server_tool_use: { web_search_requests: 2 } } },
+      new Anthropic.APIUserAbortError({ message: 'aborted' }),
+    ], [])
+    const p = new AnthropicProvider(settings, client).generateLesson(tb, lessonId, () => {}, { signal: c.signal })
+    await expect(p).rejects.toMatchObject({ code: 'aborted', usage: { searches: 2 } })
+    expect((calls.opts[0] as { signal?: AbortSignal }).signal).toBe(c.signal)
+    expect(calls.parse).toHaveLength(0)
+  })
+  it('デモ応答も途中で中止できる', async () => {
+    const c = new AbortController()
+    const p = new DemoProvider().generateLesson(tb, lessonId, () => {}, { signal: c.signal })
+    c.abort()
+    await expect(p).rejects.toMatchObject({ code: 'aborted' })
   })
 })

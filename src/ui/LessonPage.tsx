@@ -3,7 +3,7 @@ import { allLessons, findLesson, lessonNo, minePercent } from '../lib/status'
 import { go, openLesson, putBook, setDraft as storeDraft, setWide, snapshot, toast, updateLesson, useApp } from '../store'
 import { emptyDraft, newBlock, uid, type Lesson, type NoteDraft, type Textbook } from '../types'
 import { BlockRow, Composer } from './blocks'
-import { StatusChip, Working, stepPercent } from './common'
+import { StatusChip, Working, stepPercent, useAbort } from './common'
 import { isHttpUrl } from '../lib/safe'
 import { GEN_STEPS, generateInto, startGen, type GenState } from './generate'
 import { Button, Card } from './kit'
@@ -102,10 +102,11 @@ export function LessonPage({ tb }: { tb: Textbook }) {
     toast('書き込みました')
   }
 
+  const abort = useAbort()
   async function generate() {
     const g = startGen()
     setGen(g)
-    await generateInto(tb, l.id, ai, (step, detail) => setGen({ ...g, step, detail }))
+    await generateInto(tb, l.id, ai, (step, detail) => setGen({ ...g, step, detail }), abort.start())
     setGen(null)
   }
 
@@ -136,6 +137,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
               <div className="row">
                 <Button v="soft" disabled={gen !== null} onClick={generate} progress={gen ? stepPercent(gen.step, GEN_STEPS) : null}>{gen ? '生成中…' : '資料を生成'}</Button>
                 {gen && <Working running detail={gen.detail} startedAt={gen.startedAt} endedAt={gen.endedAt} />}
+                {gen && <Button v="outline" sm onClick={abort.stop}>やめる</Button>}
                 {!gen && <span className="sub">使うAI: {ai.kind === 'anthropic' ? ai.model : ai.kind === 'demo' ? 'デモ応答' : '未対応の接続先'}（「つくる」画面で切り替え）</span>}
               </div>
             </Card>
