@@ -3,10 +3,9 @@ import { allLessons, findLesson, lessonNo, minePercent } from '../lib/status'
 import { go, openLesson, putBook, setDraft as storeDraft, setWide, snapshot, toast, updateLesson, useApp } from '../store'
 import { emptyDraft, newBlock, uid, type Lesson, type NoteDraft, type Textbook } from '../types'
 import { BlockRow, Composer } from './blocks'
-import { StatusChip, Working, stepPercent, useAbort } from './common'
+import { StatusChip } from './common'
 import { isHttpUrl } from '../lib/safe'
-import { GEN_STEPS, generateInto, startGen, type GenState } from './generate'
-import { MaterialPanel, emptyMaterialInput, type MaterialInput } from './material'
+import { GenerateControls, useGenerate } from './GenerateControls'
 import { Button, Card } from './kit'
 
 const gq = (q: string) => 'https://www.google.com/search?q=' + encodeURIComponent(q)
@@ -56,8 +55,6 @@ export function LessonPage({ tb }: { tb: Textbook }) {
   const f = (lessonId && findLesson(tb, lessonId)) || null
   const [insAt, setInsAt] = useState<number | null>(null)
   const [blame, setBlame] = useState(true)
-  // 資料を生成の進行中（#55）
-  const [gen, setGen] = useState<GenState | null>(null)
   const [task, setTask] = useState('')
   const qbtn = useRef<HTMLButtonElement>(null)
   const pending = useRef<{ text: string; blockId: string } | null>(null)
@@ -103,16 +100,8 @@ export function LessonPage({ tb }: { tb: Textbook }) {
     toast('書き込みました')
   }
 
-  const abort = useAbort()
-  // 渡す資料（#63）
-  const [mat, setMat] = useState<MaterialInput>(emptyMaterialInput)
-  async function generate() {
-    const g = startGen()
-    setGen(g)
-    const ok = await generateInto(tb, l.id, ai, (step, detail) => setGen({ ...g, step, detail }), abort.start(), mat)
-    setGen(null)
-    if (ok) setMat(emptyMaterialInput())
-  }
+  // 資料を生成（#55 #63 #14 をまとめた部品 #82）
+  const g = useGenerate(tb, ai)
 
   const composerAt = insAt ?? l.blocks.length
   const composer = <Composer draft={draft} onChange={setDraft} onSubmit={addNote} />
@@ -139,13 +128,8 @@ export function LessonPage({ tb }: { tb: Textbook }) {
           {l.blocks.length === 0 && (
             <Card stack>
               <p>この節はまだ資料がありません。AIに下書きを作らせるか、下の欄から自分で書き始めてください。</p>
-              <div className="row">
-                <Button v="soft" disabled={gen !== null} onClick={generate} progress={gen ? stepPercent(gen.step, GEN_STEPS) : null}>{gen ? '生成中…' : '資料を生成'}</Button>
-                {gen && <Working running detail={gen.detail} startedAt={gen.startedAt} endedAt={gen.endedAt} />}
-                {gen && <Button v="outline" sm onClick={abort.stop}>やめる</Button>}
-                {!gen && <span className="sub">使うAI: {ai.kind === 'anthropic' ? ai.model : ai.kind === 'demo' ? 'デモ応答' : '未対応の接続先'}（「つくる」画面で切り替え）</span>}
-              </div>
-              <MaterialPanel value={mat} onChange={setMat} disabled={gen !== null} />
+              <GenerateControls g={g} lessonId={l.id} label="資料を生成"
+                note={<span className="sub">使うAI: {ai.kind === 'anthropic' ? ai.model : ai.kind === 'demo' ? 'デモ応答' : '未対応の接続先'}（「つくる」画面で切り替え）</span>} />
             </Card>
           )}
           <div className="row">
