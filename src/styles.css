@@ -62,7 +62,6 @@ main.stack{gap:var(--s24)}
 .brand{font-size:var(--text-subheading);font-weight:700;letter-spacing:-.02em;color:var(--color-ink-black)}
 .tabs{display:flex;flex-wrap:wrap;gap:2px}
 .tab{background:none;border:0;border-radius:var(--radius-buttons);padding:var(--s8) var(--s12);color:rgba(0,0,0,.54);font-weight:500;transition:color var(--ease),background var(--ease)}
-.tab .n{display:none}
 .tab:hover:not(:disabled){color:var(--color-ink-black);background:var(--wash)}
 .tab[aria-selected="true"]{color:var(--color-ink-black);font-weight:600;background:var(--wash)}
 .tab:disabled{color:var(--ink-4);cursor:default}
@@ -103,7 +102,6 @@ main.stack{gap:var(--s24)}
 .panel.tone-marigold{background:var(--color-marigold);border-color:transparent;color:var(--color-ink-black)}
 .panel.tone-marigold .sub{color:rgba(0,0,0,.7)}
 .panel.tone-peach{background:var(--color-peach);border-color:transparent;color:var(--color-ink-black)}
-.panel.tone-midnight{background:var(--color-midnight-ink);border-color:transparent;color:#fff}
 .empty{padding-block:var(--s64);text-align:center;color:var(--ink-2);display:flex;flex-direction:column;align-items:center;gap:var(--s8)}
 
 /* ---------- 共通の並べ方・文字 ---------- */
@@ -236,7 +234,6 @@ label.f{display:flex;flex-direction:column;gap:var(--s4);font-size:var(--text-ca
 .ln .src{font-size:var(--text-caption);line-height:1.5;color:var(--color-stone)}
 .ins{display:block;width:100%;background:none;border:0;text-align:left;font-size:var(--text-caption);line-height:1.4;font-weight:500;color:var(--ink-3);padding:1px 32px;opacity:.6;border-radius:var(--radius-small);transition:opacity var(--ease),background var(--ease),color var(--ease)}
 .ins:hover,.ins:focus-visible{opacity:1;background:var(--primary-tint);color:var(--primary)}
-.tw{overflow-x:auto}
 table{border-collapse:collapse;font-size:var(--text-body-sm);font-variant-numeric:tabular-nums;margin:6px 0}
 th,td{border:1px solid var(--hairline-strong);padding:var(--s4) var(--s12);text-align:left}
 th{background:var(--canvas);font-weight:600}

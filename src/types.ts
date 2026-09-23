@@ -82,8 +82,8 @@ export const TextbookZ = z.object({
 /**
  * id の一意性（#36）。章・節・ブロック・画像の id は教科書全体で重ならないこと。
  * 重なると findLesson / updateLesson が最初の1つしか扱えず、片方の編集が反映されない。
- * TextbookZ 自体には付けない（端末内の古いデータを読めなくしないため）。読み込み（parseImport）は
- * TextbookStrictZ で弾き、起動時（store.init）は renumberDuplicateIds で振り直して救済する。
+ * TextbookZ 自体には付けない（端末内の古いデータを読めなくしないため）。読み込み（parseImport）も
+ * 起動時（store.init）も migrate() が renumberDuplicateIds で振り直して救済し、直した所を知らせる（#65）。
  */
 export function findDuplicateIds(tb: Textbook): string[] {
   const seen = new Set<string>()
@@ -125,15 +125,9 @@ export function renumberDuplicateIds(tb: Textbook): { tb: Textbook; count: numbe
   return { tb: out, count }
 }
 
-export const TextbookStrictZ = TextbookZ.superRefine((tb, ctx) => {
-  const dup = findDuplicateIds(tb)
-  if (dup.length) ctx.addIssue({ code: 'custom', path: ['id'], message: `id が重複しています: ${dup.slice(0, 5).join(', ')}${dup.length > 5 ? ' …' : ''}` })
-})
-
 export type Image = z.infer<typeof ImageZ>
 export type Block = z.infer<typeof BlockZ>
 export type Clues = z.infer<typeof CluesZ>
-export type Task = z.infer<typeof TaskZ>
 export type Lesson = z.infer<typeof LessonZ>
 export type Chapter = z.infer<typeof ChapterZ>
 export type CourseInput = z.infer<typeof InputZ>

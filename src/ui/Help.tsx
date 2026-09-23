@@ -3,6 +3,7 @@ import { migrate, type MigrateResult } from '../lib/migrate'
 import { decideImport } from '../lib/io'
 import { clearRepairTarget, go, putBook, toast, useApp } from '../store'
 import { downloadBook } from './Shelf'
+import { MAX_SEARCH_DESIGN, MAX_SEARCH_LESSON, WEB_SEARCH_USD_PER_1000 } from '../ai/anthropic'
 import { Button, Card, PageHead } from './kit'
 
 const REPO = 'https://github.com/risuda-ze/jibun_textbook'
@@ -136,7 +137,7 @@ const QA: { q: string; a: string }[] = [
   },
   {
     q: 'Web 調査の料金はどのくらいですか？',
-    a: 'Anthropic の Web 検索は検索 1000 回あたり 10 ドルです。コース設計で最大 8 回、節の資料で最大 5 回まで検索します。「つくる」画面で「検索なし」も選べます。',
+    a: `Anthropic の Web 検索は検索 1000 回あたり ${WEB_SEARCH_USD_PER_1000} ドルです。コース設計で最大 ${MAX_SEARCH_DESIGN} 回、節の資料で最大 ${MAX_SEARCH_LESSON} 回まで検索します。「つくる」画面で「検索なし」も選べます。`,
   },
   {
     q: 'オフラインで使えますか？',

@@ -16,6 +16,11 @@ import {
 
 const WEB_SEARCH_TYPE = 'web_search_20260209'
 const MAX_PAUSE_CONTINUES = 5
+/** 1リクエストあたりの Web 検索の上限（max_uses）。Help の Q&A と AiBar の説明もこの値を出す */
+export const MAX_SEARCH_DESIGN = 8
+export const MAX_SEARCH_LESSON = 5
+/** Anthropic の Web 検索の料金（検索 1000 回あたり・ドル）。表示用 */
+export const WEB_SEARCH_USD_PER_1000 = 10
 
 /** テストで差し替えられるよう、使うメソッドだけの最小インターフェース */
 export interface MessagesLike {
@@ -172,7 +177,7 @@ export class AnthropicProvider implements AiProvider {
         SYS,
         `${who}\n\nこの人のためのコースを設計する材料を集める。日本語と英語の両方で調べ、公式ドキュメントなどの一次情報を優先する。` +
           `この分野を体系的に学ぶときの標準的な順序、つまずきやすい点、最近変わったことを調べて、要点を日本語でまとめる。`,
-        8, usage, (d) => onProgress(1, d), opts.signal,
+        MAX_SEARCH_DESIGN, usage, (d) => onProgress(1, d), opts.signal,
       )
       found = `\n\n## 調査で分かったこと\n${r.text}`
     }
@@ -181,7 +186,7 @@ export class AnthropicProvider implements AiProvider {
       SYS,
       `${who}${found}\n\n上をもとにコースを設計する。\n- 章は4〜9、各章の節は2〜5\n- 節の題は、その節でできるようになることが分かる具体的な言葉にする\n` +
         `- 各章に手を動かす実践課題の節（isTask: true）を1つ入れてよい\n- minutes は所要時間の見積もり（分）\n- summary は節の狙いを1文で\n- すべて日本語`,
-      DesignZ, usage, opts.signal,
+      DesignOutZ, usage, opts.signal,
     )
     onProgress(3, '設計ができた')
     return { design: design as CourseDesign, usage }
@@ -208,7 +213,7 @@ export class AnthropicProvider implements AiProvider {
         // 調査には文字の資料だけ渡す（PDF は書く段階でだけ読ませ、トークンを二重に使わない）
         withMaterials(`${ctx}${matNote}\n\nこの節の教材を書くための事実を集める。日本語と英語の両方で調べ、公式ドキュメントなどの一次情報を優先する。` +
           `手順・数値・用語は出典で確かめる。分かったことを日本語で整理する。`, mats.filter((m) => m.kind === 'text')),
-        5, usage, (d) => onProgress(0, d), opts.signal,
+        MAX_SEARCH_LESSON, usage, (d) => onProgress(0, d), opts.signal,
       )
       sources = r.sources
       truncated = r.truncated
@@ -221,7 +226,7 @@ export class AnthropicProvider implements AiProvider {
         `- 読み手が自分で確かめて書き込む前提の「下書き」。断定しすぎず、確かめるべき点は確かめ方を添える\n` +
         `- tasks: この節で実際に手を動かすこと3〜5個\n- queries: 自分で調べるときの検索語3〜5個\n- how: 本文が正しいか自分で確かめる方法2〜3個\n` +
         `- linkIndexes: 「見つけたページ」のうち一次情報として読む価値が高いものの番号（無ければ空）\n- すべて日本語`, mats),
-      LessonZ, usage, opts.signal,
+      LessonOutZ, usage, opts.signal,
     )
     const fetchedAt = new Date().toISOString().slice(0, 10)
     const links = d.linkIndexes.filter((i) => Number.isInteger(i) && sources[i]).slice(0, 6).map((i) => ({ ...sources[i], fetchedAt }))
@@ -270,7 +275,8 @@ const SYS =
 
 const PlanLessonZ = z.object({ id: z.string(), title: z.string(), minutes: z.number(), isTask: z.boolean(), summary: z.string() })
 
-const DesignZ = z.object({
+/** AI の出力（設計）のスキーマ。保存形式の types.ts の TextbookZ とは別物 */
+const DesignOutZ = z.object({
   title: z.string(),
   goal: z.string(),
   chapters: z.array(z.object({
@@ -279,7 +285,8 @@ const DesignZ = z.object({
   })),
 })
 
-const LessonZ = z.object({
+/** AI の出力（節）のスキーマ。保存形式の types.ts の LessonZ とは別物 */
+const LessonOutZ = z.object({
   blocks: z.array(z.string()),
   tasks: z.array(z.string()),
   queries: z.array(z.string()),

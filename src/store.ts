@@ -35,7 +35,6 @@ const listeners = new Set<() => void>()
 const emit = () => listeners.forEach((l) => l())
 const setState = (p: Partial<State>) => { state = { ...state, ...p }; emit() }
 
-export const getState = (): State => state
 export function useApp(): State {
   return useSyncExternalStore((cb) => { listeners.add(cb); return () => listeners.delete(cb) }, () => state)
 }
@@ -114,7 +113,6 @@ export function putBook(tb: Textbook, touch = true): void {
   })
 }
 
-/** 読めなかった教科書の生データを消す（#17） */
 /** 生データを Help の修復画面に渡して開く（#65） */
 export function openRepair(name: string, raw: unknown): void {
   setState({ repairTarget: { name, raw }, screen: 'help' })
@@ -122,6 +120,7 @@ export function openRepair(name: string, raw: unknown): void {
 }
 export const clearRepairTarget = (): void => setState({ repairTarget: null })
 
+/** 読めなかった教科書の生データを消す（#17） */
 export function dropBroken(key: string): void {
   // 端末から消えてから一覧を更新する（消える前に再読み込みされると復活するため）
   del(key)
