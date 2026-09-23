@@ -168,6 +168,7 @@ export class AnthropicProvider implements AiProvider {
     const ctx = `${describeInput(tb.input)}\n\nコース: ${tb.title}（${tb.goal}）\n\n${outline(tb)}\n\n今回書く節: ${lessonNo(tb, lessonId)} ${f.lesson.title}\n狙い: ${f.lesson.summary || '（未設定）'}`
     let sources: Source[] = []
     let found = ''
+    let truncated = false
     if (this.settings.search === 'builtin') {
       onProgress(0, 'Webを調査している')
       const r = await this.research(
@@ -177,6 +178,7 @@ export class AnthropicProvider implements AiProvider {
         5, usage, (d) => onProgress(0, d),
       )
       sources = r.sources
+      truncated = r.truncated
       found = `\n\n## 調査で分かったこと\n${r.text}\n\n## 見つけたページ\n${sources.map((s, i) => `[${i}] ${s.title} ${s.url}`).join('\n')}`
     }
     onProgress(1, '資料を書いている')
@@ -190,7 +192,7 @@ export class AnthropicProvider implements AiProvider {
     )
     const fetchedAt = new Date().toISOString().slice(0, 10)
     const links = d.linkIndexes.filter((i) => Number.isInteger(i) && sources[i]).slice(0, 6).map((i) => ({ ...sources[i], fetchedAt }))
-    const draft: LessonDraft = { blocks: d.blocks, tasks: d.tasks, clues: { queries: d.queries, how: d.how, links } }
+    const draft: LessonDraft = { blocks: d.blocks, tasks: d.tasks, clues: { queries: d.queries, how: d.how, links }, truncated }
     onProgress(2, '資料ができた')
     return { draft, usage }
   }

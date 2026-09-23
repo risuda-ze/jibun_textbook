@@ -20,8 +20,8 @@
 | 要件 | 現状（該当箇所） | 判定 | 対応方針 |
 |---|---|---|---|
 | スキーマ検証と `schemaVersion` チェック | `parseImport()` が `JSON.parse` → `schemaVersion === 1` → `TextbookZ.safeParse` の順に検証（`src/lib/io.ts`）。失敗理由を画面に出す | 済 | 版が上がったら移行処理を足す |
-| 起動時に IndexedDB から読むデータも検証する | `init()` が各教科書を `TextbookZ.safeParse` で検証し、失敗したものは読み込まない（`src/store.ts`） | 済（ただし黙って捨てる。#17） | — |
-| サイズ上限 | 書き出し側は 8MB 超で警告（`SIZE_WARN_BYTES`）。**読み込み側に上限が無い**。何十 MB でも `JSON.parse` する | 未 | 読み込み前に `File.size` を見て上限（例 16MB）を超えたら断る（#17 に記載） |
+| 起動時に IndexedDB から読むデータも検証する | `init()` が各教科書を `TextbookZ.safeParse` で検証する。失敗したものは本棚で知らせ、生データを書き出すか消せる（#17） | 済 | — |
+| サイズ上限 | 書き出し側は 8MB 超で警告（`SIZE_WARN_BYTES`）。読み込み側は 16MB（`IMPORT_LIMIT_BYTES`）を超えたら `JSON.parse` の前に断る（#17） | 済 | — |
 | 不正な `id` / 重複 / 循環 | 読み込み（`parseImport`）は `TextbookStrictZ`（`superRefine` で章・節・ブロック・画像の id の一意性を検証）で弾き、どの id が重複しているかを理由に出す。端末内のデータは `store.init` が `renumberDuplicateIds` で振り直して救済し、件数をトーストで知らせる。木構造なので循環は起きない（#36） | 済 | — |
 | URL 項目のスキーム検証 | スキーマ（`LinkZ.url`・`Block.source`・`Image.dataUrl`）は `z.string()` のまま弾かない（古い JSON を読めなくしないため）。描画時に `src/lib/safe.ts` の `isHttpUrl` / `isImageDataUrl` で無害化する（#35） | 済 | 描画経路を増やすときは必ずこの2関数を通す |
 | 同じ `id` の教科書との衝突 | `updatedAt` を比べて新しければ自動上書き、古ければ確認（`decideImport()`）。上書きは元に戻せる | 済 | — |
@@ -32,7 +32,7 @@
 |---|---|---|---|
 | 表示する HTML を必ずサニタイズする | `mdToHtml()` が marked の出力を `DOMPurify.sanitize()` に通す（`src/lib/md.ts`）。通読・レッスンとも `dangerouslySetInnerHTML` の入力はこの関数の戻り値だけ | 済 | 維持 |
 | 編集で確定する HTML もサニタイズする | `htmlToMd()` が turndown の前に `DOMPurify.sanitize()` を通す | 済 | — |
-| 貼り付けた HTML が確定前に生のまま DOM に入らない | **未対応**。`Editable` に `onPaste` が無く、貼り付け直後は貼った HTML がそのまま contenteditable に入る（blur で確定するまで）。自分の貼り付けなので第三者の入力ではないが、外部サイトからコピーした HTML が一時的に生で入る | 未 | `onPaste` で `text/plain` に落とすか、貼り付け時に sanitize（#17） |
+| 貼り付けた HTML が確定前に生のまま DOM に入らない | `Editable` の `onPaste` で `text/plain` だけを挿入する。画像の貼り付けは断る（#17） | 済 | — |
 | 外部リンクの `rel="noopener noreferrer"` | 自分のコードが作る `<a target="_blank">`（出典・手がかり・一次情報）には付いている（`blocks.tsx` `LessonPage.tsx`）。Markdown 内のリンクは marked が `target` を付けないので同一タブで開く | 済 | — |
 | `javascript:` / `data:` スキーム | Markdown 内のリンクは DOMPurify が `javascript:` を除去する。JSON 由来の `clues.links[].url` と出典 `b.source` は `isHttpUrl` を通ったときだけ `<a>` にし、それ以外は文字として出す。画像 `dataUrl` は `isImageDataUrl`（`data:image/…`）を通ったときだけ `<img>` にし、それ以外は「表示できない画像です」と出す（`src/lib/safe.ts`・#35） | 済 | `tests/safe.test.ts` と e2e「不正な URL と画像は無害化される」が見張る |
 
@@ -44,7 +44,7 @@
 | 構造化出力を検証する | `messages.parse()` + `zodOutputFormat(schema)` で受け取り、`parsed_output == null` は失敗扱い（`structure()`） | 済 | — |
 | AI 応答で教科書が壊れない | 失敗時は教科書を変えない（`src/ui/generate.ts`）。再設計は `src/lib/protect.ts` が守る対象（自分のノート・直した文・完了の節）を機械的に残し、`tests/protect.test.ts` が見張る | 済 | — |
 | Web 検索の結果が入力トークンとして課金される・上限を切る | `max_uses` を渡している。`pause_turn` の続行は最大5回（`MAX_PAUSE_CONTINUES`） | 済 | 実 API で検索回数を1回実測する（`docs/notes.md`「実 API で分かったこと」） |
-| 応答の切り詰め（`max_tokens`）を知らせる | `truncated` フラグは立つが画面に出ない | 未 | #17 |
+| 応答の切り詰め（`max_tokens`）を知らせる | 節の生成で Web 調査が切れたら、生成完了のトーストで知らせる（`LessonDraft.truncated`・#17） | 済 | 設計（`designCourse`）の調査は未対応。必要なら同じ形で足す |
 
 ## 5. 配信・ブラウザ側
 
@@ -82,7 +82,7 @@
 |---|---|---|---|
 | 誤操作で消したものを戻せる | 教科書・節・ノート・文・画像の削除は直後のトーストの「元に戻す」で戻せる（`snapshot()` + `putBook()`）。トーストは 7 秒で消える | 済（範囲は限定） | 7 秒を過ぎると戻せない。書き出し JSON からの復元が唯一の手段なので、書き出し忘れの知らせ（#16）が効く |
 | 端末の消去に備える | 書き出し JSON が唯一のバックアップ。本棚に「7 日以上書き出していない」知らせを出す | 済（本棚のみ） | レッスン画面にも出す（#16） |
-| 保存失敗を見逃さない | `putBook()` は IndexedDB への書き込み失敗をトーストで出すが、画面の状態は更新済みのまま | 未 | #17 |
+| 保存失敗を見逃さない | `putBook()` は書き込み失敗で画面の変更も取り消し、トーストで知らせる（#17） | 済 | — |
 | 「別の本として追加」で元を壊さない | `asCopy()` が `id` を振り直す | 済 | — |
 
 ## 「未」「要確認」のまとめ（別 Issue の候補）

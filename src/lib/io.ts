@@ -1,6 +1,8 @@
 import { TextbookStrictZ, TextbookZ, type Textbook, uid, nowIso } from '../types'
 
 export const SIZE_WARN_BYTES = 8 * 1024 * 1024
+/** 読み込む JSON の上限（#17）。これを超えるファイルは JSON.parse する前に断る */
+export const IMPORT_LIMIT_BYTES = 16 * 1024 * 1024
 
 /** 書き出し。スキーマを通すので、教科書以外の項目（APIキー等）は構造上入らない。 */
 export function exportJson(tb: Textbook): string {

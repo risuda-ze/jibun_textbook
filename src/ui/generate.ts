@@ -17,9 +17,11 @@ export async function generateInto(tb: Textbook, lessonId: string, ai: AiSetting
         how: [...new Set([...l.clues.how, ...draft.clues.how])],
       }
     })
+    // Web 調査が途中で切れていたら、そのことを知らせる（#17）。下書きは入るが、根拠が足りない可能性がある
+    const cut = draft.truncated ? '。Web調査が長くなり途中で切れました。根拠が足りない所は自分で確かめてください' : ''
     toast(usage.searches || usage.inputTokens
-      ? `資料を生成しました（検索${usage.searches}回・入力${usage.inputTokens.toLocaleString()}・出力${usage.outputTokens.toLocaleString()}トークン）`
-      : '資料を生成しました')
+      ? `資料を生成しました（検索${usage.searches}回・入力${usage.inputTokens.toLocaleString()}・出力${usage.outputTokens.toLocaleString()}トークン）${cut}`
+      : '資料を生成しました' + cut)
     return true
   } catch (e) {
     toast((e as Error).message)

@@ -151,8 +151,10 @@ export function Roadmap({ tb }: { tb: Textbook }) {
   }
   function removeLesson(id: string) {
     const before = snapshot(tb.id)
+    // 最後の1節を消すと章ごと消える。そのことをトーストで伝える（#17）。元に戻すで章も戻る
+    const last = tb.chapters.some((c) => c.lessons.length === 1 && c.lessons[0].id === id)
     updateBook(tb.id, (d) => { for (const c of d.chapters) c.lessons = c.lessons.filter((l) => l.id !== id); d.chapters = d.chapters.filter((c) => c.lessons.length) })
-    toast('節を消しました', before ? () => putBook(before) : undefined)
+    toast(last ? '節を消しました。節が無くなった章も消しました' : '節を消しました', before ? () => putBook(before) : undefined)
   }
 
   return (
