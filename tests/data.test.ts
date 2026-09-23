@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { TextbookZ, findDuplicateIds, newBlock, newChapter, newLesson, newTextbook, renumberDuplicateIds, type Textbook } from '../src/types'
-import { currentLesson, lessonNo, lessonStatus, minePercent, statusCounts } from '../src/lib/status'
+import { currentLesson, lessonNo, lessonStatus, minePercent, reviewCount, statusCounts } from '../src/lib/status'
 import { asCopy, decideImport, exportJson, parseImport } from '../src/lib/io'
 import { fitSize } from '../src/lib/image'
 
@@ -26,6 +26,13 @@ describe('節の状態は保存せず導出する', () => {
     expect(lessonStatus(me)).toBe('me')
     expect(lessonStatus(edited)).toBe('me')
     expect(lessonStatus(done)).toBe('done')
+  })
+  it('再確認の件数は旗の数', () => {
+    const tb = book()
+    expect(reviewCount(tb)).toBe(1)  // 見本は「完了」の節に旗がある
+    tb.chapters[0].lessons[0].review = true
+    tb.chapters[0].lessons[2].review = true
+    expect(reviewCount(tb)).toBe(3)
   })
   it('再確認の旗は状態と独立', () => {
     expect(done.review).toBe(true)

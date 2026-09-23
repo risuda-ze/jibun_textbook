@@ -1,6 +1,6 @@
-import { getProvider, type AiError, type AiSettings, type ResearchInfo, type Usage } from '../ai'
+import { getProvider, type AiError, type AiSettings, type LessonDraft, type ResearchInfo, type Usage } from '../ai'
 import { toast, updateLesson } from '../store'
-import { newBlock, type Textbook } from '../types'
+import { newBlock, type Lesson, type Textbook } from '../types'
 import { materialError, toMaterials, type MaterialInput } from './material'
 
 /** 生成の段階数（Web を調査している → 資料を書いている → 資料ができた）。ボタンの塗りは stepPercent(step, GEN_STEPS) */
@@ -31,6 +31,24 @@ export function researchNote(usage: Usage, info: ResearchInfo | undefined): stri
 export const usageNote = (usage: Usage): string =>
   usage.searches || usage.inputTokens ? `（検索${usage.searches}回・入力${usage.inputTokens.toLocaleString()}・出力${usage.outputTokens.toLocaleString()}トークン）` : ''
 
+/**
+ * AI の下書きを節に当てる（#83 で純粋関数に）。節をその場で書き換える。
+ * - 本文: 生成を待つ間に自分で書いたノートがあれば、その後ろに足す。空の要素は捨てる
+ * - 手を動かす: まだ無いときだけ採用する（自分で足した分を上書きしない）
+ * - 参考情報: 検索語と確かめ方は重複を除いて足す。リンクは URL が同じものを足さない
+ * - 元にした資料: 名前だけ残す（本文は JSON に入れない）
+ */
+export function mergeDraft(l: Lesson, draft: LessonDraft, materialNames: string[]): void {
+  l.blocks.push(...draft.blocks.filter((m) => m.trim()).map((m) => newBlock('ai', m)))
+  if (!l.tasks.length) l.tasks = draft.tasks.map((text) => ({ text, checked: false }))
+  l.materials = [...new Set([...l.materials, ...materialNames])]
+  l.clues = {
+    queries: [...new Set([...l.clues.queries, ...draft.clues.queries])],
+    links: [...l.clues.links, ...draft.clues.links.filter((x) => !l.clues.links.some((y) => y.url === x.url))],
+    how: [...new Set([...l.clues.how, ...draft.clues.how])],
+  }
+}
+
 /** 節の資料を生成して教科書に入れる。失敗しても教科書は変えない。 */
 export async function generateInto(tb: Textbook, lessonId: string, ai: AiSettings, onProgress: (step: number, detail: string) => void, signal?: AbortSignal, input?: MaterialInput): Promise<boolean> {
   // 渡す資料（#63）。ファイルと貼り付けを別々の資料として並べる。無ければ「この資料だけ」は効かない
@@ -42,18 +60,7 @@ export async function generateInto(tb: Textbook, lessonId: string, ai: AiSetting
   try {
     const { draft, usage } = await getProvider(ai).generateLesson(tb, lessonId, onProgress, { signal, materials, sourceOnly })
     if (!draft.blocks.length) throw new Error('AIが本文を返しませんでした。もう一度お試しください。')
-    updateLesson(tb.id, lessonId, (l) => {
-      // 生成を待つ間に自分で書いたノートがあれば、その後ろに足す
-      l.blocks.push(...draft.blocks.filter((m) => m.trim()).map((m) => newBlock('ai', m)))
-      if (!l.tasks.length) l.tasks = draft.tasks.map((text) => ({ text, checked: false }))
-      // 元にした資料は名前だけ残す（本文は JSON に入れない）
-      l.materials = [...new Set([...l.materials, ...materials.map((m) => m.name)])]
-      l.clues = {
-        queries: [...new Set([...l.clues.queries, ...draft.clues.queries])],
-        links: [...l.clues.links, ...draft.clues.links.filter((x) => !l.clues.links.some((y) => y.url === x.url))],
-        how: [...new Set([...l.clues.how, ...draft.clues.how])],
-      }
-    })
+    updateLesson(tb.id, lessonId, (l) => mergeDraft(l, draft, materials.map((m) => m.name)))
     // Web 調査の状態（途中で切れた・検索が失敗した）を知らせる（#17 #81）。下書きは入るが、根拠が足りない可能性がある
     const info = draft.research ?? (draft.truncated ? { truncated: true, searchErrors: [] } : undefined)
     toast(`資料を生成しました${usageNote(usage)}${researchNote(usage, info)}`)

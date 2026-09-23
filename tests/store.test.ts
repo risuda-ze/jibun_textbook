@@ -12,7 +12,8 @@ vi.mock('idb-keyval', async (orig) => {
 })
 
 import { clear, get, set } from 'idb-keyval'
-import { getStateForTest, init, putBook, removeBook, setAi, updateBook } from '../src/store'
+import { getStateForTest, init, putBook, removeBook, setAi, setDraft, updateBook } from '../src/store'
+import { emptyDraft } from '../src/types'
 import { newChapter, newLesson, newTextbook } from '../src/types'
 
 const tick = () => new Promise((r) => setTimeout(r, 0))
@@ -75,6 +76,13 @@ describe('store（#80）', () => {
     expect(getStateForTest().books.map((x) => x.id)).not.toContain(a.id)
     getStateForTest().toast?.undo?.(); await tick()
     expect(getStateForTest().books.map((x) => x.id)).toContain(a.id)
+  })
+  it('setDraft: 節ごとに下書きを持ち、空にすると消える', () => {
+    setDraft('l1', { ...emptyDraft(), md: '書きかけ' })
+    setDraft('l2', { ...emptyDraft(), quote: '引用' })
+    expect(Object.keys(getStateForTest().drafts).sort()).toEqual(['l1', 'l2'])
+    setDraft('l1', emptyDraft())
+    expect(Object.keys(getStateForTest().drafts)).toEqual(['l2'])
   })
   it('setAi: 保存できたかを返し、失敗したら知らせる', async () => {
     expect(await setAi({ model: 'm' })).toBe(true)
