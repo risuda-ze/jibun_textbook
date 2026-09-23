@@ -8,6 +8,7 @@ import { Meter, StatusChip, Working, stepPercent, useAbort } from './common'
 import { UsageLine } from './Create'
 import { downloadBook } from './Shelf'
 import { GEN_STEPS, generateInto, startGen, type GenState } from './generate'
+import { MaterialPanel, emptyMaterialInput, type MaterialInput } from './material'
 import { Button, Card, Pill, Segmented, type PillTone } from './kit'
 
 const PXMIN = 1.6
@@ -140,12 +141,14 @@ export function Roadmap({ tb }: { tb: Textbook }) {
   const W = units * UNIT * PXMIN
 
   const abort = useAbort()
+  // 渡す資料（#63）。選んでいる節の生成に使う
+  const [mat, setMat] = useState<MaterialInput>(emptyMaterialInput)
   async function generate(id: string) {
     const g = { id, ...startGen() }
     setGen(g)
-    const ok = await generateInto(tb, id, ai, (step, detail) => setGen({ ...g, step, detail }), abort.start())
+    const ok = await generateInto(tb, id, ai, (step, detail) => setGen({ ...g, step, detail }), abort.start(), mat)
     setGen(null)
-    if (ok) openLesson(id)
+    if (ok) { setMat(emptyMaterialInput()); openLesson(id) }
   }
 
   function addLesson(chapterId: string) {
@@ -255,6 +258,7 @@ export function Roadmap({ tb }: { tb: Textbook }) {
               <Button v={sel.lesson.blocks.length ? 'soft' : 'ghost'} onClick={() => openLesson(sel.lesson.id)}>{sel.lesson.blocks.length ? 'レッスンを開く' : '自分で書き始める'}</Button>
               <Button v="outline" sm onClick={() => removeLesson(sel.lesson.id)}>この節を消す</Button>
             </div>
+            {sel.lesson.blocks.length === 0 && <MaterialPanel value={mat} onChange={setMat} disabled={gen !== null} />}
             <div><div className="sub" style={{ marginBottom: 4 }}>教科書の育ち具合</div><Meter tb={tb} /></div>
           </div>
           <div className="chapterpane">

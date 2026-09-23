@@ -4,7 +4,7 @@ import { z } from 'zod'
 import type { CourseInput, Textbook } from '../types'
 import { findLesson, isProtectedLesson, lessonNo } from '../lib/status'
 import {
-  AiError, abortError, throwIfAborted, zeroUsage, type AiOpts, type AiProvider, type AiSettings, type CourseDesign, type LessonDraft,
+  AiError, abortError, throwIfAborted, zeroUsage, type AiOpts, type AiProvider, type Material, type AiSettings, type CourseDesign, type LessonDraft,
   type Progress, type QA, type RedesignPlan, type RedesignScope, type Usage,
 } from './types'
 
@@ -29,6 +29,22 @@ type AnyBlock = { type: string; [k: string]: unknown }
 type AnyMessage = { content: AnyBlock[]; stop_reason: string | null; usage?: RawUsage }
 
 export type Source = { title: string; url: string }
+/** user メッセージの内容。文字だけか、資料のブロック＋文字（#63） */
+type Prompt = string | AnyBlock[]
+
+/**
+ * 渡された資料をプロンプトに付ける（#63）。文字はそのまま text ブロック、PDF は document ブロック（base64）。
+ * 資料が無ければ文字のまま返す。指示文は最後に置く
+ */
+function withMaterials(prompt: string, mats: Material[]): Prompt {
+  if (!mats.length) return prompt
+  const blocks: AnyBlock[] = mats.map((m) =>
+    m.kind === 'pdf'
+      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: m.data ?? '' }, title: m.name }
+      : { type: 'text', text: `## 渡された資料: ${m.name}\n${m.text ?? ''}` },
+  )
+  return [...blocks, { type: 'text', text: prompt }]
+}
 export type Research = { text: string; sources: Source[]; searchErrors: string[]; truncated: boolean }
 
 export function makeClient(apiKey: string): MessagesLike {
@@ -64,7 +80,7 @@ export class AnthropicProvider implements AiProvider {
   }
 
   /** 1段目: 調査。pause_turn は内容をそのまま送り返して続行する。検索エラーはHTTP 200で返るので中身で分岐する。 */
-  async research(system: string, prompt: string, maxUses: number, usage: Usage, onDetail?: (d: string) => void, signal?: AbortSignal): Promise<Research> {
+  async research(system: string, prompt: Prompt, maxUses: number, usage: Usage, onDetail?: (d: string) => void, signal?: AbortSignal): Promise<Research> {
     const useSearch = this.settings.search === 'builtin'
     const messages: { role: 'user' | 'assistant'; content: unknown }[] = [{ role: 'user', content: prompt }]
     const out: Research = { text: '', sources: [], searchErrors: [], truncated: false }
@@ -114,7 +130,7 @@ export class AnthropicProvider implements AiProvider {
   }
 
   /** 2段目: 構造化。ツールを付けない。 */
-  async structure<T extends z.ZodType>(system: string, prompt: string, schema: T, usage: Usage, signal?: AbortSignal): Promise<z.infer<T>> {
+  async structure<T extends z.ZodType>(system: string, prompt: Prompt, schema: T, usage: Usage, signal?: AbortSignal): Promise<z.infer<T>> {
     try {
       throwIfAborted(signal)
       const res = await this.messages.parse({
@@ -179,25 +195,32 @@ export class AnthropicProvider implements AiProvider {
     let sources: Source[] = []
     let found = ''
     let truncated = false
-    if (this.settings.search === 'builtin') {
+    // 渡された資料（#63）。「この資料だけから作る」なら Web 調査をしない
+    const mats = opts.materials ?? []
+    const sourceOnly = !!opts.sourceOnly && mats.length > 0
+    const matNote = mats.length
+      ? `\n\n渡された資料: ${mats.map((m) => m.name).join('、')}。${sourceOnly ? 'この資料だけを根拠に書く。資料に無いことは書かず、足りない所は「資料に無い」と書く' : '本文の主な根拠にし、調査で補う'}`
+      : ''
+    if (this.settings.search === 'builtin' && !sourceOnly) {
       onProgress(0, 'Webを調査している')
       const r = await this.research(
         SYS,
-        `${ctx}\n\nこの節の教材を書くための事実を集める。日本語と英語の両方で調べ、公式ドキュメントなどの一次情報を優先する。` +
-          `手順・数値・用語は出典で確かめる。分かったことを日本語で整理する。`,
+        // 調査には文字の資料だけ渡す（PDF は書く段階でだけ読ませ、トークンを二重に使わない）
+        withMaterials(`${ctx}${matNote}\n\nこの節の教材を書くための事実を集める。日本語と英語の両方で調べ、公式ドキュメントなどの一次情報を優先する。` +
+          `手順・数値・用語は出典で確かめる。分かったことを日本語で整理する。`, mats.filter((m) => m.kind === 'text')),
         5, usage, (d) => onProgress(0, d), opts.signal,
       )
       sources = r.sources
       truncated = r.truncated
       found = `\n\n## 調査で分かったこと\n${r.text}\n\n## 見つけたページ\n${sources.map((s, i) => `[${i}] ${s.title} ${s.url}`).join('\n')}`
     }
-    onProgress(1, '資料を書いている')
+    onProgress(1, sourceOnly ? '渡された資料から書いている' : '資料を書いている')
     const d = await this.structure(
       SYS,
-      `${ctx}${found}\n\nこの節の教材を書く。\n- blocks: 本文を意味のまとまりごとに3〜7個に分ける。各要素はMarkdown。見出しは ### を使う。コード・表・式も使ってよい\n` +
+      withMaterials(`${ctx}${found}${matNote}\n\nこの節の教材を書く。\n- blocks: 本文を意味のまとまりごとに3〜7個に分ける。各要素はMarkdown。見出しは ### を使う。コード・表・式も使ってよい\n` +
         `- 読み手が自分で確かめて書き込む前提の「下書き」。断定しすぎず、確かめるべき点は確かめ方を添える\n` +
         `- tasks: この節で実際に手を動かすこと3〜5個\n- queries: 自分で調べるときの検索語3〜5個\n- how: 本文が正しいか自分で確かめる方法2〜3個\n` +
-        `- linkIndexes: 「見つけたページ」のうち一次情報として読む価値が高いものの番号（無ければ空）\n- すべて日本語`,
+        `- linkIndexes: 「見つけたページ」のうち一次情報として読む価値が高いものの番号（無ければ空）\n- すべて日本語`, mats),
       LessonZ, usage, opts.signal,
     )
     const fetchedAt = new Date().toISOString().slice(0, 10)

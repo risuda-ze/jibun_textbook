@@ -204,3 +204,41 @@ describe('生成の中止（#14）', () => {
     await expect(p).rejects.toMatchObject({ code: 'aborted' })
   })
 })
+
+describe('渡された資料（#63）', () => {
+  const tb = newTextbook('t', { chapters: [newChapter('c', [newLesson('l')])] })
+  const lessonId = tb.chapters[0].lessons[0].id
+  const out = { parsed_output: { blocks: ['a'], tasks: [], queries: [], how: [], linkIndexes: [] }, stop_reason: 'end_turn' }
+  const mats = [
+    { kind: 'text' as const, name: 'notes.md', size: 3, text: '所有権のメモ' },
+    { kind: 'pdf' as const, name: 'paper.pdf', size: 4, data: 'JVBERg==' },
+  ]
+
+  it('「この資料だけから作る」は Web 検索をせず、文字は text・PDF は document ブロックで渡す', async () => {
+    const { client, calls } = fake([], [out])
+    await new AnthropicProvider(settings, client).generateLesson(tb, lessonId, () => {}, { materials: mats, sourceOnly: true })
+    expect(calls.stream).toHaveLength(0)
+    expect(calls.parse).toHaveLength(1)
+    const content = (calls.parse[0].messages as { content: Record<string, unknown>[] }[])[0].content
+    expect(content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('渡された資料: notes.md') })
+    expect(content[0]).toMatchObject({ text: expect.stringContaining('所有権のメモ') })
+    expect(content[1]).toMatchObject({ type: 'document', title: 'paper.pdf', source: { type: 'base64', media_type: 'application/pdf', data: 'JVBERg==' } })
+    expect((content[2] as { text: string }).text).toContain('この資料だけを根拠に書く')
+  })
+  it('資料があっても調査する時は、調査には文字の資料だけ渡し、書く段階で PDF も渡す', async () => {
+    const { client, calls } = fake([{ stop_reason: 'end_turn', content: [text('調査メモ')] }], [out])
+    await new AnthropicProvider(settings, client).generateLesson(tb, lessonId, () => {}, { materials: mats, sourceOnly: false })
+    expect(calls.stream).toHaveLength(1)
+    expect(calls.stream[0].tools).toBeDefined()
+    const research = (calls.stream[0].messages as { content: Record<string, unknown>[] }[])[0].content
+    expect(research.map((b) => b.type)).toEqual(['text', 'text'])
+    const write = (calls.parse[0].messages as { content: Record<string, unknown>[] }[])[0].content
+    expect(write.map((b) => b.type)).toEqual(['text', 'document', 'text'])
+    expect((write[2] as { text: string }).text).toContain('本文の主な根拠にし、調査で補う')
+  })
+  it('資料が無ければ従来どおり文字だけのプロンプト', async () => {
+    const { client, calls } = fake([], [out])
+    await new AnthropicProvider({ ...settings, search: 'none' }, client).generateLesson(tb, lessonId, () => {}, { sourceOnly: true })
+    expect(typeof (calls.parse[0].messages as { content: unknown }[])[0].content).toBe('string')
+  })
+})

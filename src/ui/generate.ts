@@ -1,6 +1,7 @@
 import { getProvider, type AiError, type AiSettings } from '../ai'
 import { toast, updateLesson } from '../store'
 import { newBlock, type Textbook } from '../types'
+import { toMaterials, type MaterialInput } from './material'
 
 /** 生成の段階数（Web を調査している → 資料を書いている → 資料ができた）。ボタンの塗りは stepPercent(step, GEN_STEPS) */
 export const GEN_STEPS = 2
@@ -11,14 +12,19 @@ export type GenState = { step: number; detail: string; startedAt: number; endedA
 export const startGen = (): GenState => ({ step: 0, detail: '', startedAt: Date.now(), endedAt: null })
 
 /** 節の資料を生成して教科書に入れる。失敗しても教科書は変えない。 */
-export async function generateInto(tb: Textbook, lessonId: string, ai: AiSettings, onProgress: (step: number, detail: string) => void, signal?: AbortSignal): Promise<boolean> {
+export async function generateInto(tb: Textbook, lessonId: string, ai: AiSettings, onProgress: (step: number, detail: string) => void, signal?: AbortSignal, input?: MaterialInput): Promise<boolean> {
+  // 渡す資料（#63）。ファイルと貼り付けを別々の資料として並べる。無ければ「この資料だけ」は効かない
+  const materials = input ? toMaterials(input) : []
+  const sourceOnly = !!input?.sourceOnly && materials.length > 0
   try {
-    const { draft, usage } = await getProvider(ai).generateLesson(tb, lessonId, onProgress, { signal })
+    const { draft, usage } = await getProvider(ai).generateLesson(tb, lessonId, onProgress, { signal, materials, sourceOnly })
     if (!draft.blocks.length) throw new Error('AIが本文を返しませんでした。もう一度お試しください。')
     updateLesson(tb.id, lessonId, (l) => {
       // 生成を待つ間に自分で書いたノートがあれば、その後ろに足す
       l.blocks.push(...draft.blocks.filter((m) => m.trim()).map((m) => newBlock('ai', m)))
       if (!l.tasks.length) l.tasks = draft.tasks.map((text) => ({ text, checked: false }))
+      // 元にした資料は名前だけ残す（本文は JSON に入れない）
+      l.materials = [...new Set([...l.materials, ...materials.map((m) => m.name)])]
       l.clues = {
         queries: [...new Set([...l.clues.queries, ...draft.clues.queries])],
         links: [...l.clues.links, ...draft.clues.links.filter((x) => !l.clues.links.some((y) => y.url === x.url))],
