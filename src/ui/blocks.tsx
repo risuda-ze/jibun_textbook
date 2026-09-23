@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { htmlToMd, mdToHtml, toggleTask } from '../lib/md'
 import { shrinkImage } from '../lib/image'
 import { isHttpUrl, isImageDataUrl } from '../lib/safe'
+import { applyMarkdown, type MdKind } from '../lib/mdedit'
 import { toast } from '../store'
 import type { Block, NoteDraft } from '../types'
 import { Button } from './kit'
@@ -145,12 +146,38 @@ export function Composer({ draft, onChange, onSubmit }: { draft: NoteDraft; onCh
     setPad(false)
   }
 
+  // Markdown の挿入ボタン（#52）。textarea の選択範囲に記法を当て、当てた範囲を選び直す。
+  // 選び直しは再描画（value の反映）の後でないと末尾へ飛ぶので、effect で行う
+  const pendingSel = useRef<{ start: number; end: number } | null>(null)
+  useEffect(() => {
+    const el = note.current, p = pendingSel.current
+    if (!el || !p) return
+    pendingSel.current = null
+    el.focus()
+    el.setSelectionRange(p.start, p.end)
+  }, [md])
+  function insertMd(kind: MdKind) {
+    const el = note.current
+    if (!el) return
+    const r = applyMarkdown(latest.current.md, el.selectionStart, el.selectionEnd, kind)
+    pendingSel.current = { start: r.start, end: r.end }
+    set({ md: r.md })
+  }
+  const MD_BUTTONS: [MdKind, string, string][] = [
+    ['bold', '太字', '**太字**'], ['bullet', '箇条書き', '- 項目'], ['number', '番号', '1. 項目'],
+    ['heading', '見出し', '## 見出し'], ['code', 'コード', '`コード`'], ['link', 'リンク', '[文](URL)'],
+  ]
+
   return (
     <div className="addnote" onPaste={(e) => {
       const fs = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'))
       if (fs.length) { e.preventDefault(); void addFiles(fs); toast('画像を貼り付けました') }
     }}>
       {quote && <blockquote>{quote} <button className="linkbtn" onClick={() => set({ quote: '' })}>引用をやめる</button></blockquote>}
+      <div className="row mdtools" role="toolbar" aria-label="Markdown の挿入">
+        {MD_BUTTONS.map(([k, label, hint]) => <Button key={k} v="outline" sm title={hint} onMouseDown={(e) => e.preventDefault()} onClick={() => insertMd(k)}>{label}</Button>)}
+        <span className="sub">Markdown が使えます。書き込むと整形されます</span>
+      </div>
       <textarea ref={note} id="note" value={md} onChange={(e) => set({ md: e.target.value })} placeholder="自分の言葉で。やってみた結果、調べて分かったこと、引っかかった点など。スクショは Ctrl+V で貼れます" />
       {images.length > 0 && (
         <div className="atts">
