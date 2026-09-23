@@ -45,7 +45,7 @@ Android の Chrome で上の URL を開き、メニューから「ホーム画�
 
 ## データの形
 
-- 教科書1冊 = JSON 1ファイル（`<題名>.textbook.json`）。`schemaVersion` で形式の版を管理します
+- 教科書1冊 = JSON 1ファイル（`<題名>.textbook.json`）。`schemaVersion` で形式の版を管理します。古い版は読み込むときに自動で今の版に移行します（`src/lib/migrate.ts`）。自動で直らないときは Help の「読み込めない場合、まずはこちら」で手動で試せます
 - 画像は長辺 1600px・WebP に縮小して data URL で JSON の中に埋め込みます。ファイル1つで完結します
 - 保存先は端末のブラウザの IndexedDB です。ブラウザやオリジン（URL のホスト）が変わると別の保存領域になるので、移すときは JSON を書き出して読み込みます
 - API キーと AI の設定は JSON に含めません

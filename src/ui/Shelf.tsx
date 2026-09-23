@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import {
     dropBroken,
     go,
+    openRepair,
     markExported,
     openBook,
     putBook,
@@ -73,12 +74,14 @@ export function Shelf() {
             return setError(`「${f.name}」は読み込めませんでした。${r.reason}`);
         const existing = books.find((b) => b.id === r.tb.id);
         const d = decideImport(existing, r.tb);
+        // 版の移行や不整合の修復をしたら、何を直したかを知らせる（#65）
+        const fixed = r.steps.length ? `直した所: ${r.steps.join("、")}。` : "";
         if (d === "add") {
             putBook(r.tb, false);
-            toast(`「${r.tb.title}」を読み込みました。`);
+            toast(`「${r.tb.title}」を読み込みました。${fixed}`);
         } else if (d === "overwrite") {
             putBook(r.tb, false);
-            toast(`「${r.tb.title}」を新しい内容で上書きしました。`, () =>
+            toast(`「${r.tb.title}」を新しい内容で上書きしました。${fixed}`, () =>
                 putBook(existing!, false),
             );
         } else if (d === "same") toast("同じ内容が存在します。");
@@ -144,7 +147,7 @@ export function Shelf() {
                 <Card stack tone="peach" aria-label="読めない教科書">
                     <p>
                         <b>読み込めない教科書が {broken.length} 冊あります。</b>
-                        形式が壊れているか、古い版のデータです。生データを書き出して保管するか、消してください。
+                        形式が壊れているか、古い版のデータです。「Help で直す」で版の移行と修復を試せます。生データを書き出して保管するか、消すこともできます。
                     </p>
                     <div className="row">
                         {broken.map((b) => (
@@ -157,6 +160,7 @@ export function Shelf() {
                                     document.body.appendChild(a); a.click(); a.remove();
                                     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
                                 }}>生データを書き出す</Button>
+                                <Button v="outline" sm onClick={() => openRepair(b.key, b.raw)}>Help で直す</Button>
                                 <Button v="danger" sm onClick={() => { if (confirm("この生データを端末から消しますか？")) dropBroken(b.key); }}>消去</Button>
                             </span>
                         ))}

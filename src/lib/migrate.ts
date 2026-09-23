@@ -1,0 +1,71 @@
+import { TextbookZ, findDuplicateIds, nowIso, renumberDuplicateIds, type Textbook } from '../types'
+
+/** 今の保存形式の版。`TextbookZ` の `schemaVersion` と同じ値にする（規約: CLAUDE.md「保存形式の規約」） */
+export const CURRENT_VERSION = 1
+
+type Raw = Record<string, unknown>
+export type Migration = (raw: Raw) => Raw
+
+/**
+ * 版ごとの移行関数。キーは元の版、戻り値は次の版の形（`schemaVersion` も次の版にする）。
+ * 1段ずつ積む。版をまたぐ直行関数は作らない。今は版 1 だけなので空。
+ */
+export const migrations: Record<number, Migration> = {}
+
+export type MigrateResult =
+  | { ok: true; tb: Textbook; from: number; steps: string[] }
+  | { ok: false; reason: string; from: number | null }
+
+const isObj = (x: unknown): x is Raw => !!x && typeof x === 'object' && !Array.isArray(x)
+const validIso = (x: unknown): x is string => typeof x === 'string' && !Number.isNaN(Date.parse(x))
+
+/**
+ * 生の JSON を今の版の教科書にする（#65）。
+ * 版を読み → 移行関数を1段ずつ当て → 既知の不整合を直し → スキーマで検証する。
+ * 直した内容は `steps` に日本語で残す（空なら手を入れていない）。
+ * `opts` はテスト用（移行表と今の版を差し替える）。
+ */
+export function migrate(raw: unknown, opts: { table?: Record<number, Migration>; current?: number } = {}): MigrateResult {
+  const table = opts.table ?? migrations
+  const current = opts.current ?? CURRENT_VERSION
+  if (!isObj(raw)) return { ok: false, reason: '教科書のJSONではありません。', from: null }
+  const v = raw.schemaVersion
+  if (typeof v !== 'number' || !Number.isInteger(v)) {
+    return { ok: false, reason: 'schemaVersion（形式の版）がありません。このアプリが書き出したファイルではない可能性があります。', from: null }
+  }
+  if (v > current) {
+    return { ok: false, reason: `このアプリより新しい形式のファイルです（schemaVersion: ${v}）。アプリを更新してから読み込んでください。`, from: v }
+  }
+  const steps: string[] = []
+  let obj: Raw = raw
+  for (let i = v; i < current; i++) {
+    const fn = table[i]
+    if (!fn) return { ok: false, reason: `版 ${i} から ${i + 1} への移行が用意されていません。アプリを更新してから読み込んでください。`, from: v }
+    obj = { ...fn(obj), schemaVersion: i + 1 }
+    steps.push(`版 ${i} から ${i + 1} に移行しました`)
+  }
+
+  // 既知の不整合の修復。日時が無い・不正なら補う
+  if (!validIso(obj.createdAt)) {
+    obj = { ...obj, createdAt: validIso(obj.updatedAt) ? obj.updatedAt : nowIso() }
+    steps.push('作成日時が無かったので補いました')
+  }
+  if (!validIso(obj.updatedAt)) {
+    obj = { ...obj, updatedAt: obj.createdAt }
+    steps.push('更新日時が無かったので作成日時で補いました')
+  }
+
+  const r = TextbookZ.safeParse(obj)
+  if (!r.success) {
+    const i = r.error.issues[0]
+    return { ok: false, reason: `形式が正しくありません（${i.path.join('.') || 'root'}: ${i.message}）。`, from: v }
+  }
+  let tb = r.data
+  // id の重複は後ろから振り直す（#36 の救済を読込と端末内で同じにする）
+  if (findDuplicateIds(tb).length) {
+    const fixed = renumberDuplicateIds(tb)
+    tb = fixed.tb
+    steps.push(`重複していた id を ${fixed.count} 件振り直しました`)
+  }
+  return { ok: true, tb, from: v, steps }
+}

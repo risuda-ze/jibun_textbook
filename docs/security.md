@@ -19,8 +19,8 @@
 
 | 要件 | 現状（該当箇所） | 判定 | 対応方針 |
 |---|---|---|---|
-| スキーマ検証と `schemaVersion` チェック | `parseImport()` が `JSON.parse` → `schemaVersion === 1` → `TextbookZ.safeParse` の順に検証（`src/lib/io.ts`）。失敗理由を画面に出す | 済 | 版が上がったら移行処理を足す |
-| 起動時に IndexedDB から読むデータも検証する | `init()` が各教科書を `TextbookZ.safeParse` で検証する。失敗したものは本棚で知らせ、生データを書き出すか消せる（#17） | 済 | — |
+| スキーマ検証と `schemaVersion` チェック | `parseImport()` が `JSON.parse` → `migrate()`（`src/lib/migrate.ts`。版を読んで移行関数を1段ずつ当て、日時の欠落と id の重複を直し、`TextbookZ.safeParse` で検証）の順に処理（`src/lib/io.ts`）。失敗理由を画面に出し、Help の「読み込めない場合、まずはこちら」で手動でも試せる（#65） | 済 | 版を上げるときは `migrations` に関数を足す（`CLAUDE.md`「保存形式の規約」） |
+| 起動時に IndexedDB から読むデータも検証する | `init()` が各教科書を同じ `migrate()` に通す。直したものは書き戻し、直せないものは本棚で知らせて Help で直すか、生データを書き出すか消せる（#17 #65） | 済 | — |
 | サイズ上限 | 書き出し側は 8MB 超で警告（`SIZE_WARN_BYTES`）。読み込み側は 16MB（`IMPORT_LIMIT_BYTES`）を超えたら `JSON.parse` の前に断る（#17） | 済 | — |
 | 不正な `id` / 重複 / 循環 | 読み込み（`parseImport`）は `TextbookStrictZ`（`superRefine` で章・節・ブロック・画像の id の一意性を検証）で弾き、どの id が重複しているかを理由に出す。端末内のデータは `store.init` が `renumberDuplicateIds` で振り直して救済し、件数をトーストで知らせる。木構造なので循環は起きない（#36） | 済 | — |
 | URL 項目のスキーム検証 | スキーマ（`LinkZ.url`・`Block.source`・`Image.dataUrl`）は `z.string()` のまま弾かない（古い JSON を読めなくしないため）。描画時に `src/lib/safe.ts` の `isHttpUrl` / `isImageDataUrl` で無害化する（#35） | 済 | 描画経路を増やすときは必ずこの2関数を通す |

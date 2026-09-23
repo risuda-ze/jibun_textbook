@@ -1,0 +1,73 @@
+{
+ "schemaVersion": 1,
+ "id": "fixture-v1",
+ "title": "見本の教科書",
+ "goal": "版 1 の見本。次に版を上げるときの移行テストの入力",
+ "input": {
+  "prompt": "",
+  "can": "",
+  "time": "",
+  "env": ""
+ },
+ "createdAt": "2026-09-23T00:00:00.000Z",
+ "updatedAt": "2026-09-23T00:00:00.000Z",
+ "chapters": [
+  {
+   "id": "ch-1",
+   "title": "第1章",
+   "lessons": [
+    {
+     "id": "ls-1",
+     "title": "最初の節",
+     "minutes": 45,
+     "isTask": false,
+     "done": false,
+     "review": false,
+     "summary": "AI の下書きと自分の書き込みが1つずつ",
+     "tasks": [],
+     "clues": {
+      "queries": [],
+      "links": [],
+      "how": []
+     },
+     "blocks": [
+      {
+       "id": "bk-1",
+       "by": "ai",
+       "md": "### 要点\n- 見本",
+       "edited": false,
+       "source": "",
+       "quote": "",
+       "images": []
+      },
+      {
+       "id": "bk-2",
+       "by": "me",
+       "md": "自分で確かめたこと",
+       "edited": false,
+       "source": "https://example.com/",
+       "quote": "",
+       "images": []
+      }
+     ]
+    },
+    {
+     "id": "ls-2",
+     "title": "二つ目の節",
+     "minutes": 45,
+     "isTask": false,
+     "done": false,
+     "review": false,
+     "summary": "",
+     "tasks": [],
+     "clues": {
+      "queries": [],
+      "links": [],
+      "how": []
+     },
+     "blocks": []
+    }
+   ]
+  }
+ ]
+}
