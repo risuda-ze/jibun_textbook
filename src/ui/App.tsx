@@ -27,8 +27,10 @@ export function App() {
         (s.screen === "road" || s.screen === "lesson" || s.screen === "book")
             ? "shelf"
             : s.screen;
+    // レッスンと通読では、設定に応じて画面幅の約 90% まで広げる（#53）
+    const wide = s.wide && (screen === "lesson" || screen === "book");
     return (
-        <div className="app">
+        <div className={`app${wide ? " wide" : ""}`}>
             <header className="bar">
                 <div className="brand">じぶん教科書</div>
                 <nav className="tabs" role="tablist">
