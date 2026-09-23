@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { getProvider, type CourseDesign, type QA, type Usage } from '../ai'
+import { getProvider, type AiError, type CourseDesign, type QA, type Usage } from '../ai'
 import { openBook, putBook, toast, useApp } from '../store'
 import { newChapter, newLesson, newTextbook, type CourseInput } from '../types'
-import { AiBar, Steps, Working, stepPercent } from './common'
+import { AiBar, Steps, Working, stepPercent, useAbort } from './common'
 import { Button, Card, PageHead } from './kit'
 
 const STEP_LABELS = ['学びたいことを分解', 'Webを調査', 'コース設計を作成']
@@ -42,12 +42,17 @@ export function Create() {
     setBusy(null)
   }
 
+  const abort = useAbort()
   async function run(extraNote = '') {
     setError(''); setBusy('design'); setStep(0); setDetail(''); setStartedAt(Date.now()); setEndedAt(null); setRedoing(!!extraNote)
     try {
-      const r = await getProvider(ai).designCourse(input, qa ?? [], extraNote, (s, d) => { setStep(s); setDetail(d) })
+      const r = await getProvider(ai).designCourse(input, qa ?? [], extraNote, (s, d) => { setStep(s); setDetail(d) }, { signal: abort.start() })
       setDesign(r.design); setUsage(r.usage); setOff(new Set()); setStep(STEP_LABELS.length); setShowQa(false)
-    } catch (e) { setError((e as Error).message); setStep(-1) }
+    } catch (e) {
+      // 自分でやめたときはエラーにせず短く知らせる（#14）
+      if ((e as AiError).code === 'aborted') toast('生成をやめました'); else setError((e as Error).message)
+      setStep(-1)
+    }
     setEndedAt(Date.now())
     setBusy(null)
   }
@@ -85,7 +90,7 @@ export function Create() {
               {busy === 'ask' ? '質問を考えている…' : busy === 'design' && !redoing ? '設計しています…' : design ? 'もう一度調べ直す' : '調べてコース設計を作る'}
             </Button>
             {busy === 'design' && !redoing
-              ? <Working running detail={detail} startedAt={startedAt} endedAt={endedAt} />
+              ? <><Working running detail={detail} startedAt={startedAt} endedAt={endedAt} /><Button v="outline" sm onClick={abort.stop}>やめる</Button></>
               : <span className="sub">全部自由入力です。先に設計だけ作り、資料は節ごとに後で生成します。</span>}
           </div>
           {error && <p className="err" role="alert">{error}</p>}
@@ -136,7 +141,7 @@ export function Create() {
               progress={busy === 'design' && redoing ? stepPercent(step, STEP_LABELS.length) : null}>
               {busy === 'design' && redoing ? '直しています…' : '設計を直してもらう'}
             </Button>
-            {busy === 'design' && redoing && <Working running detail={detail} startedAt={startedAt} endedAt={endedAt} />}
+            {busy === 'design' && redoing && <><Working running detail={detail} startedAt={startedAt} endedAt={endedAt} /><Button v="outline" sm onClick={abort.stop}>やめる</Button></>}
           </div>
           <p className="sub">あとからでも、ロードマップの「設計を直す」で節・章・全体を選んで直せます。</p>
         </Card>

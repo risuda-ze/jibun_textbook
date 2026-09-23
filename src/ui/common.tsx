@@ -2,7 +2,7 @@ import type { Lesson, Textbook } from '../types'
 import { STATUS_LABEL, lessonStatus, statusCounts, type Status } from '../lib/status'
 import { MODELS, type AiKind } from '../ai/types'
 import { setAi, toast, useApp } from '../store'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, Card, Pill, Segmented } from './kit'
 
 export function StatusChip({ lesson }: { lesson: Lesson }) {
@@ -113,4 +113,17 @@ export function Steps({ labels, step, detail }: { labels: string[]; step: number
       ))}
     </ol>
   )
+}
+
+/**
+ * 生成の中止（#14）。start() で新しい AbortController を作って signal を返し、stop() で中止する。
+ * 画面を離れる（unmount）ときも自動で中止する。
+ */
+export function useAbort(): { start: () => AbortSignal; stop: () => void } {
+  const ref = useRef<AbortController | null>(null)
+  useEffect(() => () => ref.current?.abort(), [])
+  return {
+    start: () => { ref.current?.abort(); const c = new AbortController(); ref.current = c; return c.signal },
+    stop: () => ref.current?.abort(),
+  }
 }

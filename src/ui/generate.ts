@@ -1,4 +1,4 @@
-import { getProvider, type AiSettings } from '../ai'
+import { getProvider, type AiError, type AiSettings } from '../ai'
 import { toast, updateLesson } from '../store'
 import { newBlock, type Textbook } from '../types'
 
@@ -11,9 +11,9 @@ export type GenState = { step: number; detail: string; startedAt: number; endedA
 export const startGen = (): GenState => ({ step: 0, detail: '', startedAt: Date.now(), endedAt: null })
 
 /** 節の資料を生成して教科書に入れる。失敗しても教科書は変えない。 */
-export async function generateInto(tb: Textbook, lessonId: string, ai: AiSettings, onProgress: (step: number, detail: string) => void): Promise<boolean> {
+export async function generateInto(tb: Textbook, lessonId: string, ai: AiSettings, onProgress: (step: number, detail: string) => void, signal?: AbortSignal): Promise<boolean> {
   try {
-    const { draft, usage } = await getProvider(ai).generateLesson(tb, lessonId, onProgress)
+    const { draft, usage } = await getProvider(ai).generateLesson(tb, lessonId, onProgress, { signal })
     if (!draft.blocks.length) throw new Error('AIが本文を返しませんでした。もう一度お試しください。')
     updateLesson(tb.id, lessonId, (l) => {
       // 生成を待つ間に自分で書いたノートがあれば、その後ろに足す
@@ -32,7 +32,10 @@ export async function generateInto(tb: Textbook, lessonId: string, ai: AiSetting
       : '資料を生成しました' + cut)
     return true
   } catch (e) {
-    toast((e as Error).message)
+    const err = e as AiError
+    // 自分でやめたときは短く知らせる（#14）。ここまでに使った検索の回数が分かれば添える（課金されるため）
+    if (err.code === 'aborted') toast(err.usage?.searches ? `生成をやめました（ここまでの検索${err.usage.searches}回）` : '生成をやめました')
+    else toast(err.message)
     return false
   }
 }
