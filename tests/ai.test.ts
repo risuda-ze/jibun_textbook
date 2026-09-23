@@ -225,13 +225,15 @@ describe('渡された資料（#63）', () => {
     expect(content[1]).toMatchObject({ type: 'document', title: 'paper.pdf', source: { type: 'base64', media_type: 'application/pdf', data: 'JVBERg==' } })
     expect((content[2] as { text: string }).text).toContain('この資料だけを根拠に書く')
   })
-  it('資料があっても調査する時は、調査には文字の資料だけ渡し、書く段階で PDF も渡す', async () => {
+  it('資料があっても調査する時は、調査には資料の本文を渡さず（名前だけ）、書く段階で全部渡す', async () => {
     const { client, calls } = fake([{ stop_reason: 'end_turn', content: [text('調査メモ')] }], [out])
     await new AnthropicProvider(settings, client).generateLesson(tb, lessonId, () => {}, { materials: mats, sourceOnly: false })
     expect(calls.stream).toHaveLength(1)
     expect(calls.stream[0].tools).toBeDefined()
-    const research = (calls.stream[0].messages as { content: Record<string, unknown>[] }[])[0].content
-    expect(research.map((b) => b.type)).toEqual(['text', 'text'])
+    const research = (calls.stream[0].messages as { content: unknown }[])[0].content
+    expect(typeof research).toBe('string')
+    expect(research as string).toContain('notes.md')
+    expect(research as string).not.toContain('所有権のメモ')
     const write = (calls.parse[0].messages as { content: Record<string, unknown>[] }[])[0].content
     expect(write.map((b) => b.type)).toEqual(['text', 'document', 'text'])
     expect((write[2] as { text: string }).text).toContain('本文の主な根拠にし、調査で補う')

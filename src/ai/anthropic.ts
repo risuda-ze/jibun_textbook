@@ -208,11 +208,12 @@ export class AnthropicProvider implements AiProvider {
       : ''
     if (this.settings.search === 'builtin' && !sourceOnly) {
       onProgress(0, 'Webを調査している')
+      // 調査には資料の本文を渡さない（名前だけ）。資料は書く段階でだけ読ませ、入力トークンを二重に使わない（#79）
+      const researchNote = mats.length ? `\n\n手元に資料がある（${mats.map((m) => m.name).join('、')}。本文は書く段階で読む）。資料を補う事実や最新の情報を集める。` : ''
       const r = await this.research(
         SYS,
-        // 調査には文字の資料だけ渡す（PDF は書く段階でだけ読ませ、トークンを二重に使わない）
-        withMaterials(`${ctx}${matNote}\n\nこの節の教材を書くための事実を集める。日本語と英語の両方で調べ、公式ドキュメントなどの一次情報を優先する。` +
-          `手順・数値・用語は出典で確かめる。分かったことを日本語で整理する。`, mats.filter((m) => m.kind === 'text')),
+        `${ctx}${researchNote}\n\nこの節の教材を書くための事実を集める。日本語と英語の両方で調べ、公式ドキュメントなどの一次情報を優先する。` +
+          `手順・数値・用語は出典で確かめる。分かったことを日本語で整理する。`,
         MAX_SEARCH_LESSON, usage, (d) => onProgress(0, d), opts.signal,
       )
       sources = r.sources

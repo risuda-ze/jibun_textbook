@@ -19,7 +19,7 @@ const kb = (n: number): string => (n >= 1024 * 1024 ? `${Math.round(n / 1024 / 1
 export function checkSize(kind: MaterialKind, size: number): string | null {
   const limit = kind === 'pdf' ? PDF_LIMIT_BYTES : TEXT_LIMIT_BYTES
   if (size <= limit) return null
-  return `大きすぎて渡せません（${kb(size)}。${kind === 'pdf' ? 'PDF' : '文字のファイル'}の上限は ${kb(limit)}）。`
+  return `大きすぎて渡せません（${kb(size)}。${kind === 'pdf' ? 'PDF' : '文字'}の上限は ${kb(limit)}）。`
 }
 
 export type ReadResult = { ok: true; material: Material } | { ok: false; reason: string }
@@ -49,9 +49,15 @@ export async function readMaterial(file: File): Promise<ReadResult> {
   }
 }
 
-/** 貼り付けた文を資料にする。空なら null */
-export function pastedMaterial(text: string): Material | null {
+/** 貼り付けた文を資料にする。空なら null。ファイルと同じ上限（#79） */
+export function pastedMaterial(text: string): ReadResult | null {
   const t = text.trim()
   if (!t) return null
-  return { kind: 'text', name: PASTED_NAME, size: new Blob([t]).size, text: t }
+  const size = new Blob([t]).size
+  const over = checkSize('text', size)
+  if (over) return { ok: false, reason: `貼り付けた文は${over}` }
+  return { ok: true, material: { kind: 'text', name: PASTED_NAME, size, text: t } }
 }
+
+/** 貼り付けた文の今の大きさ（バイト）。欄の下に上限と並べて出す */
+export const pastedSize = (text: string): number => new Blob([text.trim()]).size
