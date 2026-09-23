@@ -37,6 +37,7 @@ describe('渡す資料（#63）', () => {
   })
   it('貼り付けは前後の空白を落とし、空なら無し', () => {
     expect(pastedMaterial('  \n')).toBeNull()
-    expect(pastedMaterial(' 字幕の文 ')).toMatchObject({ kind: 'text', name: PASTED_NAME, text: '字幕の文' })
+    expect(pastedMaterial(' 字幕の文 ')).toMatchObject({ ok: true, material: { kind: 'text', name: PASTED_NAME, text: '字幕の文' } })
+    expect(pastedMaterial('a'.repeat(TEXT_LIMIT_BYTES + 1))).toMatchObject({ ok: false, reason: expect.stringContaining('200KB') })
   })
 })

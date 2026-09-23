@@ -40,4 +40,10 @@ test('渡せない種類や大きすぎるファイルは理由つきで断る',
   await expect(page.getByRole('alert')).toContainText('200KB')
   // 何も渡していないので「この資料だけから作る」は選べない
   await expect(page.locator('#sourceonly')).toBeDisabled()
+  // 貼り付けも上限を超えると理由が出て、生成は始まらない
+  await page.locator('#materialtext').fill('a'.repeat(200 * 1024 + 1))
+  await expect(page.getByRole('alert').filter({ hasText: '貼り付けた文' })).toContainText('大きすぎて')
+  await page.getByRole('button', { name: 'この節の資料を生成' }).click()
+  await expect(page.locator('.toast')).toContainText('貼り付けた文は大きすぎて')
+  await expect(page.getByRole('button', { name: '生成中…' })).toHaveCount(0)
 })

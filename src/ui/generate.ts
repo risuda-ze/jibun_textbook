@@ -1,7 +1,7 @@
 import { getProvider, type AiError, type AiSettings } from '../ai'
 import { toast, updateLesson } from '../store'
 import { newBlock, type Textbook } from '../types'
-import { toMaterials, type MaterialInput } from './material'
+import { materialError, toMaterials, type MaterialInput } from './material'
 
 /** 生成の段階数（Web を調査している → 資料を書いている → 資料ができた）。ボタンの塗りは stepPercent(step, GEN_STEPS) */
 export const GEN_STEPS = 2
@@ -16,6 +16,9 @@ export async function generateInto(tb: Textbook, lessonId: string, ai: AiSetting
   // 渡す資料（#63）。ファイルと貼り付けを別々の資料として並べる。無ければ「この資料だけ」は効かない
   const materials = input ? toMaterials(input) : []
   const sourceOnly = !!input?.sourceOnly && materials.length > 0
+  // 貼り付けが上限を超えていたら、API を呼ぶ前に断る（#79）
+  const bad = input ? materialError(input) : null
+  if (bad) { toast(bad); return false }
   try {
     const { draft, usage } = await getProvider(ai).generateLesson(tb, lessonId, onProgress, { signal, materials, sourceOnly })
     if (!draft.blocks.length) throw new Error('AIが本文を返しませんでした。もう一度お試しください。')

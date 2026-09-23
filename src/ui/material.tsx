@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import type { Material } from '../ai/types'
-import { PDF_LIMIT_BYTES, TEXT_LIMIT_BYTES, pastedMaterial, readMaterial } from '../lib/material'
+import { PDF_LIMIT_BYTES, TEXT_LIMIT_BYTES, pastedMaterial, pastedSize, readMaterial } from '../lib/material'
 import { formatSize } from '../lib/io'
 import { Button, Card } from './kit'
 
@@ -13,8 +13,14 @@ export function toMaterials(m: MaterialInput): Material[] {
   const out: Material[] = []
   if (m.file) out.push(m.file)
   const p = pastedMaterial(m.pasted)
-  if (p) out.push(p)
+  if (p?.ok) out.push(p.material)
   return out
+}
+
+/** 渡せない状態なら理由。生成の前に見る（#79） */
+export function materialError(m: MaterialInput): string | null {
+  const p = pastedMaterial(m.pasted)
+  return p && !p.ok ? p.reason : null
 }
 
 export function MaterialPanel({ value, onChange, disabled }: { value: MaterialInput; onChange: (v: MaterialInput) => void; disabled?: boolean }) {
@@ -22,6 +28,7 @@ export function MaterialPanel({ value, onChange, disabled }: { value: MaterialIn
   const [error, setError] = useState('')
   const file = useRef<HTMLInputElement>(null)
   const count = toMaterials(value).length
+  const pastedErr = materialError(value)
 
   async function onFile(f: File | undefined) {
     if (!f) return
@@ -55,8 +62,11 @@ export function MaterialPanel({ value, onChange, disabled }: { value: MaterialIn
           </div>
           {error && <p className="err" role="alert">{error}</p>}
           <label className="f" htmlFor="materialtext">文字を貼り付ける（YouTube の字幕や、コピーした本文）
-            <textarea id="materialtext" rows={4} value={value.pasted} disabled={disabled} onChange={(e) => onChange({ ...value, pasted: e.target.value })} placeholder="ここに貼り付けます" />
+            <textarea id="materialtext" rows={4} value={value.pasted} disabled={disabled} onChange={(e) => onChange({ ...value, pasted: e.target.value })} placeholder="ここに貼り付けます" aria-invalid={!!pastedErr} />
           </label>
+          <p className={pastedErr ? 'err' : 'sub'} role={pastedErr ? 'alert' : undefined}>
+            {pastedErr ?? `${formatSize(pastedSize(value.pasted))} / 上限 ${formatSize(TEXT_LIMIT_BYTES)}`}
+          </p>
           <label className="row sub" htmlFor="sourceonly">
             <input type="checkbox" id="sourceonly" checked={value.sourceOnly} disabled={disabled || count === 0} onChange={(e) => onChange({ ...value, sourceOnly: e.target.checked })} />
             この資料だけから作る（Web 調査をしません）
