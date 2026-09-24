@@ -381,7 +381,7 @@ export function Roadmap({ tb }: { tb: Textbook }) {
             <div className="tl-label">3時間ごと</div>
             <div className="tl-lane" style={{ width: W }}>
               {Array.from({ length: units }, (_, i) => (
-                <span key={i} className="tick" style={{ left: i * UNIT * PXMIN }}>
+                <span key={i} className="tick mono" style={{ left: i * UNIT * PXMIN }}>
                   {(i + 1) * 3}h
                 </span>
               ))}

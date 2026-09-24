@@ -255,7 +255,7 @@ export function downloadBook(tb: Textbook): void {
 export function UsageLine({ usage }: { usage: Usage | null }) {
   if (!usage || (!usage.inputTokens && !usage.searches)) return null
   return (
-    <p className="usage">
+    <p className="usage mono">
       検索 {usage.searches}回 / 入力 {usage.inputTokens.toLocaleString()} / 出力 {usage.outputTokens.toLocaleString()} トークン
     </p>
   )
