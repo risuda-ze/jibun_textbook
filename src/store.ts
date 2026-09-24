@@ -108,7 +108,10 @@ export async function init(): Promise<void> {
     settingsFailed = true
   }
   books.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  setState({ ready: true, books, broken, ai: { ...DEFAULT_AI, ...s?.ai }, lastExport: s?.lastExport ?? {}, wide: s?.wide ?? false })
+  const ai: AiSettings = { ...DEFAULT_AI, ...s?.ai }
+  // 消した接続先（compat / local）が端末の設定に残っていても開けるようにする（#127）
+  if (ai.kind !== 'demo') ai.kind = 'anthropic'
+  setState({ ready: true, books, broken, ai, lastExport: s?.lastExport ?? {}, wide: s?.wide ?? false })
   if (booksFailed) toast('端末の保存領域を読めませんでした。ブラウザの設定で保存が許可されているか確認してください。')
   else if (settingsFailed) toast('設定を読み込めませんでした。既定の設定で開きます。')
   else if (repaired) toast(`古い形式か不整合のあった教科書 ${repaired} 冊を直しました。`)

@@ -50,8 +50,6 @@ export function Meter({ tb }: { tb: Textbook }) {
 
 const KINDS: [AiKind, string][] = [
   ['anthropic', 'Anthropic API'],
-  ['compat', 'OpenAI互換API'],
-  ['local', 'ローカル'],
   ['demo', 'デモ応答'],
 ]
 
@@ -124,11 +122,6 @@ export function AiBar() {
             </select>
           </label>
         </div>
-      )}
-      {(ai.kind === 'compat' || ai.kind === 'local') && (
-        <p className="sub">
-          この接続先はまだ使えません。次の段階で対応します。{ai.kind === 'local' && 'ローカルのモデルはPCでだけ使える予定です。'}
-        </p>
       )}
       {ai.kind === 'demo' && <p className="sub">APIキーなしで動線を試すための見本を返します。調査はしません。</p>}
     </Card>

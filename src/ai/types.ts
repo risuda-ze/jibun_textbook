@@ -2,7 +2,7 @@ import type { Clues, CourseInput, Textbook } from '../types'
 import type { PlanChapter, PlanLesson } from '../lib/protect'
 import { AI_MSG } from '../lib/messages'
 
-export type AiKind = 'anthropic' | 'compat' | 'local' | 'demo'
+export type AiKind = 'anthropic' | 'demo'
 export type SearchMode = 'builtin' | 'none'
 
 /** 端末内にだけ保存する設定。教科書のJSONには入らない。 */
@@ -103,7 +103,7 @@ export interface AiProvider {
   ): Promise<{ plan: RedesignPlan; usage: Usage }>
 }
 
-export type AiErrorCode = 'nokey' | 'auth' | 'rate' | 'network' | 'refusal' | 'parse' | 'unsupported' | 'api' | 'aborted'
+export type AiErrorCode = 'nokey' | 'auth' | 'rate' | 'network' | 'refusal' | 'parse' | 'api' | 'aborted'
 
 export class AiError extends Error {
   code: AiErrorCode
