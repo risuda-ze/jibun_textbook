@@ -8,7 +8,6 @@ export const L = {
   design: '調べてコース設計を作る',
   generateLesson: 'この節の資料を生成',
   generate: '資料を生成',
-  generating: '生成中…',
   stop: 'やめる',
   startWriting: '自分で書き始める',
   write: '書き込む',
