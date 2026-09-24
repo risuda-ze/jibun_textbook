@@ -8,7 +8,7 @@ test('完了条件1: 自由入力 → 確認質問 → 設計案 → ロード�
   const list = isPhone(page) ? page.locator('.chlist') : page.locator('.tl')
   await expect(list).toBeVisible()
   await expect(list.getByText('最小の一歩をやってみる')).toBeVisible()
-  await expect(page.locator('.detail').getByText('未作成').first()).toBeVisible()
+  await expect(page.locator('.detail').getByText('未作成').locator('visible=true').first()).toBeVisible()
 })
 
 test('スマホ幅は章ごとの一覧、PC幅はタイムライン', async ({ page }) => {
@@ -45,8 +45,8 @@ test('完了条件4: 完了と再確認の印がロードマップと本棚に�
   await page.getByLabel('完了', { exact: true }).check()
   await expect(page.locator('.pagehead .chip.done')).toBeVisible()
   await page.getByRole('button', { name: L.roadmap, exact: true }).click()
-  await expect(page.locator('.detail .chip.done').first()).toBeVisible()
-  await expect(page.locator('.detail .flag').first()).toBeVisible()
+  await expect(page.locator('.detail .chip.done').locator('visible=true').first()).toBeVisible()
+  await expect(page.locator('.detail .flag').locator('visible=true').first()).toBeVisible()
   await page.getByRole('tab', { name: /本棚/ }).click()
   await expect(page.getByText('すべて完了')).toBeVisible()
   await expect(page.getByText('再確認 1件')).toBeVisible()
@@ -178,7 +178,7 @@ test('AIにつながらないときは教科書を変えずに理由を出す', 
   await blankBook(page)
   await page.getByRole('button', { name: L.generateLesson }).click()
   await expect(page.getByRole('status')).toContainText('APIキーが未設定')
-  await expect(page.locator('.detail').getByText('未作成').first()).toBeVisible()
+  await expect(page.locator('.detail').getByText('未作成').locator('visible=true').first()).toBeVisible()
 })
 
 test('ノートの下書きは差し込み位置や節の切り替えで消えない', async ({ page }) => {
