@@ -10,6 +10,7 @@ import {
   DIFF_LABEL,
   type DiffRow,
 } from '../lib/protect'
+import { moveChapter, moveLesson, moveLessonToChapter } from '../lib/reorder'
 import { STATUS_LABEL, currentLesson, findLesson, lessonNo, lessonStatus } from '../lib/status'
 import { openLesson, putBook, selectLesson, snapshot, toast, updateBook, updateLesson, useApp } from '../store'
 import { newChapter, newLesson, type Lesson, type Textbook } from '../types'
@@ -185,6 +186,7 @@ export function Roadmap({ tb }: { tb: Textbook }) {
     (lessonId && findLesson(tb, lessonId)) ||
     (cur && findLesson(tb, cur.id)) ||
     (tb.chapters[0]?.lessons[0] && findLesson(tb, tb.chapters[0].lessons[0].id))
+  const selNo = sel ? lessonNo(tb, sel.lesson.id) : ''
 
   // タイムライン: 章ごとに1トラック。節は所要時間を幅にして、前の章の続きから並べる
   let cursor = 0
@@ -240,6 +242,13 @@ export function Roadmap({ tb }: { tb: Textbook }) {
           }
         : undefined,
     )
+  }
+  /** 並べ替え（#11）。純粋関数の結果で置き換え、元に戻せるトーストを出す。選択は動かした節のまま */
+  function move(fn: (d: Textbook) => Textbook, lessonId: string, msg: string) {
+    const before = snapshot(tb.id)
+    updateBook(tb.id, (d) => Object.assign(d, fn(d)))
+    selectLesson(lessonId)
+    toast(msg, before ? () => putBook(before) : undefined)
   }
 
   return (
@@ -381,7 +390,27 @@ export function Roadmap({ tb }: { tb: Textbook }) {
         <Card className="detail" id="detail">
           {/* 章構成を左（広い）、選択中の節を右に置く（#89）。読み上げ順も同じ */}
           <div className="chapterpane">
-            <div className="eyebrow">CH{sel.ci + 1}</div>
+            <div className="row movectl">
+              <div className="eyebrow">CH{sel.ci + 1}</div>
+              <Button
+                v="ghost"
+                sm
+                aria-label={`第${sel.ci + 1}章を上へ`}
+                disabled={sel.ci === 0}
+                onClick={() => move((d) => moveChapter(d, sel.chapter.id, -1), sel.lesson.id, '章を上へ動かしました')}
+              >
+                上へ
+              </Button>
+              <Button
+                v="ghost"
+                sm
+                aria-label={`第${sel.ci + 1}章を下へ`}
+                disabled={sel.ci === tb.chapters.length - 1}
+                onClick={() => move((d) => moveChapter(d, sel.chapter.id, 1), sel.lesson.id, '章を下へ動かしました')}
+              >
+                下へ
+              </Button>
+            </div>
             <TitleInput
               key={sel.chapter.id}
               className="titleinput"
@@ -411,6 +440,55 @@ export function Roadmap({ tb }: { tb: Textbook }) {
                 </li>
               ))}
             </ul>
+            {/* 選択中の節の位置を動かす（#11）。行ごとのボタンにしないのは、スマホ幅ではこの一覧が隠れる（一覧は .chlist）ため */}
+            <div className="row movectl" style={{ marginTop: 8 }} role="group" aria-label={`${selNo} の位置`}>
+              <span className="sub">{selNo} を</span>
+              <Button
+                v="ghost"
+                sm
+                aria-label={`${selNo} を上へ`}
+                disabled={sel.li === 0}
+                onClick={() => move((d) => moveLesson(d, sel.lesson.id, -1), sel.lesson.id, '節を上へ動かしました')}
+              >
+                上へ
+              </Button>
+              <Button
+                v="ghost"
+                sm
+                aria-label={`${selNo} を下へ`}
+                disabled={sel.li === sel.chapter.lessons.length - 1}
+                onClick={() => move((d) => moveLesson(d, sel.lesson.id, 1), sel.lesson.id, '節を下へ動かしました')}
+              >
+                下へ
+              </Button>
+              {tb.chapters.length > 1 && (
+                <select
+                  aria-label={`${selNo} を別の章へ`}
+                  value=""
+                  onChange={(e) => {
+                    const to = tb.chapters.findIndex((c) => c.id === e.target.value)
+                    if (to < 0) return
+                    // 最後の1節を移すと元の章は消える。そのことをトーストで伝える（removeLesson と同じ）
+                    const last = sel.chapter.lessons.length === 1
+                    move(
+                      (d) => moveLessonToChapter(d, sel.lesson.id, e.target.value),
+                      sel.lesson.id,
+                      `節を第${to + 1}章の末尾へ動かしました${last ? '。節が無くなった章も消しました' : ''}`,
+                    )
+                  }}
+                >
+                  <option value="">別の章へ…</option>
+                  {tb.chapters.map(
+                    (c, i) =>
+                      c.id !== sel.chapter.id && (
+                        <option key={c.id} value={c.id}>
+                          第{i + 1}章 {c.title}
+                        </option>
+                      ),
+                  )}
+                </select>
+              )}
+            </div>
             {/* この章への操作は章構成の右下に。コース全体への「章を足す」はカードの外に置く */}
             <div className="row" style={{ marginTop: 8, justifyContent: 'flex-end' }}>
               <Button v="outline" sm onClick={() => addLesson(sel.chapter.id)}>
