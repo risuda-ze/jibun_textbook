@@ -70,6 +70,15 @@ describe('JSONの書き出しと読み込み', () => {
     expect(r.ok).toBe(true)
     if (r.ok) expect(r.tb).toEqual(TextbookZ.parse(tb))
   })
+  it('画像の説明（alt）は JSON に出て、読み込んで戻る（#13）', () => {
+    const tb = book()
+    tb.chapters[0].lessons[2].blocks[1].images = [{ id: 'im1', dataUrl: 'data:image/png;base64,AA==', alt: 'エラー画面のスクショ' }]
+    const json = exportJson(tb)
+    expect(json).toContain('"alt": "エラー画面のスクショ"')
+    const r = parseImport(json)
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.tb.chapters[0].lessons[2].blocks[1].images[0].alt).toBe('エラー画面のスクショ')
+  })
   it('書き出しJSONに教科書以外の項目（APIキー等）は入らない', () => {
     const dirty = { ...book(), apiKey: 'sk-ant-SECRET', ai: { apiKey: 'sk-ant-SECRET' } } as unknown as Textbook
     const json = exportJson(dirty)

@@ -1014,9 +1014,30 @@ label.f {
 .imgwrap {
   position: relative;
   display: inline-block;
+  margin: 0;
+  max-width: 100%;
 }
-.imgwrap button,
-.atts button {
+/* 画像の説明（#13）。表示は figcaption、書くときは input */
+.imgwrap figcaption {
+  margin: -4px 0 var(--s8);
+}
+.imgwrap input.alt {
+  margin-bottom: var(--s8);
+}
+.imgwrap .imgbtn {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.atts input.alt {
+  width: 180px;
+  margin-top: var(--s4);
+  padding: var(--s4) var(--s8);
+  font-size: var(--text-body-sm);
+}
+.imgwrap .rm,
+.atts .rm {
   position: absolute;
   top: 12px;
   right: 4px;
@@ -1028,12 +1049,12 @@ label.f {
   line-height: 1;
   padding: 4px 7px;
 }
-.imgwrap button {
+.imgwrap .rm {
   opacity: 0;
   transition: opacity var(--ease);
 }
-.imgwrap:hover button,
-.imgwrap button:focus-visible {
+.imgwrap:hover .rm,
+.imgwrap .rm:focus-visible {
   opacity: 1;
 }
 .ln blockquote,
@@ -1173,7 +1194,7 @@ pre code {
   border-radius: var(--radius-buttons);
   display: block;
 }
-.atts button {
+.atts .rm {
   top: 2px;
   right: 2px;
 }
