@@ -1,9 +1,8 @@
-import { L } from './labels'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { AiSettings } from '../ai'
 import { useApp } from '../store'
 import type { Textbook } from '../types'
-import { RunControls, stepPercent } from './common'
+import { StopButton, stepPercent, useElapsed } from './common'
 import { GEN_STEPS, startGeneration, stopGeneration } from './generate'
 import { Button } from './kit'
 import { MaterialPanel, emptyMaterialInput, type MaterialInput } from './material'
@@ -34,7 +33,7 @@ export function useGenerate(tb: Textbook, ai: AiSettings) {
 export type Generate = ReturnType<typeof useGenerate>
 
 /**
- * 生成ボタン（押すと進行中の色になる #50 #55）・今していることと経過秒数・やめる（#14）・同じ行の他のボタン・資料を渡す欄（#63）。
+ * 生成ボタン（押すと進行中の色になり、今していることと経過秒数が中に出る #50 #55 #77）・やめる（#14）・同じ行の他のボタン・資料を渡す欄（#63）。
  * `show=false` なら生成ボタンと資料の欄を出さず、`actions` だけの行にする（本文がある節）
  */
 export function GenerateControls({
@@ -55,6 +54,7 @@ export function GenerateControls({
   onDone?: () => void
 }) {
   const running = g.running[lessonId]
+  const seconds = useElapsed(!!running, running?.startedAt ?? null, running?.endedAt ?? null)
   return (
     <>
       <div className="row">
@@ -68,13 +68,12 @@ export function GenerateControls({
               })
             }}
             progress={running ? stepPercent(running.step, GEN_STEPS) : null}
+            busy={running ? { label: running.detail, seconds, title: running.hint } : null}
           >
-            {running ? L.generating : label}
+            {label}
           </Button>
         )}
-        {running && (
-          <RunControls detail={running.detail} startedAt={running.startedAt} endedAt={running.endedAt} onStop={() => g.stop(lessonId)} />
-        )}
+        {running && <StopButton onStop={() => g.stop(lessonId)} />}
         {show && !running && note}
         {actions}
       </div>

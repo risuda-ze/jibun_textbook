@@ -7,8 +7,8 @@ import { migrate } from './lib/migrate'
 
 export type Screen = 'shelf' | 'new' | 'road' | 'lesson' | 'book' | 'help'
 export type Toast = { id: number; msg: string; undo?: () => void }
-/** 資料の生成の進行中の状態（段階・今していること・開始と終了の時刻） */
-export type GenState = { step: number; detail: string; startedAt: number; endedAt: number | null }
+/** 資料の生成の進行中の状態（段階・今していること・検索語などの補足・開始と終了の時刻） */
+export type GenState = { step: number; detail: string; hint: string; startedAt: number; endedAt: number | null }
 
 export type State = {
   ready: boolean

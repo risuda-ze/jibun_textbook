@@ -4,7 +4,7 @@ import { researchNote } from './generate'
 import { getProvider, type CourseDesign, type QA, type Usage } from '../ai'
 import { openBook, putBook, toast, useApp } from '../store'
 import { newChapter, newLesson, newTextbook, type CourseInput } from '../types'
-import { AiBar, RunControls, Steps, UsageLine, stepPercent, useAiRun } from './common'
+import { AiBar, Steps, StopButton, UsageLine, stepPercent, useAiRun } from './common'
 import { Button, Card, PageHead } from './kit'
 
 const STEP_LABELS = ['学びたいことを分解', 'Webを調査', 'コース設計を作成']
@@ -122,11 +122,12 @@ export function Create() {
               onClick={ask}
               disabled={busyAny}
               progress={asking ? 0 : d.busy && !redoing ? stepPercent(d.step, STEP_LABELS.length) : null}
+              busy={asking ? { label: '質問を作成中…', seconds: null } : d.busy && !redoing ? d.working : null}
             >
-              {asking ? '質問を考えている…' : d.busy && !redoing ? '設計しています…' : design ? 'もう一度調べ直す' : L.design}
+              {design ? 'もう一度調べ直す' : L.design}
             </Button>
             {d.busy && !redoing ? (
-              <RunControls detail={d.detail} startedAt={d.startedAt} endedAt={d.endedAt} onStop={d.stop} />
+              <StopButton onStop={d.stop} />
             ) : (
               <span className="sub">全部自由入力です。先に設計だけ作り、資料は節ごとに後で生成します。</span>
             )}
@@ -165,7 +166,7 @@ export function Create() {
             </>
           )}
           <div className="eyebrow">AIの作業</div>
-          <Steps labels={STEP_LABELS} step={d.step} detail={d.detail} />
+          <Steps labels={STEP_LABELS} step={d.step} detail={d.hint || d.detail} />
           <UsageLine usage={usage} />
         </Card>
       </div>
@@ -222,10 +223,11 @@ export function Create() {
               disabled={busyAny || !note.trim()}
               onClick={() => run(note)}
               progress={d.busy && redoing ? stepPercent(d.step, STEP_LABELS.length) : null}
+              busy={d.busy && redoing ? d.working : null}
             >
-              {d.busy && redoing ? '直しています…' : '設計を直してもらう'}
+              設計を直してもらう
             </Button>
-            {d.busy && redoing && <RunControls detail={d.detail} startedAt={d.startedAt} endedAt={d.endedAt} onStop={d.stop} />}
+            {d.busy && redoing && <StopButton onStop={d.stop} />}
           </div>
           <p className="sub">あとからでも、ロードマップの「設計を直す」で節・章・全体を選んで直せます。</p>
         </Card>

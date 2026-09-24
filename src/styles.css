@@ -638,8 +638,11 @@ label.f {
   background-size: var(--gauge, 0%) 100%;
   transition: background-size 0.4s ease;
 }
+/* 進行中の文（ボタンの中）。幅は押す前の値に固定されるので、収まらなければ … で切る（#77） */
 .working {
-  font-size: var(--text-caption);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .outline.dim {
   opacity: 0.5;

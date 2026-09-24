@@ -45,11 +45,11 @@ export class DemoProvider implements AiProvider {
 
   async designCourse(input: CourseInput, _qa: QA[], note: string, onProgress: Progress, opts: AiOpts = {}) {
     const t = topicOf(input)
-    onProgress(0, '学びたいことを分解している')
+    onProgress(0, '分解中…')
     await wait(DEMO_DELAY_MS, opts.signal)
-    onProgress(1, 'デモ応答のためWeb調査はしません')
+    onProgress(1, 'デモ応答中…')
     await wait(DEMO_DELAY_MS, opts.signal)
-    onProgress(2, 'コース設計を作っている')
+    onProgress(2, '設計中…')
     await wait(DEMO_DELAY_MS, opts.signal)
     const L = (title: string, minutes = 45, isTask = false) => ({ title, minutes, isTask, summary: `${title}ができるようになる。` })
     const design = {
@@ -83,9 +83,9 @@ export class DemoProvider implements AiProvider {
     // 渡された資料（#63）は本文に名前と先頭だけ写して、動線を確かめられるようにする
     const mats = opts.materials ?? []
     const sourceOnly = !!opts.sourceOnly && mats.length > 0
-    onProgress(0, sourceOnly ? '渡された資料だけで書きます（デモ応答）' : 'デモ応答のためWeb調査はしません')
+    onProgress(0, 'デモ応答中…')
     await wait(DEMO_DELAY_MS, opts.signal)
-    onProgress(1, '資料を書いている')
+    onProgress(1, sourceOnly ? '資料から作成中…' : '資料を作成中…')
     await wait(DEMO_DELAY_MS, opts.signal)
     const t = f.lesson.title
     const matLine = mats.length
@@ -110,7 +110,7 @@ export class DemoProvider implements AiProvider {
 
   async proposeRedesign(tb: Textbook, scope: RedesignScope, lessonId: string, order: string, onProgress: Progress, opts: AiOpts = {}) {
     const f = findLesson(tb, lessonId)!
-    onProgress(0, '変更案を作っている')
+    onProgress(0, '案を作成中…')
     await wait(DEMO_DELAY_MS, opts.signal)
     const tag = order ? `（${order.slice(0, 16)}）` : '（見直し）'
     let plan: RedesignPlan

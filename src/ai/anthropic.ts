@@ -211,11 +211,11 @@ export class AnthropicProvider implements AiProvider {
   async designCourse(input: CourseInput, qa: QA[], note: string, onProgress: Progress, opts: AiOpts = {}) {
     const usage = zeroUsage()
     const who = describeInput(input) + describeQa(qa) + (note ? `\n\n設計への注文: ${note}` : '')
-    onProgress(0, '学びたいことを分解している')
+    onProgress(0, '分解中…')
     let found = ''
     let research: ResearchInfo | undefined
     if (this.settings.search === 'builtin') {
-      onProgress(1, 'Webを調査している')
+      onProgress(1, 'Web調査中…')
       const r = await this.research(
         SYS,
         `${who}\n\nこの人のためのコースを設計する材料を集める。日本語と英語の両方で調べ、公式ドキュメントなどの一次情報を優先する。` +
@@ -228,7 +228,7 @@ export class AnthropicProvider implements AiProvider {
       found = `\n\n## 調査で分かったこと\n${r.text}`
       research = { truncated: r.truncated, searchErrors: r.searchErrors }
     }
-    onProgress(2, 'コース設計を作っている')
+    onProgress(2, '設計中…')
     const design = await this.structure(
       SYS,
       `${who}${found}\n\n上をもとにコースを設計する。\n- 章は4〜9、各章の節は2〜5\n- 節の題は、その節でできるようになることが分かる具体的な言葉にする\n` +
@@ -257,7 +257,7 @@ export class AnthropicProvider implements AiProvider {
       ? `\n\n渡された資料: ${mats.map((m) => m.name).join('、')}。${sourceOnly ? 'この資料だけを根拠に書く。資料に無いことは書かず、足りない所は「資料に無い」と書く' : '本文の主な根拠にし、調査で補う'}`
       : ''
     if (this.settings.search === 'builtin' && !sourceOnly) {
-      onProgress(0, 'Webを調査している')
+      onProgress(0, 'Web調査中…')
       // 調査には資料の本文を渡さない（名前だけ）。資料は書く段階でだけ読ませ、入力トークンを二重に使わない（#79）
       const researchNote = mats.length
         ? `\n\n手元に資料がある（${mats.map((m) => m.name).join('、')}。本文は書く段階で読む）。資料を補う事実や最新の情報を集める。`
@@ -276,7 +276,7 @@ export class AnthropicProvider implements AiProvider {
       research = { truncated: r.truncated, searchErrors: r.searchErrors }
       found = `\n\n## 調査で分かったこと\n${r.text}\n\n## 見つけたページ\n${sources.map((s, i) => `[${i}] ${s.title} ${s.url}`).join('\n')}`
     }
-    onProgress(1, sourceOnly ? '渡された資料から書いている' : '資料を書いている')
+    onProgress(1, sourceOnly ? '資料から作成中…' : '資料を作成中…')
     const d = await this.structure(
       SYS,
       withMaterials(
@@ -304,7 +304,7 @@ export class AnthropicProvider implements AiProvider {
     const f = findLesson(tb, lessonId)
     if (!f) throw new AiError('api', '節が見つかりませんでした。')
     const usage = zeroUsage()
-    onProgress(0, '変更案を作っている')
+    onProgress(0, '案を作成中…')
     const base = `${describeInput(tb.input)}\n\nコース: ${tb.title}（${tb.goal}）\n\n${outline(tb, true)}\n\n注文: ${order || '（特になし。より良くする）'}`
     let plan: RedesignPlan
     if (scope === 'lesson') {

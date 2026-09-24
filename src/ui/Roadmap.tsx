@@ -13,7 +13,7 @@ import {
 import { STATUS_LABEL, currentLesson, findLesson, lessonNo, lessonStatus } from '../lib/status'
 import { openLesson, putBook, selectLesson, snapshot, toast, updateBook, updateLesson, useApp } from '../store'
 import { newChapter, newLesson, type Lesson, type Textbook } from '../types'
-import { Meter, RunControls, StatusChip, TitleInput, UsageLine, downloadBook, stepPercent, useAiRun } from './common'
+import { Meter, StatusChip, StopButton, TitleInput, UsageLine, downloadBook, stepPercent, useAiRun } from './common'
 import { GenerateControls, useGenerate } from './GenerateControls'
 import { Button, Card, Pill, Segmented, type PillTone } from './kit'
 
@@ -117,10 +117,10 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
           placeholder="どう変えたいか（例: 理論は短く、実践を先に）"
           style={{ flex: '1 1 280px' }}
         />
-        <Button v="soft" disabled={p.busy} onClick={propose} progress={p.busy ? stepPercent(p.step, 1) : null}>
-          {p.busy ? '案を作成中…' : plan ? '別の案を出す' : L.propose}
+        <Button v="soft" disabled={p.busy} onClick={propose} progress={p.busy ? stepPercent(p.step, 1) : null} busy={p.working}>
+          {plan ? '別の案を出す' : L.propose}
         </Button>
-        {p.busy && <RunControls detail={p.detail} startedAt={p.startedAt} endedAt={p.endedAt} onStop={p.stop} />}
+        {p.busy && <StopButton onStop={p.stop} />}
       </div>
       {p.error && (
         <p className="err" role="alert">

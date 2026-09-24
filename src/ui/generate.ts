@@ -1,15 +1,16 @@
 import { getProvider, type AiError, type AiSettings, type LessonDraft, type ResearchInfo, type Usage } from '../ai'
 import { setRunning, toast, updateLesson, type GenState } from '../store'
 import { newBlock, type Lesson, type Textbook } from '../types'
+import { splitDetail } from './common'
 import { materialError, toMaterials, type MaterialInput } from './material'
 
-/** 生成の段階数（Web を調査している → 資料を書いている → 資料ができた）。ボタンの塗りは stepPercent(step, GEN_STEPS) */
+/** 生成の段階数（Web調査中… → 資料を作成中… → 資料ができた）。ボタンの塗りは stepPercent(step, GEN_STEPS) */
 export const GEN_STEPS = 2
 
-/** 進行中の状態。画面がボタンの塗りと Working に使う（#55） */
+/** 進行中の状態。画面がボタンの塗りと中の文に使う（#55 #77） */
 export type { GenState }
 
-export const startGen = (): GenState => ({ step: 0, detail: '', startedAt: Date.now(), endedAt: null })
+export const startGen = (): GenState => ({ step: 0, detail: '', hint: '', startedAt: Date.now(), endedAt: null })
 
 /**
  * Web 調査の状態を、完了の知らせに添える文にする（#81）。
@@ -106,10 +107,20 @@ export async function startGeneration(tb: Textbook, lessonId: string, ai: AiSett
   if (controllers.has(lessonId)) return false
   const c = new AbortController()
   controllers.set(lessonId, c)
-  const g = startGen()
+  let g = startGen()
   setRunning(lessonId, g)
   try {
-    return await generateInto(tb, lessonId, ai, (step, detail) => setRunning(lessonId, { ...g, step, detail }), c.signal, input)
+    return await generateInto(
+      tb,
+      lessonId,
+      ai,
+      (step, detail) => {
+        g = { ...g, step, ...splitDetail(g, detail) }
+        setRunning(lessonId, g)
+      },
+      c.signal,
+      input,
+    )
   } finally {
     controllers.delete(lessonId)
     setRunning(lessonId, null)

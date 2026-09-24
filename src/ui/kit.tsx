@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, CSSProperties, HTMLAttributes, ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ButtonHTMLAttributes, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 
 /**
  * 共通コンポーネント。見た目の正は DESIGN.md（暖色の紙のキャンバス・白いカード・細い罫線・青は主操作だけ）。
@@ -19,21 +19,65 @@ export type ButtonVariant = 'primary' | 'soft' | 'ghost' | 'outline' | 'danger'
 /**
  * progress を渡すと「進行中のボタン」になる（#50）。押した瞬間に灰色になり、進んだ分（0〜100%）だけ左から青で塗る。
  * null に戻すと元の色に戻る。時間の見積もりは出さず、段階が終わった分だけ進める。
+ *
+ * busy を渡すと children の代わりに「{label}・{seconds}秒」をボタンの中に出す（#77）。
+ * 幅は進行中でない間に測った値に固定し、文字が収まらなければ … で切る。title は検索語など、ボタンに出さない補足
  */
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { v?: ButtonVariant; sm?: boolean; progress?: number | null }
+export type Busy = { label: string; seconds: number | null; title?: string }
 
-export function Button({ v = 'ghost', sm, className = '', type = 'button', progress = null, style, ...rest }: ButtonProps) {
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  v?: ButtonVariant
+  sm?: boolean
+  progress?: number | null
+  busy?: Busy | null
+}
+
+export function Button({
+  v = 'ghost',
+  sm,
+  className = '',
+  type = 'button',
+  progress = null,
+  busy,
+  style,
+  title,
+  children,
+  ...rest
+}: ButtonProps) {
+  const ref = useRef<HTMLButtonElement>(null)
+  const width = useRef<number | null>(null)
+  // busy を使うボタンだけ、進行中でない間の幅を覚える。進行中はその幅に固定する
+  useLayoutEffect(() => {
+    if (busy === null) width.current = ref.current?.getBoundingClientRect().width ?? null
+  })
   const gauge = progress !== null
   const pct = gauge ? Math.max(0, Math.min(100, Math.round(progress))) : 0
-  const st = gauge ? ({ ...style, '--gauge': pct + '%' } as CSSProperties) : style
+  const st = { ...style } as CSSProperties & Record<string, string | number>
+  if (gauge) st['--gauge'] = pct + '%'
+  if (busy && width.current !== null) st.width = width.current
+  // role="status" の中の文はボタンの名前に数えられない（読み上げで名無しになる）ので、同じ文を aria-label にも入れる
+  const sec = busy && busy.seconds !== null ? `・${busy.seconds}秒` : ''
+  const busyText = busy ? (busy.label || '実行中…') + sec : ''
   return (
     <button
+      ref={ref}
       type={type}
       className={`btn ${v}${sm ? ' sm' : ''}${gauge ? ' gauge' : ''}${className ? ' ' + className : ''}`}
       style={st}
-      aria-busy={gauge || undefined}
+      title={busy?.title || title}
+      aria-busy={gauge || !!busy || undefined}
+      aria-label={busy ? busyText : undefined}
       {...rest}
-    />
+    >
+      {busy ? (
+        <span className="working" role="status">
+          {busy.label || '実行中…'}
+          {sec && <span className="mono">{sec}</span>}
+        </span>
+      ) : (
+        children
+      )}
+    </button>
   )
 }
 
