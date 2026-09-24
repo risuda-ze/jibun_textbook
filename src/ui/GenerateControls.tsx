@@ -1,30 +1,35 @@
 import { L } from './labels'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { AiSettings } from '../ai'
+import { useApp } from '../store'
 import type { Textbook } from '../types'
-import { RunControls, stepPercent, useAbort } from './common'
-import { GEN_STEPS, generateInto, startGen, type GenState } from './generate'
+import { RunControls, stepPercent } from './common'
+import { GEN_STEPS, startGeneration, stopGeneration } from './generate'
 import { Button } from './kit'
 import { MaterialPanel, emptyMaterialInput, type MaterialInput } from './material'
 
 /**
- * 「資料を生成」の状態と操作（#82）。レッスンとロードマップで同じものを使う。
- * 状態は画面が持つ（ロードマップで別の節を選び直しても、進行中の生成は続く）
+ * 「資料を生成」の操作（#82）。レッスンとロードマップで同じものを使う。
+ * 進行中の状態は store が持つ（#87）。画面を離れても生成は続き、戻ってくれば進行中の表示が続く。
+ * 渡す資料の欄だけは画面ごとの入力なので、ここで持つ
  */
 export function useGenerate(tb: Textbook, ai: AiSettings) {
-  const [gen, setGen] = useState<({ id: string } & GenState) | null>(null)
-  // 渡す資料（#63）
+  const { running } = useApp()
   const [mat, setMat] = useState<MaterialInput>(emptyMaterialInput)
-  const abort = useAbort()
+  const mounted = useRef(true)
+  useEffect(
+    () => () => {
+      mounted.current = false
+    },
+    [],
+  )
   async function start(lessonId: string): Promise<boolean> {
-    const g = { id: lessonId, ...startGen() }
-    setGen(g)
-    const ok = await generateInto(tb, lessonId, ai, (step, detail) => setGen({ ...g, step, detail }), abort.start(), mat)
-    setGen(null)
-    if (ok) setMat(emptyMaterialInput())
-    return ok
+    const ok = await startGeneration(tb, lessonId, ai, mat)
+    if (ok && mounted.current) setMat(emptyMaterialInput())
+    // 画面を離れていたら「終わった後の操作」（レッスンを開くなど）はしない
+    return ok && mounted.current
   }
-  return { gen, mat, setMat, start, stop: abort.stop }
+  return { running, busy: Object.keys(running).length > 0, mat, setMat, start, stop: stopGeneration }
 }
 export type Generate = ReturnType<typeof useGenerate>
 
@@ -49,14 +54,14 @@ export function GenerateControls({
   actions?: ReactNode
   onDone?: () => void
 }) {
-  const running = g.gen?.id === lessonId ? g.gen : null
+  const running = g.running[lessonId]
   return (
     <>
       <div className="row">
         {show && (
           <Button
             v="soft"
-            disabled={g.gen !== null}
+            disabled={g.busy}
             onClick={() => {
               void g.start(lessonId).then((ok) => {
                 if (ok) onDone?.()
@@ -67,11 +72,13 @@ export function GenerateControls({
             {running ? L.generating : label}
           </Button>
         )}
-        {running && <RunControls detail={running.detail} startedAt={running.startedAt} endedAt={running.endedAt} onStop={g.stop} />}
+        {running && (
+          <RunControls detail={running.detail} startedAt={running.startedAt} endedAt={running.endedAt} onStop={() => g.stop(lessonId)} />
+        )}
         {show && !running && note}
         {actions}
       </div>
-      {show && <MaterialPanel value={g.mat} onChange={g.setMat} disabled={g.gen !== null} />}
+      {show && <MaterialPanel value={g.mat} onChange={g.setMat} disabled={g.busy} />}
     </>
   )
 }

@@ -1,5 +1,5 @@
 import { getProvider, type AiError, type AiSettings, type LessonDraft, type ResearchInfo, type Usage } from '../ai'
-import { toast, updateLesson } from '../store'
+import { setRunning, toast, updateLesson, type GenState } from '../store'
 import { newBlock, type Lesson, type Textbook } from '../types'
 import { materialError, toMaterials, type MaterialInput } from './material'
 
@@ -7,7 +7,7 @@ import { materialError, toMaterials, type MaterialInput } from './material'
 export const GEN_STEPS = 2
 
 /** 進行中の状態。画面がボタンの塗りと Working に使う（#55） */
-export type GenState = { step: number; detail: string; startedAt: number; endedAt: number | null }
+export type { GenState }
 
 export const startGen = (): GenState => ({ step: 0, detail: '', startedAt: Date.now(), endedAt: null })
 
@@ -94,3 +94,26 @@ export async function generateInto(
     return false
   }
 }
+
+/** 節ごとの中止の口。画面ではなくここが持つ（#87） */
+const controllers = new Map<string, AbortController>()
+
+/**
+ * 資料の生成を始める（#87）。進行中の状態は store の `running` に置くので、タブを切り替えたり別の節を選んだりしても生成は続く。
+ * 止まるのは明示の「やめる」（`stopGeneration`）だけ。同じ節が進行中なら何もしない
+ */
+export async function startGeneration(tb: Textbook, lessonId: string, ai: AiSettings, input?: MaterialInput): Promise<boolean> {
+  if (controllers.has(lessonId)) return false
+  const c = new AbortController()
+  controllers.set(lessonId, c)
+  const g = startGen()
+  setRunning(lessonId, g)
+  try {
+    return await generateInto(tb, lessonId, ai, (step, detail) => setRunning(lessonId, { ...g, step, detail }), c.signal, input)
+  } finally {
+    controllers.delete(lessonId)
+    setRunning(lessonId, null)
+  }
+}
+
+export const stopGeneration = (lessonId: string): void => controllers.get(lessonId)?.abort()
