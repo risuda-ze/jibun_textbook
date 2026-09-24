@@ -177,7 +177,7 @@ export function Roadmap({ tb }: { tb: Textbook }) {
               <div className="tl-label"><span className="mono">CH{ci + 1}</span>{c.title}</div>
               <div className="tl-lane" style={{ width: W }}>
                 {clips.map(({ l, left }, li) => (
-                  <button key={l.id} className={`clip ${lessonStatus(l)} ${l.isTask ? 'task' : ''}`} style={{ left: left * PXMIN, width: Math.max(20, l.minutes) * PXMIN - 3 }}
+                  <button type="button" key={l.id} className={`clip ${lessonStatus(l)} ${l.isTask ? 'task' : ''}`} style={{ left: left * PXMIN, width: Math.max(20, l.minutes) * PXMIN - 3 }}
                     aria-pressed={sel?.lesson.id === l.id} title={`${ci + 1}-${li + 1} ${l.title}（${l.minutes}分・${STATUS_LABEL[lessonStatus(l)]}）`} onClick={() => selectLesson(l.id)}>
                     {ci + 1}-{li + 1} {l.title}{l.review && <span className="flagdot" aria-label="再確認" />}
                   </button>
@@ -197,7 +197,7 @@ export function Roadmap({ tb }: { tb: Textbook }) {
             <ul className="lessonlist">
               {c.lessons.map((l, li) => (
                 <li key={l.id}>
-                  <button aria-current={sel?.lesson.id === l.id} onClick={() => { selectLesson(l.id); requestAnimationFrame(() => document.getElementById('detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' })) }}>
+                  <button type="button" aria-current={sel?.lesson.id === l.id} onClick={() => { selectLesson(l.id); requestAnimationFrame(() => document.getElementById('detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' })) }}>
                     <span className="mono sub">{ci + 1}-{li + 1}</span><span>{l.isTask && '◆ '}{l.title}</span><span className="row" style={{ justifyContent: 'flex-end' }}><StatusChip lesson={l} /></span>
                   </button>
                 </li>
@@ -231,7 +231,7 @@ export function Roadmap({ tb }: { tb: Textbook }) {
             <ul className="lessonlist">
               {sel.chapter.lessons.map((l, li) => (
                 <li key={l.id}>
-                  <button aria-current={l.id === sel.lesson.id} onClick={() => selectLesson(l.id)}>
+                  <button type="button" aria-current={l.id === sel.lesson.id} onClick={() => selectLesson(l.id)}>
                     <span className="mono sub">{sel.ci + 1}-{li + 1}</span><span>{l.isTask && '◆ '}{l.title}</span><span className="row" style={{ justifyContent: 'flex-end' }}><StatusChip lesson={l} /></span>
                   </button>
                 </li>

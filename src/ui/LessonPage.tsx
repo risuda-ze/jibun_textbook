@@ -60,6 +60,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
   const qbtn = useRef<HTMLButtonElement>(null)
   const pending = useRef<{ text: string; blockId: string } | null>(null)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 節が変わったときに差し込み位置を戻す（lessonId は「いつ走るか」の指定）
   useEffect(() => { setInsAt(null) }, [lessonId])
 
   // 本文を選択すると「引用してノートを書く」を出す
@@ -81,6 +82,9 @@ export function LessonPage({ tb }: { tb: Textbook }) {
     return () => document.removeEventListener('selectionchange', onSel)
   }, [])
 
+  // 資料を生成（#55 #63 #14 をまとめた部品 #82）。hook なので早期 return より前に呼ぶ（#86 の lint で発見）
+  const g = useGenerate(tb, ai)
+
   if (!f) return <Card className="empty"><p>節が選ばれていません。</p><Button v="primary" onClick={() => go('road')}>ロードマップへ</Button></Card>
   const l = f.lesson
   const ls = allLessons(tb)
@@ -101,8 +105,6 @@ export function LessonPage({ tb }: { tb: Textbook }) {
     toast('書き込みました')
   }
 
-  // 資料を生成（#55 #63 #14 をまとめた部品 #82）
-  const g = useGenerate(tb, ai)
 
   const composerAt = insAt ?? l.blocks.length
   const composer = <Composer draft={draft} onChange={setDraft} onSubmit={addNote} />
@@ -140,7 +142,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
           <div className={`blocks doc ${blame ? '' : 'noblame'}`}>
             {l.blocks.map((b, i) => (
               <Fragment key={b.id}>
-                {composerAt === i ? composer : <button className="ins" onClick={() => setInsAt(i)}>＋ ここに書く</button>}
+                {composerAt === i ? composer : <button type="button" className="ins" onClick={() => setInsAt(i)}>＋ ここに書く</button>}
                 <BlockRow
                   block={b}
                   onCommit={(md) => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) { x.md = md; if (x.by === 'ai') x.edited = true } })}
@@ -150,7 +152,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
                 />
               </Fragment>
             ))}
-            {composerAt >= l.blocks.length ? composer : <button className="ins" onClick={() => setInsAt(null)}>＋ ここに書く</button>}
+            {composerAt >= l.blocks.length ? composer : <button type="button" className="ins" onClick={() => setInsAt(null)}>＋ ここに書く</button>}
           </div>
           <Clues tb={tb} lesson={l} />
         </div>
@@ -188,7 +190,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
         </aside>
       </div>
 
-      <button ref={qbtn} className="qbtn" hidden onPointerDown={(e) => {
+      <button type="button" ref={qbtn} className="qbtn" hidden onPointerDown={(e) => {
         // クリックより先に選択が消えるので、押した瞬間に処理する
         e.preventDefault()
         const p = pending.current; if (!p) return

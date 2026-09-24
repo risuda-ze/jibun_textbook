@@ -55,6 +55,7 @@ docs/             実装メモ・テスト結果・あとでやること
 ```bash
 npm run dev        # 開発サーバー http://localhost:5173/jibun_textbook/
 npm run typecheck
+npm run lint       # 整形と lint（Biome）。CI でも走る。直すのは npm run format
 npm test           # 単体とAI層
 npm run e2e        # 通し。初回は npx playwright install chromium
 npm run build      # dist/ を作る
