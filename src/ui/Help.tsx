@@ -6,7 +6,7 @@ import { PDF_LIMIT_BYTES, TEXT_LIMIT_BYTES } from '../lib/material'
 import { clearRepairTarget, go, useApp } from '../store'
 import { downloadBook } from './common'
 import { OlderCard, importTextbook, type Older } from './import'
-import { MAX_SEARCH_DESIGN, MAX_SEARCH_LESSON, WEB_SEARCH_USD_PER_1000 } from '../ai/anthropic'
+import { MAX_SEARCH_DESIGN, MAX_SEARCH_LESSON, WEB_SEARCH_USD_PER_1000 } from '../ai'
 import { Button, Card, PageHead } from './kit'
 
 const REPO = 'https://github.com/risuda-ze/jibun_textbook'

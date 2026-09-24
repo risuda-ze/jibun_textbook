@@ -38,7 +38,7 @@ export function Create() {
     if (!input.prompt.trim()) return toast('学びたいことを書いてから進んでください')
     d.setError('')
     setDesign(null)
-    const r = await a.run((_, signal) => getProvider(ai).askQuestions(input, { signal }))
+    const r = await a.run(async (_, signal) => (await getProvider(ai)).askQuestions(input, { signal }))
     if (!r) return
     setUsage(r.usage)
     setQa(r.questions.map((q) => ({ q, a: '' })))
@@ -48,7 +48,7 @@ export function Create() {
   async function run(extraNote = '') {
     setRedoing(!!extraNote)
     const r = await d.run(
-      (progress, signal) => getProvider(ai).designCourse(input, qa ?? [], extraNote, progress, { signal }),
+      async (progress, signal) => (await getProvider(ai)).designCourse(input, qa ?? [], extraNote, progress, { signal }),
       STEP_LABELS.length,
     )
     if (!r) return

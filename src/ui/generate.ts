@@ -73,7 +73,7 @@ export async function generateInto(
     return false
   }
   try {
-    const { draft, usage } = await getProvider(ai).generateLesson(tb, lessonId, onProgress, { signal, materials, sourceOnly })
+    const { draft, usage } = await (await getProvider(ai)).generateLesson(tb, lessonId, onProgress, { signal, materials, sourceOnly })
     if (!draft.blocks.length) throw new Error('AIが本文を返しませんでした。もう一度お試しください。')
     updateLesson(tb.id, lessonId, (l) =>
       mergeDraft(
