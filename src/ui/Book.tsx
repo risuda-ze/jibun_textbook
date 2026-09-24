@@ -45,7 +45,7 @@ export function Book({ tb }: { tb: Textbook }) {
                 <h3 className="lt">
                   <span className="mono sub">{ci + 1}-{li + 1}</span>{l.title}
                   {l.done && <Pill tone="done">完了</Pill>}{l.review && <Pill tone="review">再確認</Pill>}
-                  <button className="linkbtn" onClick={() => openLesson(l.id)}>このページに書く</button>
+                  <button type="button" className="linkbtn" onClick={() => openLesson(l.id)}>このページに書く</button>
                 </h3>
                 {bs.map((b) => <BlockRow key={b.id} block={b} read onCheck={(md) => updateLesson(tb.id, l.id, (d) => { const x = d.blocks.find((y) => y.id === b.id); if (x) x.md = md })} />)}
               </div>

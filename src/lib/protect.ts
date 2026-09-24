@@ -82,7 +82,12 @@ export function applyCoursePlan(tb: Textbook, plan: PlanChapter[]): Textbook {
   })
   // 同じ節が2か所に入らないようにする（先勝ち）
   const seen = new Set<string>()
-  const dedup = out.map((c) => ({ ...c, lessons: c.lessons.filter((l) => (seen.has(l.id) ? false : (seen.add(l.id), true))) }))
+  const keepFirst = (id: string): boolean => {
+    if (seen.has(id)) return false
+    seen.add(id)
+    return true
+  }
+  const dedup = out.map((c) => ({ ...c, lessons: c.lessons.filter((l) => keepFirst(l.id)) }))
   return { ...tb, chapters: dedup }
 }
 

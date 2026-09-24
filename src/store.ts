@@ -32,7 +32,7 @@ let state: State = {
   ready: false, books: [], bookId: null, lessonId: null, screen: 'shelf', ai: DEFAULT_AI, lastExport: {}, wide: false, drafts: {}, broken: [], repairTarget: null, toast: null,
 }
 const listeners = new Set<() => void>()
-const emit = () => listeners.forEach((l) => l())
+const emit = () => { for (const l of listeners) l() }
 const setState = (p: Partial<State>) => { state = { ...state, ...p }; emit() }
 
 /** テスト専用。画面は useApp() を使う */

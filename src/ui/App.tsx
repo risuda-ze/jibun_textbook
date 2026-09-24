@@ -37,7 +37,7 @@ export function App() {
                 <div className="brand">じぶん教科書</div>
                 <nav className="tabs" role="tablist">
                     {TABS.map(([k, label, needsBook]) => (
-                        <button
+                        <button type="button"
                             key={k}
                             className="tab"
                             role="tab"
@@ -65,7 +65,7 @@ export function App() {
                 <div className="toast" role="status">
                     <span>{s.toast.msg}</span>
                     {s.toast.undo && (
-                        <button
+                        <button type="button"
                             onClick={() => {
                                 s.toast?.undo?.();
                                 clearToast();

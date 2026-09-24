@@ -83,7 +83,7 @@ export function BlockRow({ block: b, read, onCommit, onCheck, onDelete, onRemove
           <span className="imgwrap" key={im.id}>
             {/* JSON 由来の画像は data:image/ だけを表示する（#35） */}
             {isImageDataUrl(im.dataUrl) ? <img src={im.dataUrl} alt={im.alt || '自分で入れた画像'} /> : <span className="sub">表示できない画像です</span>}
-            {!read && <button onClick={() => onRemoveImage?.(im.id)} aria-label="この画像を外す">×</button>}
+            {!read && <button type="button" onClick={() => onRemoveImage?.(im.id)} aria-label="この画像を外す">×</button>}
           </span>
         ))}
         {b.source && <div className="src">出典: {isHttpUrl(b.source) ? <a href={b.source} target="_blank" rel="noopener noreferrer">{b.source}</a> : b.source}</div>}
@@ -117,7 +117,7 @@ export function DrawPad({ onSave, onClose }: { onSave: (dataUrl: string) => void
         onPointerMove={(e) => { if (!drawing.current) return; const x = e.currentTarget.getContext('2d')!; x.lineTo(...pos(e)); x.stroke() }}
         onPointerUp={() => { drawing.current = false }} />
       <div className="row">
-        {PENS.map(([c, t]) => <button key={c} className="pen" style={{ background: c }} aria-label={t} title={t} aria-pressed={pen === c} onClick={() => setPen(c)} />)}
+        {PENS.map(([c, t]) => <button type="button" key={c} className="pen" style={{ background: c }} aria-label={t} title={t} aria-pressed={pen === c} onClick={() => setPen(c)} />)}
         <Button v="outline" sm onClick={clear}>全部消す</Button>
         <Button v="soft" sm onClick={() => onSave(cv.current!.toDataURL('image/png'))}>この図を入れる</Button>
         <Button v="outline" sm onClick={onClose}>やめる</Button>
@@ -158,6 +158,7 @@ export function Composer({ draft, onChange, onSubmit }: { draft: NoteDraft; onCh
   // Markdown の挿入ボタン（#52）。textarea の選択範囲に記法を当て、当てた範囲を選び直す。
   // 選び直しは再描画（value の反映）の後でないと末尾へ飛ぶので、effect で行う
   const pendingSel = useRef<{ start: number; end: number } | null>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: md が反映された再描画の後に選択を戻す（md は「いつ走るか」の指定）
   useEffect(() => {
     const el = note.current, p = pendingSel.current
     if (!el || !p) return
@@ -182,7 +183,7 @@ export function Composer({ draft, onChange, onSubmit }: { draft: NoteDraft; onCh
       const fs = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'))
       if (fs.length) { e.preventDefault(); void addFiles(fs); toast('画像を貼り付けました') }
     }}>
-      {quote && <blockquote>{quote} <button className="linkbtn" onClick={() => set({ quote: '' })}>引用をやめる</button></blockquote>}
+      {quote && <blockquote>{quote} <button type="button" className="linkbtn" onClick={() => set({ quote: '' })}>引用をやめる</button></blockquote>}
       <div className="row mdtools" role="toolbar" aria-label="Markdown の挿入">
         {MD_BUTTONS.map(([k, label, hint]) => <Button key={k} v="outline" sm title={hint} onMouseDown={(e) => e.preventDefault()} onClick={() => insertMd(k)}>{label}</Button>)}
         <span className="sub">Markdown が使えます。書き込むと整形されます</span>
@@ -191,7 +192,7 @@ export function Composer({ draft, onChange, onSubmit }: { draft: NoteDraft; onCh
       {images.length > 0 && (
         <div className="atts">
           {images.map((u, i) => (
-            <figure key={i}><img src={u} alt={`入れる画像 ${i + 1}`} /><button onClick={() => set({ images: images.filter((_, j) => j !== i) })} aria-label="この画像を外す">×</button></figure>
+            <figure key={i}><img src={u} alt={`入れる画像 ${i + 1}`} /><button type="button" onClick={() => set({ images: images.filter((_, j) => j !== i) })} aria-label="この画像を外す">×</button></figure>
           ))}
         </div>
       )}
