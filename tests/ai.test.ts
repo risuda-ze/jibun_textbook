@@ -212,6 +212,19 @@ describe('節の生成', () => {
     expect(calls.stream).toHaveLength(0)
     expect(calls.parse).toHaveLength(1)
   })
+
+  it('書き換えた節の狙いが構造化の入力に入る（#103）', async () => {
+    const edited = structuredClone(tb)
+    edited.chapters[0].lessons[0].summary = 'ムーブとコピーの違いを自分の言葉で言える'
+    const { client, calls } = fake(
+      [],
+      [{ parsed_output: { blocks: ['a'], tasks: [], queries: [], how: [], linkIndexes: [] }, stop_reason: 'end_turn' }],
+    )
+    await new AnthropicProvider({ ...settings, search: 'none' }, client).generateLesson(edited, lessonId, () => {})
+    const prompt = JSON.stringify(calls.parse[0].messages)
+    expect(prompt).toContain('狙い: ムーブとコピーの違いを自分の言葉で言える')
+    expect(prompt).not.toContain('ムーブを理解する')
+  })
 })
 
 describe('設計を直す', () => {

@@ -519,6 +519,27 @@ label.f {
   letter-spacing: -0.02em;
   line-height: 1.25;
 }
+/* 狙いの入力欄（#103）。枠は titleinput と同じ、書体は .lead / .sub のまま。1〜3行で中身に合わせて伸びる */
+.goalinput {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  max-height: calc(3lh + 4px);
+  resize: none;
+  field-sizing: content;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-buttons);
+  padding: 2px var(--s8);
+  margin-left: calc(var(--s8) * -1);
+}
+.goalinput:hover {
+  background: var(--wash);
+}
+.goalinput:focus {
+  background: var(--card);
+  border-color: var(--primary);
+}
 
 /* ---------- 切り替え（kit.tsx の Segmented） ---------- */
 .seg {

@@ -7,7 +7,7 @@ import { markExported, putBook, setAi, snapshot, toast, updateLesson, useApp } f
 import { SIZE_WARN_BYTES, byteSize, exportJson, fileName, formatSize } from '../lib/io'
 import { downloadText } from '../lib/download'
 import type { AiError, Progress, Usage } from '../ai/types'
-import { useEffect, useRef, useState, type InputHTMLAttributes } from 'react'
+import { useEffect, useRef, useState, type InputHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 import { Button, Card, Pill, Segmented, type Busy } from './kit'
 
 export function StatusChip({ lesson }: { lesson: Lesson }) {
@@ -195,11 +195,7 @@ export function useAbort(): { start: () => AbortSignal; stop: () => void } {
  * 題名などの入力欄（#80）。文字は手元で持ち、300ms 打鍵が止まるか欄を離れたときだけ確定する。
  * 1文字ごとに教科書全体をクローンして IndexedDB に書かないため
  */
-export function TitleInput({
-  value,
-  onCommit,
-  ...rest
-}: { value: string; onCommit: (v: string) => void } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'onBlur'>) {
+function useCommit(value: string, onCommit: (v: string) => void) {
   const [v, setV] = useState(value)
   const dirty = useRef(false)
   const latest = useRef(value)
@@ -226,20 +222,35 @@ export function TitleInput({
     },
     [],
   )
-  return (
-    <input
-      {...rest}
-      value={v}
-      onChange={(e) => {
-        setV(e.target.value)
-        latest.current = e.target.value
-        dirty.current = true
-        clearTimeout(timer.current)
-        timer.current = setTimeout(commit, 300)
-      }}
-      onBlur={commit}
-    />
-  )
+  const onChange = (next: string) => {
+    setV(next)
+    latest.current = next
+    dirty.current = true
+    clearTimeout(timer.current)
+    timer.current = setTimeout(commit, 300)
+  }
+  return { v, onChange, onBlur: commit }
+}
+
+type Commit = { value: string; onCommit: (v: string) => void }
+
+export function TitleInput({
+  value,
+  onCommit,
+  ...rest
+}: Commit & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'onBlur'>) {
+  const c = useCommit(value, onCommit)
+  return <input {...rest} value={c.v} onChange={(e) => c.onChange(e.target.value)} onBlur={c.onBlur} />
+}
+
+/** 狙いなど1〜3行の入力欄（#103）。確定のしかたは TitleInput と同じ */
+export function GoalInput({
+  value,
+  onCommit,
+  ...rest
+}: Commit & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange' | 'onBlur'>) {
+  const c = useCommit(value, onCommit)
+  return <textarea rows={1} {...rest} value={c.v} onChange={(e) => c.onChange(e.target.value)} onBlur={c.onBlur} />
 }
 
 /** 教科書を JSON で書き出す（#82 で Shelf から移動。本棚・ロードマップ・通読・Help で共用） */
