@@ -1,12 +1,9 @@
 import { expect, test } from '@playwright/test'
-import { L } from '../src/ui/labels'
-import { demoBook } from './helpers'
+import { lessonWithDraft } from './helpers'
 
 // 見たまま編集中に文字で打ったリンクの記法 [文](URL) が、確定後にリンクになる（#76）
 test('見たまま編集: [文](https://…) と打って確定するとリンクになる', async ({ page }) => {
-  await demoBook(page)
-  await page.getByRole('button', { name: L.generateLesson }).click()
-  await expect(page.locator('.doc [data-by="ai"]')).toHaveCount(3)
+  await lessonWithDraft(page)
 
   const first = page.locator('.doc [data-by="ai"]').first()
   await first.locator('.blk-body').click()
@@ -20,9 +17,7 @@ test('見たまま編集: [文](https://…) と打って確定するとリン�
 })
 
 test('見たまま編集: URL でないものはリンクにしない', async ({ page }) => {
-  await demoBook(page)
-  await page.getByRole('button', { name: L.generateLesson }).click()
-  await expect(page.locator('.doc [data-by="ai"]')).toHaveCount(3)
+  await lessonWithDraft(page)
 
   const first = page.locator('.doc [data-by="ai"]').first()
   await first.locator('.blk-body').click()

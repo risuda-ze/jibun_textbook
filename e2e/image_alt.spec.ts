@@ -1,12 +1,9 @@
 import { expect, test } from '@playwright/test'
-import { L } from '../src/ui/labels'
-import { PNG, demoBook, nav, writeNote } from './helpers'
+import { PNG, lessonWithDraft, nav, writeNote } from './helpers'
 
 // 画像の説明（alt）（#13）: 入力欄で書く → レッスンと通読に <img alt> と figcaption が出る → 保存後にクリックで書き換える
 test('画像の説明: 入力時に書け、保存後にも書き換えられ、通読にも出る', async ({ page }) => {
-  await demoBook(page)
-  await page.getByRole('button', { name: L.generateLesson }).click()
-  await expect(page.locator('.doc [data-by="ai"]')).toHaveCount(3)
+  await lessonWithDraft(page)
 
   await page.locator('#imgf').setInputFiles({ name: 'shot.png', mimeType: 'image/png', buffer: PNG })
   await expect(page.locator('.atts img')).toHaveCount(1)

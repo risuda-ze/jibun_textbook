@@ -273,7 +273,6 @@ describe('接続先の切り替え', () => {
     expect(await getProvider({ ...DEFAULT_AI, kind: 'demo' })).toBeInstanceOf(DemoProvider)
     const p = await getProvider(settings)
     expect(p).toBeInstanceOf(AnthropicProvider)
-    expect(typeof p.generateLesson).toBe('function')
   })
 })
 

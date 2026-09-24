@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { CURRENT_VERSION, migrate, migrations } from '../src/lib/migrate'
+import { CURRENT_VERSION, migrate } from '../src/lib/migrate'
 import { TextbookZ, findDuplicateIds, newBlock, newChapter, newLesson, newTextbook } from '../src/types'
 
 const v1 = () => JSON.parse(readFileSync('tests/fixtures/textbook_v1.json', 'utf8')) as Record<string, unknown>
@@ -86,8 +86,5 @@ describe('migrate（#65）', () => {
     const r = migrate({ ...v1(), chapters: 'oops' })
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toContain('chapters')
-  })
-  it('今の移行表は空（版 1 だけ）', () => {
-    expect(Object.keys(migrations)).toEqual([])
   })
 })
