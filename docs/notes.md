@@ -56,7 +56,7 @@
 - default ブランチは **`production`**（配信される状態）。統合ブランチは **`develop`**
 - 作業は Issue ごとに `feat/<Issue番号>_<概要>` を `develop` から切り、`develop` に向けて PR を出す。`develop → production` も PR で行う
 - Rulesets により `develop` と `production` は直接 push できず、線形履歴（squash か rebase でマージ）と CI の成功が必須
-- 配信用のタグ `vX.Y.Z` は `production` のコミットに打つ。タグは打ち直せない（`version-rule`）ので、打つ前に対象コミットを確かめる
+- 配信用のタグ `vX.Y.Z` は人が打たない。リリース PR で `package.json` の `version` を上げると、`production` への push で `release.yml` が `v<version>` を打つ（下の「配信」）。タグは打ち直せない（`version-rule`）
 
 ### CI（`.github/workflows/ci.yml`）
 
@@ -67,40 +67,40 @@ Dependabot（`.github/dependabot.yml`）は npm を毎週月曜、GitHub Actions
 minor と patch は1本にまとめる。Dependabot alerts と security updates はリポジトリ設定で有効にしてある。
 Rulesets: `develop-rule` と `production-rule` が PR 必須・線形履歴・required checks（`ci.yml` のジョブ）を課す。`version-rule` は `v*` タグの更新と削除を禁止する。
 
-### 配信（`.github/workflows/deploy.yml`）
+### 配信（`.github/workflows/release.yml`・2026-09-25 に `deploy.yml` と統合・#132）
 
-GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`v*` タグの push と手動実行でだけ配信する**。
-ブランチへの push では配信しない。配信のタイミングは人が握る。
+GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`production` への push で `package.json` の `version` が上がっていたときだけ配信する**。
+タグ・Release（zip）・Pages 配信が1つの run で終わる（ビルドは1回。配信したサイトと zip は同じ成果物）。
 
 1. リポジトリを public にする（Pages の無料枠は public が条件）
 2. Settings → Pages → Source を「GitHub Actions」にする
-3. `git tag vX.Y.Z && git push origin vX.Y.Z` で配信される（`release.yml` があれば Release も同時に発行される）
-4. 手動で配信し直す: `gh workflow run deploy.yml -f ref=vX.Y.Z`（`ref` が空なら実行元の `production`）
-5. Android の Chrome で配信 URL を開き、メニューから「ホーム画面に追加」
+3. リリース PR（`develop → production`）で `package.json` の `version` を上げる。これが配信の合図
+4. マージすると `release.yml` が走る: `tag`（`v<version>` を打つ。既にあれば以降を skip）→ `build`（`npm test` → `npm run build`）→ `deploy`（Pages）と `release`（zip を Release に添付・`generate_release_notes`）
+5. 手動で配信し直す: Actions → Release → Run workflow → `tag` に既存のタグ名（例: `v0.2.1`）。そのタグの内容でビルドし直して配信と Release を更新する。
+   コマンドなら `gh workflow run release.yml --ref production -f tag=vX.Y.Z`
+6. Android の Chrome で配信 URL を開き、メニューから「ホーム画面に追加」
 
-注意: ワークフローは**タグ先のコミットに入っている定義**で動く。古いコミットにタグを打つと、その時点に
-`deploy.yml` の新しい定義が無いので自動では走らない。その場合は 4 の手動実行で `ref` にタグを指定する。
-リポジトリ名を変えるなら `vite.config.ts` の `base` も変える。
-- **`github-pages` 環境の配信ルールにタグの許可が要る**。環境の Deployment branches が「production ブランチだけ」だと、タグからの配信は `Tag "vX.Y.Z" is not allowed to deploy to github-pages due to environment protection rules` で失敗する（Release の方は環境を使わないので成功する）。v0.2.0 で起きたので、環境に「tag `v*`」の許可を足した。確認と追加は次のコマンド
+- `version` を上げない push（docs だけの修正など）ではタグが既にあるので何も起きない（壊れない）。上げ忘れたら、上げる PR をもう1本出す
+- 同じ `version` で2回目は出ない。タグは打ち直せない（`version-rule`）ので、`version` は必ず前に進める。`version` が `X.Y.Z` の形式でなければ `tag` ジョブで止まる
+- リポジトリ名を変えるなら `vite.config.ts` の `base` も変える
+- **`github-pages` 環境の Deployment branches に `production` の許可が要る**（run はブランチ push から始まるため）。無いと `deploy` が
+  `Branch "production" is not allowed to deploy to github-pages due to environment protection rules` で失敗する（`release` は環境を使わないので成功する）。
+  v0.2.0 のときに足した「tag `v*`」の許可は残してよい。確認と追加は次のコマンド
 
   ```bash
   gh api repos/risuda-ze/jibun_textbook/environments/github-pages/deployment-branch-policies --jq '.branch_policies[] | "\(.type // "branch") \(.name)"'
   ```
 
   ```bash
-  gh api -X POST repos/risuda-ze/jibun_textbook/environments/github-pages/deployment-branch-policies -f name='v*' -f type=tag
+  gh api -X POST repos/risuda-ze/jibun_textbook/environments/github-pages/deployment-branch-policies -f name='production' -f type=branch
   ```
 
   失敗した配信は `gh run rerun <run id> --failed` で再実行できる（タグは打ち直せない）
 
 ### 発行（`.github/workflows/release.yml`）
 
-`v*` タグを打つと、その時点の `dist/` を zip にして GitHub Release に添付する（`softprops/action-gh-release`）。配信（`deploy.yml`）と同じトリガーなので、**タグ = Release + 配信**。
-
-1. `package.json` の `version` を上げてコミットし、`production` まで入れる
-2. `production` のそのコミットに `git tag vX.Y.Z && git push origin vX.Y.Z`。`release.yml` と `deploy.yml` が走る
-3. タグ名は `vX.Y.Z` だけを受け付ける。両ワークフローの最初のステップで形式を確かめ、違えば何もしない
-4. 手動で発行し直す: `gh workflow run release.yml --ref production -f tag=vX.Y.Z`
+Release（`dist/` の zip を添付・`softprops/action-gh-release`）は上の「配信」と同じ run の `release` ジョブが作る。**`version` を上げたリリース PR のマージ = タグ + Release + 配信**。
+手順は「配信」の 3〜5 と同じ。`deploy` と `release` は権限も失敗も独立（片方が落ちても、もう片方は出る）。
 
 zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても動かない。Pages 配下で動く前提の成果物。
 
