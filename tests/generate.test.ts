@@ -3,7 +3,7 @@ import { clear } from 'idb-keyval'
 import { generateInto, mergeDraft } from '../src/ui/generate'
 import { getStateForTest, init, putBook } from '../src/store'
 import { DEFAULT_AI } from '../src/ai/types'
-import { newBlock, newChapter, newLesson, newTextbook } from '../src/types'
+import { clearLesson, newBlock, newChapter, newLesson, newTextbook } from '../src/types'
 
 const draft = () => ({
   blocks: ['### 本文', '', '  ', '### 要点'],
@@ -78,6 +78,28 @@ describe('generateInto（デモ応答で通す）', () => {
     expect(l.tasks.length).toBeGreaterThan(0)
     expect(l.clues.queries.length).toBeGreaterThan(0)
     expect(getStateForTest().toast?.msg).toContain('資料を生成しました')
+  })
+  it('消したあとに生成すると、前の本文・手を動かす・参考情報・資料の名前が残らない（#104）', async () => {
+    const old = newLesson('古い節', {
+      done: true,
+      blocks: [newBlock('ai', '古い下書き'), newBlock('me', '古いノート')],
+      tasks: [{ text: '古いやること', checked: true }],
+      clues: { queries: ['古い検索'], links: [{ title: '古いリンク', url: 'https://old.example/', fetchedAt: '' }], how: ['古い探し方'] },
+      materials: ['old.md'],
+    })
+    const tb = newTextbook('t', { chapters: [newChapter('c', [clearLesson(old)])] })
+    putBook(tb)
+    await tick()
+    const ok = await generateInto(tb, old.id, { ...DEFAULT_AI, kind: 'demo' }, () => {})
+    expect(ok).toBe(true)
+    const l = getStateForTest().books[0].chapters[0].lessons[0]
+    expect(l.blocks.every((b) => b.by === 'ai' && b.md !== '古い下書き')).toBe(true)
+    expect(l.tasks.some((t) => t.text === '古いやること')).toBe(false)
+    expect(l.clues.queries).not.toContain('古い検索')
+    expect(l.clues.links.some((x) => x.url === 'https://old.example/')).toBe(false)
+    expect(l.clues.how).not.toContain('古い探し方')
+    expect(l.materials).not.toContain('old.md')
+    expect(l.done).toBe(false)
   })
   it('失敗しても教科書は変えず、理由を知らせる（未対応の接続先）', async () => {
     const tb = book()

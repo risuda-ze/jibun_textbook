@@ -14,4 +14,5 @@ export const L = {
   roadmap: 'ロードマップ',
   propose: '変更案を出してもらう',
   material: '資料を渡す',
+  clearLesson: '資料を消す',
 } as const

@@ -13,7 +13,7 @@ import {
 import { STATUS_LABEL, currentLesson, findLesson, lessonNo, lessonStatus } from '../lib/status'
 import { openLesson, putBook, selectLesson, snapshot, toast, updateBook, updateLesson, useApp } from '../store'
 import { newChapter, newLesson, type Lesson, type Textbook } from '../types'
-import { Meter, StatusChip, StopButton, TitleInput, UsageLine, downloadBook, stepPercent, useAiRun } from './common'
+import { Meter, StatusChip, StopButton, TitleInput, UsageLine, clearLessonWithUndo, downloadBook, stepPercent, useAiRun } from './common'
 import { GenerateControls, useGenerate } from './GenerateControls'
 import { Button, Card, Pill, Segmented, type PillTone } from './kit'
 
@@ -373,6 +373,11 @@ export function Roadmap({ tb }: { tb: Textbook }) {
                   <Button v="outline" sm onClick={() => removeLesson(sel.lesson.id)}>
                     この節を消す
                   </Button>
+                  {sel.lesson.blocks.length > 0 && (
+                    <Button v="outline" sm onClick={() => clearLessonWithUndo(tb, sel.lesson.id)}>
+                      {L.clearLesson}
+                    </Button>
+                  )}
                 </>
               }
             />

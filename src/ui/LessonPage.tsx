@@ -4,7 +4,7 @@ import { allLessons, findLesson, lessonNo, minePercent } from '../lib/status'
 import { go, openLesson, putBook, setDraft as storeDraft, setWide, snapshot, toast, updateLesson, useApp } from '../store'
 import { emptyDraft, newBlock, uid, type Lesson, type NoteDraft, type Textbook } from '../types'
 import { BlockRow, Composer } from './blocks'
-import { StatusChip } from './common'
+import { StatusChip, clearLessonWithUndo } from './common'
 import { isHttpUrl } from '../lib/safe'
 import { GenerateControls, useGenerate } from './GenerateControls'
 import { Button, Card } from './kit'
@@ -363,6 +363,11 @@ export function LessonPage({ tb }: { tb: Textbook }) {
             <p className="sub" style={{ fontSize: 13 }}>
               自分の言葉 <b className="mono">{pct}%</b>
             </p>
+            {l.blocks.length > 0 && (
+              <Button v="outline" sm onClick={() => clearLessonWithUndo(tb, l.id)}>
+                {L.clearLesson}
+              </Button>
+            )}
           </Card>
           <Card as="div">
             <h2>手を動かす</h2>
