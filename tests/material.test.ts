@@ -31,7 +31,10 @@ describe('渡す資料（#63）', () => {
     }
   })
   it('渡せない種類・大きすぎるファイルは理由つきで断る', async () => {
-    expect(await readMaterial(new File(['x'], 'photo.png', { type: 'image/png' }))).toMatchObject({ ok: false, reason: expect.stringContaining('渡せない種類') })
+    expect(await readMaterial(new File(['x'], 'photo.png', { type: 'image/png' }))).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('渡せない種類'),
+    })
     const big = new File([new Uint8Array(TEXT_LIMIT_BYTES + 1)], 'big.txt', { type: 'text/plain' })
     expect(await readMaterial(big)).toMatchObject({ ok: false, reason: expect.stringContaining('200KB') })
   })

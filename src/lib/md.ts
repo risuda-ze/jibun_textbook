@@ -46,5 +46,8 @@ td.addRule('divAsParagraph', {
 })
 
 export function htmlToMd(html: string): string {
-  return td.turndown(DOMPurify.sanitize(html)).replace(/\n{3,}/g, '\n\n').trim()
+  return td
+    .turndown(DOMPurify.sanitize(html))
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }

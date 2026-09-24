@@ -4,8 +4,22 @@ import { z } from 'zod'
 import type { CourseInput, Textbook } from '../types'
 import { findLesson, isProtectedLesson, lessonNo } from '../lib/status'
 import {
-  AiError, abortError, throwIfAborted, zeroUsage, type AiOpts, type AiProvider, type Material, type AiSettings, type CourseDesign, type LessonDraft,
-  type Progress, type QA, type RedesignPlan, type RedesignScope, type ResearchInfo, type Usage,
+  AiError,
+  abortError,
+  throwIfAborted,
+  zeroUsage,
+  type AiOpts,
+  type AiProvider,
+  type Material,
+  type AiSettings,
+  type CourseDesign,
+  type LessonDraft,
+  type Progress,
+  type QA,
+  type RedesignPlan,
+  type RedesignScope,
+  type ResearchInfo,
+  type Usage,
 } from './types'
 
 /**
@@ -25,7 +39,10 @@ export const WEB_SEARCH_USD_PER_1000 = 10
 /** テストで差し替えられるよう、使うメソッドだけの最小インターフェース */
 export interface MessagesLike {
   stream(params: Record<string, unknown>, options?: RequestOpts): { finalMessage(): Promise<AnyMessage> }
-  parse(params: Record<string, unknown>, options?: RequestOpts): Promise<{ parsed_output: unknown; stop_reason: string | null; usage?: RawUsage }>
+  parse(
+    params: Record<string, unknown>,
+    options?: RequestOpts,
+  ): Promise<{ parsed_output: unknown; stop_reason: string | null; usage?: RawUsage }>
 }
 /** SDK の request options のうち使うもの。signal で中止する（#14） */
 export type RequestOpts = { signal?: AbortSignal }
@@ -62,18 +79,26 @@ function toAiError(e: unknown): AiError {
   if (e instanceof AiError) return e
   // 自分でやめた（#14）。APIUserAbortError は APIError の子なので先に見る
   if (e instanceof Anthropic.APIUserAbortError || (e instanceof Error && e.name === 'AbortError')) return abortError()
-  if (e instanceof Anthropic.AuthenticationError) return new AiError('auth', 'APIキーが正しく認証されませんでした。キーを入れ直してください。')
-  if (e instanceof Anthropic.PermissionDeniedError) return new AiError('auth', 'このキーでは使用できない機能またはモデルです。モデルを変更するか、Web調査を「検索なし」にしてください。')
-  if (e instanceof Anthropic.RateLimitError) return new AiError('rate', '利用上限に達しました。しばらく待ってから、もう一度お試しください。')
-  if (e instanceof Anthropic.APIConnectionError) return new AiError('network', 'ネットワークに接続できませんでした。接続を確認してから、もう一度お試しください。')
+  if (e instanceof Anthropic.AuthenticationError)
+    return new AiError('auth', 'APIキーが正しく認証されませんでした。キーを入れ直してください。')
+  if (e instanceof Anthropic.PermissionDeniedError)
+    return new AiError('auth', 'このキーでは使用できない機能またはモデルです。モデルを変更するか、Web調査を「検索なし」にしてください。')
+  if (e instanceof Anthropic.RateLimitError)
+    return new AiError('rate', '利用上限に達しました。しばらく待ってから、もう一度お試しください。')
+  if (e instanceof Anthropic.APIConnectionError)
+    return new AiError('network', 'ネットワークに接続できませんでした。接続を確認してから、もう一度お試しください。')
   if (e instanceof Anthropic.APIError) return new AiError('api', `APIエラーが発生しました（${e.status ?? '?'}）: ${e.message}`)
-  if (e instanceof TypeError) return new AiError('network', 'ネットワークに接続できませんでした。接続を確認してから、もう一度お試しください。')
+  if (e instanceof TypeError)
+    return new AiError('network', 'ネットワークに接続できませんでした。接続を確認してから、もう一度お試しください。')
   return new AiError('api', e instanceof Error ? e.message : String(e))
 }
 
 export class AnthropicProvider implements AiProvider {
   private messages: MessagesLike
-  constructor(private settings: AiSettings, client?: MessagesLike) {
+  constructor(
+    private settings: AiSettings,
+    client?: MessagesLike,
+  ) {
     if (!client && !settings.apiKey) throw new AiError('nokey', 'APIキーが未設定です。「使うAI」でキーを入力してください。')
     this.messages = client ?? makeClient(settings.apiKey)
   }
@@ -85,7 +110,14 @@ export class AnthropicProvider implements AiProvider {
   }
 
   /** 1段目: 調査。pause_turn は内容をそのまま送り返して続行する。検索エラーはHTTP 200で返るので中身で分岐する。 */
-  async research(system: string, prompt: Prompt, maxUses: number, usage: Usage, onDetail?: (d: string) => void, signal?: AbortSignal): Promise<Research> {
+  async research(
+    system: string,
+    prompt: Prompt,
+    maxUses: number,
+    usage: Usage,
+    onDetail?: (d: string) => void,
+    signal?: AbortSignal,
+  ): Promise<Research> {
     const useSearch = this.settings.search === 'builtin'
     const messages: { role: 'user' | 'assistant'; content: unknown }[] = [{ role: 'user', content: prompt }]
     const out: Research = { text: '', sources: [], searchErrors: [], truncated: false }
@@ -99,13 +131,16 @@ export class AnthropicProvider implements AiProvider {
       for (let i = 0; i <= MAX_PAUSE_CONTINUES; i++) {
         throwIfAborted(signal)
         const msg = await this.messages
-          .stream({
-            model: this.settings.model,
-            max_tokens: 16000,
-            system,
-            messages,
-            ...(useSearch ? { tools: [{ type: WEB_SEARCH_TYPE, name: 'web_search', max_uses: maxUses }] } : {}),
-          }, { signal })
+          .stream(
+            {
+              model: this.settings.model,
+              max_tokens: 16000,
+              system,
+              messages,
+              ...(useSearch ? { tools: [{ type: WEB_SEARCH_TYPE, name: 'web_search', max_uses: maxUses }] } : {}),
+            },
+            { signal },
+          )
           .finalMessage()
         this.add(usage, msg.usage)
         for (const b of msg.content) {
@@ -121,7 +156,8 @@ export class AnthropicProvider implements AiProvider {
             if (q) onDetail?.(`検索: ${q}`)
           }
         }
-        if (msg.stop_reason === 'refusal') throw new AiError('refusal', 'この内容についてはモデルが応答を控えました。言い回しを変えるか、モデルを切り替えてください。')
+        if (msg.stop_reason === 'refusal')
+          throw new AiError('refusal', 'この内容についてはモデルが応答を控えました。言い回しを変えるか、モデルを切り替えてください。')
         if (msg.stop_reason === 'max_tokens') out.truncated = true
         if (msg.stop_reason !== 'pause_turn') break
         messages.push({ role: 'assistant', content: msg.content })
@@ -140,15 +176,19 @@ export class AnthropicProvider implements AiProvider {
   async structure<T extends z.ZodType>(system: string, prompt: Prompt, schema: T, usage: Usage, signal?: AbortSignal): Promise<z.infer<T>> {
     try {
       throwIfAborted(signal)
-      const res = await this.messages.parse({
-        model: this.settings.model,
-        max_tokens: 16000,
-        system,
-        messages: [{ role: 'user', content: prompt }],
-        output_config: { format: zodOutputFormat(schema) },
-      }, { signal })
+      const res = await this.messages.parse(
+        {
+          model: this.settings.model,
+          max_tokens: 16000,
+          system,
+          messages: [{ role: 'user', content: prompt }],
+          output_config: { format: zodOutputFormat(schema) },
+        },
+        { signal },
+      )
       this.add(usage, res.usage)
-      if (res.stop_reason === 'refusal') throw new AiError('refusal', 'この内容についてはモデルが応答を控えました。言い回しを変えるか、モデルを切り替えてください。')
+      if (res.stop_reason === 'refusal')
+        throw new AiError('refusal', 'この内容についてはモデルが応答を控えました。言い回しを変えるか、モデルを切り替えてください。')
       if (res.parsed_output == null) throw new AiError('parse', 'AIの返答を読み取れませんでした。もう一度お試しください。')
       return res.parsed_output as z.infer<T>
     } catch (e) {
@@ -180,7 +220,10 @@ export class AnthropicProvider implements AiProvider {
         SYS,
         `${who}\n\nこの人のためのコースを設計する材料を集める。日本語と英語の両方で調べ、公式ドキュメントなどの一次情報を優先する。` +
           `この分野を体系的に学ぶときの標準的な順序、つまずきやすい点、最近変わったことを調べて、要点を日本語でまとめる。`,
-        MAX_SEARCH_DESIGN, usage, (d) => onProgress(1, d), opts.signal,
+        MAX_SEARCH_DESIGN,
+        usage,
+        (d) => onProgress(1, d),
+        opts.signal,
       )
       found = `\n\n## 調査で分かったこと\n${r.text}`
       research = { truncated: r.truncated, searchErrors: r.searchErrors }
@@ -190,7 +233,9 @@ export class AnthropicProvider implements AiProvider {
       SYS,
       `${who}${found}\n\n上をもとにコースを設計する。\n- 章は4〜9、各章の節は2〜5\n- 節の題は、その節でできるようになることが分かる具体的な言葉にする\n` +
         `- 各章に手を動かす実践課題の節（isTask: true）を1つ入れてよい\n- minutes は所要時間の見積もり（分）\n- summary は節の狙いを1文で\n- すべて日本語`,
-      DesignOutZ, usage, opts.signal,
+      DesignOutZ,
+      usage,
+      opts.signal,
     )
     onProgress(3, '設計ができた')
     return { design: design as CourseDesign, usage, research }
@@ -214,12 +259,17 @@ export class AnthropicProvider implements AiProvider {
     if (this.settings.search === 'builtin' && !sourceOnly) {
       onProgress(0, 'Webを調査している')
       // 調査には資料の本文を渡さない（名前だけ）。資料は書く段階でだけ読ませ、入力トークンを二重に使わない（#79）
-      const researchNote = mats.length ? `\n\n手元に資料がある（${mats.map((m) => m.name).join('、')}。本文は書く段階で読む）。資料を補う事実や最新の情報を集める。` : ''
+      const researchNote = mats.length
+        ? `\n\n手元に資料がある（${mats.map((m) => m.name).join('、')}。本文は書く段階で読む）。資料を補う事実や最新の情報を集める。`
+        : ''
       const r = await this.research(
         SYS,
         `${ctx}${researchNote}\n\nこの節の教材を書くための事実を集める。日本語と英語の両方で調べ、公式ドキュメントなどの一次情報を優先する。` +
           `手順・数値・用語は出典で確かめる。分かったことを日本語で整理する。`,
-        MAX_SEARCH_LESSON, usage, (d) => onProgress(0, d), opts.signal,
+        MAX_SEARCH_LESSON,
+        usage,
+        (d) => onProgress(0, d),
+        opts.signal,
       )
       sources = r.sources
       truncated = r.truncated
@@ -229,14 +279,22 @@ export class AnthropicProvider implements AiProvider {
     onProgress(1, sourceOnly ? '渡された資料から書いている' : '資料を書いている')
     const d = await this.structure(
       SYS,
-      withMaterials(`${ctx}${found}${matNote}\n\nこの節の教材を書く。\n- blocks: 本文を意味のまとまりごとに3〜7個に分ける。各要素はMarkdown。見出しは ### を使う。コード・表・式も使ってよい\n` +
-        `- 読み手が自分で確かめて書き込む前提の「下書き」。断定しすぎず、確かめるべき点は確かめ方を添える\n` +
-        `- tasks: この節で実際に手を動かすこと3〜5個\n- queries: 自分で調べるときの検索語3〜5個\n- how: 本文が正しいか自分で確かめる方法2〜3個\n` +
-        `- linkIndexes: 「見つけたページ」のうち一次情報として読む価値が高いものの番号（無ければ空）\n- すべて日本語`, mats),
-      LessonOutZ, usage, opts.signal,
+      withMaterials(
+        `${ctx}${found}${matNote}\n\nこの節の教材を書く。\n- blocks: 本文を意味のまとまりごとに3〜7個に分ける。各要素はMarkdown。見出しは ### を使う。コード・表・式も使ってよい\n` +
+          `- 読み手が自分で確かめて書き込む前提の「下書き」。断定しすぎず、確かめるべき点は確かめ方を添える\n` +
+          `- tasks: この節で実際に手を動かすこと3〜5個\n- queries: 自分で調べるときの検索語3〜5個\n- how: 本文が正しいか自分で確かめる方法2〜3個\n` +
+          `- linkIndexes: 「見つけたページ」のうち一次情報として読む価値が高いものの番号（無ければ空）\n- すべて日本語`,
+        mats,
+      ),
+      LessonOutZ,
+      usage,
+      opts.signal,
     )
     const fetchedAt = new Date().toISOString().slice(0, 10)
-    const links = d.linkIndexes.filter((i) => Number.isInteger(i) && sources[i]).slice(0, 6).map((i) => ({ ...sources[i], fetchedAt }))
+    const links = d.linkIndexes
+      .filter((i) => Number.isInteger(i) && sources[i])
+      .slice(0, 6)
+      .map((i) => ({ ...sources[i], fetchedAt }))
     const draft: LessonDraft = { blocks: d.blocks, tasks: d.tasks, clues: { queries: d.queries, how: d.how, links }, truncated, research }
     onProgress(2, '資料ができた')
     return { draft, usage }
@@ -252,25 +310,38 @@ export class AnthropicProvider implements AiProvider {
     if (scope === 'lesson') {
       const r = await this.structure(
         SYS,
-        `${base}\n\n節「${f.lesson.title}」のAIの下書きだけを書き直す。今の下書き:\n${f.lesson.blocks.filter((b) => b.by === 'ai' && !b.edited).map((b) => b.md).join('\n\n---\n\n') || '（なし）'}\n\n` +
-          `blocks に新しい本文をMarkdownで3〜7個。見出しは ###。日本語。`,
-        z.object({ blocks: z.array(z.string()) }), usage, opts.signal,
+        `${base}\n\n節「${f.lesson.title}」のAIの下書きだけを書き直す。今の下書き:\n${
+          f.lesson.blocks
+            .filter((b) => b.by === 'ai' && !b.edited)
+            .map((b) => b.md)
+            .join('\n\n---\n\n') || '（なし）'
+        }\n\n` + `blocks に新しい本文をMarkdownで3〜7個。見出しは ###。日本語。`,
+        z.object({ blocks: z.array(z.string()) }),
+        usage,
+        opts.signal,
       )
       plan = { scope, blocks: r.blocks }
     } else if (scope === 'chapter') {
       const r = await this.structure(
         SYS,
         `${base}\n\n第${f.ci + 1}章「${f.chapter.title}」の節の並びだけを見直す。\n- 既存の節を残すときは id をそのまま書く。新しい節は id を空文字にする\n- 【守る】と付いた節は変更も削除もできない。必ず id を含める`,
-        z.object({ lessons: z.array(PlanLessonZ) }), usage, opts.signal,
+        z.object({ lessons: z.array(PlanLessonZ) }),
+        usage,
+        opts.signal,
       )
       plan = { scope, lessons: r.lessons.map((l) => ({ ...l, id: l.id || null })) }
     } else {
       const r = await this.structure(
         SYS,
         `${base}\n\nコース全体の章と節を見直す。\n- 既存の章・節を残すときは id をそのまま書く。新しいものは id を空文字にする\n- 【守る】と付いた節は変更も削除もできない。必ず元の章に id を含める`,
-        z.object({ chapters: z.array(z.object({ id: z.string(), title: z.string(), lessons: z.array(PlanLessonZ) })) }), usage, opts.signal,
+        z.object({ chapters: z.array(z.object({ id: z.string(), title: z.string(), lessons: z.array(PlanLessonZ) })) }),
+        usage,
+        opts.signal,
       )
-      plan = { scope, chapters: r.chapters.map((c) => ({ ...c, id: c.id || null, lessons: c.lessons.map((l) => ({ ...l, id: l.id || null })) })) }
+      plan = {
+        scope,
+        chapters: r.chapters.map((c) => ({ ...c, id: c.id || null, lessons: c.lessons.map((l) => ({ ...l, id: l.id || null })) })),
+      }
     }
     return { plan, usage }
   }
@@ -286,10 +357,12 @@ const PlanLessonZ = z.object({ id: z.string(), title: z.string(), minutes: z.num
 const DesignOutZ = z.object({
   title: z.string(),
   goal: z.string(),
-  chapters: z.array(z.object({
-    title: z.string(),
-    lessons: z.array(z.object({ title: z.string(), minutes: z.number(), isTask: z.boolean(), summary: z.string() })),
-  })),
+  chapters: z.array(
+    z.object({
+      title: z.string(),
+      lessons: z.array(z.object({ title: z.string(), minutes: z.number(), isTask: z.boolean(), summary: z.string() })),
+    }),
+  ),
 })
 
 /** AI の出力（節）のスキーマ。保存形式の types.ts の LessonZ とは別物 */
@@ -311,8 +384,16 @@ function describeQa(qa: QA[]): string {
 }
 
 function outline(tb: Textbook, withIds = false): string {
-  return '## 今の設計\n' + tb.chapters.map((c, ci) =>
-    `第${ci + 1}章 ${c.title}${withIds ? ` (id: ${c.id})` : ''}\n` +
-    c.lessons.map((l, li) => `  ${ci + 1}-${li + 1} ${l.title}${withIds ? ` (id: ${l.id})${isProtectedLesson(l) ? '【守る】' : ''}` : ''}`).join('\n'),
-  ).join('\n')
+  return (
+    '## 今の設計\n' +
+    tb.chapters
+      .map(
+        (c, ci) =>
+          `第${ci + 1}章 ${c.title}${withIds ? ` (id: ${c.id})` : ''}\n` +
+          c.lessons
+            .map((l, li) => `  ${ci + 1}-${li + 1} ${l.title}${withIds ? ` (id: ${l.id})${isProtectedLesson(l) ? '【守る】' : ''}` : ''}`)
+            .join('\n'),
+      )
+      .join('\n')
+  )
 }

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { TextbookZ, findDuplicateIds, newBlock, newChapter, newLesson, newTextbook, renumberDuplicateIds, type Textbook } from '../src/types'
+import {
+  TextbookZ,
+  findDuplicateIds,
+  newBlock,
+  newChapter,
+  newLesson,
+  newTextbook,
+  renumberDuplicateIds,
+  type Textbook,
+} from '../src/types'
 import { currentLesson, lessonNo, lessonStatus, minePercent, reviewCount, statusCounts } from '../src/lib/status'
 import { asCopy, decideImport, exportJson, parseImport } from '../src/lib/io'
 import { fitSize } from '../src/lib/image'
@@ -29,7 +38,7 @@ describe('節の状態は保存せず導出する', () => {
   })
   it('再確認の件数は旗の数', () => {
     const tb = book()
-    expect(reviewCount(tb)).toBe(1)  // 見本は「完了」の節に旗がある
+    expect(reviewCount(tb)).toBe(1) // 見本は「完了」の節に旗がある
     tb.chapters[0].lessons[0].review = true
     tb.chapters[0].lessons[2].review = true
     expect(reviewCount(tb)).toBe(3)
@@ -75,10 +84,16 @@ describe('JSONの書き出しと読み込み', () => {
     expect(parseImport(JSON.stringify({ schemaVersion: 1, id: 'x' })).ok).toBe(false)
   })
   it('欠けている項目は既定値で補う', () => {
-    const r = parseImport(JSON.stringify({
-      schemaVersion: 1, id: 'a', title: 't', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
-      chapters: [{ id: 'c', title: 'c', lessons: [{ id: 'l', title: 'l' }] }],
-    }))
+    const r = parseImport(
+      JSON.stringify({
+        schemaVersion: 1,
+        id: 'a',
+        title: 't',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        chapters: [{ id: 'c', title: 'c', lessons: [{ id: 'l', title: 'l' }] }],
+      }),
+    )
     expect(r.ok).toBe(true)
     if (r.ok) expect(r.tb.chapters[0].lessons[0]).toMatchObject({ done: false, review: false, blocks: [] })
   })
@@ -88,7 +103,8 @@ describe('読み込み時の上書き判定', () => {
   const base = book()
   const at = (iso: string): Textbook => ({ ...base, updatedAt: iso })
   it('端末に無ければ追加', () => expect(decideImport(undefined, base)).toBe('add'))
-  it('読み込む側が新しければ自動で上書き', () => expect(decideImport(at('2026-09-01T00:00:00Z'), at('2026-09-02T00:00:00Z'))).toBe('overwrite'))
+  it('読み込む側が新しければ自動で上書き', () =>
+    expect(decideImport(at('2026-09-01T00:00:00Z'), at('2026-09-02T00:00:00Z'))).toBe('overwrite'))
   it('読み込む側が古ければ警告', () => expect(decideImport(at('2026-09-02T00:00:00Z'), at('2026-09-01T00:00:00Z'))).toBe('older'))
   it('同じ日時なら何もしない', () => expect(decideImport(at('2026-09-02T00:00:00Z'), at('2026-09-02T00:00:00Z'))).toBe('same'))
   it('別の本として追加するとidが変わる', () => {

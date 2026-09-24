@@ -10,15 +10,23 @@ test('レッスン: ファイルを渡して「この資料だけから作る」
   await page.getByRole('button', { name: L.startWriting }).click()
   await page.getByRole('button', { name: L.material }).click()
   // デモ応答は資料の先頭 40 字を本文に写す。それより後ろの文で「JSON に本文が入らない」ことを確かめる
-  await page.locator('#materialfile').setInputFiles(md('notes.md', '# 自分のメモ\nRust の所有権について。ここまでは見本の本文に写る。\nこの行は教科書のJSONには入らない'))
+  await page
+    .locator('#materialfile')
+    .setInputFiles(md('notes.md', '# 自分のメモ\nRust の所有権について。ここまでは見本の本文に写る。\nこの行は教科書のJSONには入らない'))
   await expect(page.getByLabel('渡す資料')).toContainText('notes.md')
   await page.locator('#sourceonly').check()
   await page.getByRole('button', { name: L.generate }).click()
   await expect(page.locator('.doc [data-by="ai"]').first()).toContainText('渡された資料: notes.md')
   await expect(page.getByText('元にした資料: notes.md')).toBeVisible()
   // JSON には資料の本文は入らない（名前だけ）
-  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('tab', { name: /本棚/ }).click().then(() => page.getByRole('button', { name: 'JSON書出' }).first().click())])
-  const json = (await import('node:fs')).readFileSync(await dl.path() as string, 'utf8')
+  const [dl] = await Promise.all([
+    page.waitForEvent('download'),
+    page
+      .getByRole('tab', { name: /本棚/ })
+      .click()
+      .then(() => page.getByRole('button', { name: 'JSON書出' }).first().click()),
+  ])
+  const json = (await import('node:fs')).readFileSync((await dl.path()) as string, 'utf8')
   expect(json).toContain('notes.md')
   expect(json).not.toContain('JSONには入らない')
 })

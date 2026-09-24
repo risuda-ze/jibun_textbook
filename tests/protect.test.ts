@@ -7,7 +7,12 @@ const P = (id: string | null, title: string): PlanLesson => ({ id, title, minute
 function fixture() {
   const draft = newLesson('AIだけの節', { blocks: [newBlock('ai', '下書き')] })
   const noted = newLesson('ノートのある節', {
-    blocks: [newBlock('ai', '下書きA'), newBlock('me', '自分のノート'), newBlock('ai', '直した文', { edited: true }), newBlock('ai', '下書きB')],
+    blocks: [
+      newBlock('ai', '下書きA'),
+      newBlock('me', '自分のノート'),
+      newBlock('ai', '直した文', { edited: true }),
+      newBlock('ai', '下書きB'),
+    ],
   })
   const done = newLesson('完了の節', { done: true, blocks: [newBlock('ai', '確認済みの本文')] })
   const empty = newLesson('未作成の節')
@@ -77,7 +82,10 @@ describe('コース全体を直す', () => {
   })
   it('差分の行は反映結果と一致する', () => {
     const { tb, ch1, draft, noted, done } = fixture()
-    const after = { ...tb, chapters: tb.chapters.map((c) => (c.id === ch1.id ? applyChapterPlan(c, [P(draft.id, '改題'), P(null, '追加')]) : c)) }
+    const after = {
+      ...tb,
+      chapters: tb.chapters.map((c) => (c.id === ch1.id ? applyChapterPlan(c, [P(draft.id, '改題'), P(null, '追加')]) : c)),
+    }
     expect(diffTextbooks(tb, after, ch1.id)).toEqual([
       { kind: 'change', level: 'lesson', text: '改題', from: 'AIだけの節' },
       { kind: 'keep', level: 'lesson', text: noted.title, note: '自分の書き込みあり' },
@@ -93,8 +101,8 @@ describe('差分の行（#83）', () => {
     const { tb, ch1, ch2 } = fixture()
     const after = structuredClone(tb)
     after.chapters[0].title = '一章（改名）'
-    after.chapters[0].lessons = after.chapters[0].lessons.slice(0, 2)   // 完了の節と未作成の節を消す
-    after.chapters = [after.chapters[0], newChapter('三章', [newLesson('新しい節')])]  // 二章を消し、三章を足す
+    after.chapters[0].lessons = after.chapters[0].lessons.slice(0, 2) // 完了の節と未作成の節を消す
+    after.chapters = [after.chapters[0], newChapter('三章', [newLesson('新しい節')])] // 二章を消し、三章を足す
     const rows = diffTextbooks(tb, after)
     const pick = (kind: string, level: string) => rows.filter((r) => r.kind === kind && r.level === level).map((r) => r.text)
     expect(pick('change', 'chapter')).toEqual(['一章（改名）'])
