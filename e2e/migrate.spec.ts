@@ -3,8 +3,21 @@ import { expect, test } from '@playwright/test'
 
 // #65: 版の移行と不整合の修復。Help の「読み込めない場合、まずはこちら」で試せる。JSON 読込でも自動で直る
 const DUP = {
-  schemaVersion: 1, id: 'b-dup', title: '直す本', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
-  chapters: [{ id: 'c1', title: '第1章', lessons: [{ id: 'l1', title: '節1' }, { id: 'l1', title: '節2' }] }],
+  schemaVersion: 1,
+  id: 'b-dup',
+  title: '直す本',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  chapters: [
+    {
+      id: 'c1',
+      title: '第1章',
+      lessons: [
+        { id: 'l1', title: '節1' },
+        { id: 'l1', title: '節2' },
+      ],
+    },
+  ],
 }
 const file = (name: string, obj: unknown) => ({ name, mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(obj)) })
 
@@ -21,7 +34,13 @@ test('Help で id が重複した JSON を選ぶと、直した所が見えて�
 
   // 同じ本の古いファイルを Help から入れようとすると、本棚と同じ確認が出る（#78）
   await page.getByRole('button', { name: L.help }).click()
-  await page.locator('#repairfile').setInputFiles(file('old.textbook.json', { ...DUP, updatedAt: '2025-01-01T00:00:00.000Z', chapters: [{ id: 'c1', title: '第1章', lessons: [{ id: 'l1', title: '節1' }] }] }))
+  await page.locator('#repairfile').setInputFiles(
+    file('old.textbook.json', {
+      ...DUP,
+      updatedAt: '2025-01-01T00:00:00.000Z',
+      chapters: [{ id: 'c1', title: '第1章', lessons: [{ id: 'l1', title: '節1' }] }],
+    }),
+  )
   await page.getByLabel('直した結果').getByRole('button', { name: '本棚に追加' }).click()
   const dialog = page.getByRole('alertdialog')
   await expect(dialog).toContainText('読み込もうとしたファイルの方が古いです')

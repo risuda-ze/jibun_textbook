@@ -32,15 +32,38 @@ export type Generate = ReturnType<typeof useGenerate>
  * 生成ボタン（押すと進行中の色になる #50 #55）・今していることと経過秒数・やめる（#14）・同じ行の他のボタン・資料を渡す欄（#63）。
  * `show=false` なら生成ボタンと資料の欄を出さず、`actions` だけの行にする（本文がある節）
  */
-export function GenerateControls({ g, lessonId, label, show = true, note, actions, onDone }: {
-  g: Generate; lessonId: string; label: string; show?: boolean; note?: ReactNode; actions?: ReactNode; onDone?: () => void
+export function GenerateControls({
+  g,
+  lessonId,
+  label,
+  show = true,
+  note,
+  actions,
+  onDone,
+}: {
+  g: Generate
+  lessonId: string
+  label: string
+  show?: boolean
+  note?: ReactNode
+  actions?: ReactNode
+  onDone?: () => void
 }) {
   const running = g.gen?.id === lessonId ? g.gen : null
   return (
     <>
       <div className="row">
         {show && (
-          <Button v="soft" disabled={g.gen !== null} onClick={() => { void g.start(lessonId).then((ok) => { if (ok) onDone?.() }) }} progress={running ? stepPercent(running.step, GEN_STEPS) : null}>
+          <Button
+            v="soft"
+            disabled={g.gen !== null}
+            onClick={() => {
+              void g.start(lessonId).then((ok) => {
+                if (ok) onDone?.()
+              })
+            }}
+            progress={running ? stepPercent(running.step, GEN_STEPS) : null}
+          >
             {running ? L.generating : label}
           </Button>
         )}

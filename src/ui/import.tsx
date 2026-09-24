@@ -39,16 +39,34 @@ export function OlderCard({ older, onDone }: { older: Older; onDone: () => void 
         <b>読み込もうとしたファイルの方が古いです。</b>「{older.existing.title}」
       </p>
       <p className="sub mono">
-        端末: {new Date(older.existing.updatedAt).toLocaleString('ja-JP')} / ファイル: {new Date(older.incoming.updatedAt).toLocaleString('ja-JP')}
+        端末: {new Date(older.existing.updatedAt).toLocaleString('ja-JP')} / ファイル:{' '}
+        {new Date(older.incoming.updatedAt).toLocaleString('ja-JP')}
       </p>
       <div className="row">
-        <Button v="ghost" onClick={() => { const prev = older.existing; putBook(older.incoming, false); onDone(); toast('古い内容で上書きしました', () => putBook(prev, false)) }}>
+        <Button
+          v="ghost"
+          onClick={() => {
+            const prev = older.existing
+            putBook(older.incoming, false)
+            onDone()
+            toast('古い内容で上書きしました', () => putBook(prev, false))
+          }}
+        >
           古い内容で上書き
         </Button>
-        <Button v="ghost" onClick={() => { putBook(asCopy(older.incoming), false); onDone(); toast('別の本として追加しました') }}>
+        <Button
+          v="ghost"
+          onClick={() => {
+            putBook(asCopy(older.incoming), false)
+            onDone()
+            toast('別の本として追加しました')
+          }}
+        >
           別の本として追加
         </Button>
-        <Button v="soft" onClick={onDone}>やめる</Button>
+        <Button v="soft" onClick={onDone}>
+          やめる
+        </Button>
       </div>
     </Card>
   )

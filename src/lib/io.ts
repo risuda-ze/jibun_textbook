@@ -19,8 +19,7 @@ export function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-export const fileName = (tb: Textbook): string =>
-  `${tb.title.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40) || 'textbook'}.textbook.json`
+export const fileName = (tb: Textbook): string => `${tb.title.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40) || 'textbook'}.textbook.json`
 
 /** steps は読み込むときに直した所（版の移行・不整合の修復）。空なら手を入れていない。from は読んだ版（分からなければ null） */
 export type ParseResult = { ok: true; tb: Textbook; steps: string[]; from: number } | { ok: false; reason: string; from: number | null }
@@ -44,7 +43,8 @@ export function parseImport(text: string): ParseResult {
  * 16MB を超えるファイルは JSON.parse の前に断る（#17）
  */
 export async function readTextbookFile(f: File): Promise<ParseResult> {
-  if (f.size > IMPORT_LIMIT_BYTES) return { ok: false, reason: MSG.tooBig(f.name, formatSize(f.size), formatSize(IMPORT_LIMIT_BYTES)), from: null }
+  if (f.size > IMPORT_LIMIT_BYTES)
+    return { ok: false, reason: MSG.tooBig(f.name, formatSize(f.size), formatSize(IMPORT_LIMIT_BYTES)), from: null }
   return parseImport(await f.text())
 }
 

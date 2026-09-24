@@ -76,29 +76,62 @@ function Repair() {
     <div className="stack">
       <p className="sub">上の対処で直らない場合は、ここでファイルを選ぶと、版の移行と不整合の修復を試せます。元のファイルは変えません。</p>
       <div className="row">
-        <Button v="soft" onClick={() => file.current?.click()}>ファイルを選ぶ</Button>
-        <input ref={file} type="file" id="repairfile" accept=".json,application/json" hidden onChange={(e) => { void onFile(e.target.files?.[0]); e.target.value = '' }} />
+        <Button v="soft" onClick={() => file.current?.click()}>
+          ファイルを選ぶ
+        </Button>
+        <input
+          ref={file}
+          type="file"
+          id="repairfile"
+          accept=".json,application/json"
+          hidden
+          onChange={(e) => {
+            void onFile(e.target.files?.[0])
+            e.target.value = ''
+          }}
+        />
       </div>
       {res && (
         <Card as="div" tone={res.r.ok ? 'sky' : 'peach'} aria-label="直した結果">
-          <p><b className="mono">{res.name}</b>{res.r.from !== null && <span className="sub">・schemaVersion {res.r.from}</span>}</p>
+          <p>
+            <b className="mono">{res.name}</b>
+            {res.r.from !== null && <span className="sub">・schemaVersion {res.r.from}</span>}
+          </p>
           {res.r.ok ? (
             <>
               {res.r.steps.length ? (
-                <ul>{res.r.steps.map((s) => <li key={s}>{s}</li>)}</ul>
+                <ul>
+                  {res.r.steps.map((s) => (
+                    <li key={s}>{s}</li>
+                  ))}
+                </ul>
               ) : (
                 <p className="sub">直す所はありませんでした。そのまま読み込めます。</p>
               )}
               <div className="row" style={{ marginTop: 8 }}>
-                <Button v="soft" onClick={add}>本棚に追加</Button>
-                <Button v="outline" sm onClick={() => res.r.ok && downloadBook(res.r.tb)}>直した JSON を書き出す</Button>
+                <Button v="soft" onClick={add}>
+                  本棚に追加
+                </Button>
+                <Button v="outline" sm onClick={() => res.r.ok && downloadBook(res.r.tb)}>
+                  直した JSON を書き出す
+                </Button>
               </div>
-              {older && <OlderCard older={older} onDone={() => { setOlder(null); go('shelf') }} />}
+              {older && (
+                <OlderCard
+                  older={older}
+                  onDone={() => {
+                    setOlder(null)
+                    go('shelf')
+                  }}
+                />
+              )}
             </>
           ) : (
             <>
               <p className="err">{res.r.reason}</p>
-              <p className="sub">直せませんでした。<a href="#help-contact">問い合わせ</a>からファイルを添えて知らせてください。</p>
+              <p className="sub">
+                直せませんでした。<a href="#help-contact">問い合わせ</a>からファイルを添えて知らせてください。
+              </p>
             </>
           )}
         </Card>
@@ -171,7 +204,11 @@ export function Help() {
         eyebrow="Help"
         title="困ったときに"
         lead="読み込めないときの対処、よくある質問、問い合わせ先です。"
-        actions={<Button v="ghost" onClick={() => go('shelf')}>本棚へ戻る</Button>}
+        actions={
+          <Button v="ghost" onClick={() => go('shelf')}>
+            本棚へ戻る
+          </Button>
+        }
       />
 
       <Card as="section" stack aria-labelledby="help-trouble">
@@ -202,10 +239,17 @@ export function Help() {
 
       <Card as="section" stack aria-labelledby="help-contact">
         <h2 id="help-contact">問い合わせ</h2>
-        <p className="sub">不具合や要望は GitHub の Issue で受け付けます（GitHub のアカウントが必要です）。下のリンクを開くと、書く項目が入った状態で新しい Issue が開きます。</p>
+        <p className="sub">
+          不具合や要望は GitHub の Issue で受け付けます（GitHub のアカウントが必要です）。下のリンクを開くと、書く項目が入った状態で新しい
+          Issue が開きます。
+        </p>
         <div className="row">
-          <a className="btn soft" href={issueUrl('bug', '不具合: ', BUG_BODY)} target="_blank" rel="noopener noreferrer">不具合を知らせる</a>
-          <a className="btn outline" href={issueUrl('enhancement', '要望: ', WISH_BODY)} target="_blank" rel="noopener noreferrer">要望を送る</a>
+          <a className="btn soft" href={issueUrl('bug', '不具合: ', BUG_BODY)} target="_blank" rel="noopener noreferrer">
+            不具合を知らせる
+          </a>
+          <a className="btn outline" href={issueUrl('enhancement', '要望: ', WISH_BODY)} target="_blank" rel="noopener noreferrer">
+            要望を送る
+          </a>
         </div>
         <p className="sub">知らせるときは、書き出した JSON（個人情報が無いか確かめてから）と画面の写真を添えると早く直せます。</p>
       </Card>

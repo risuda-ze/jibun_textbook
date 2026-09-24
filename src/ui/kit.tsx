@@ -54,11 +54,28 @@ type CardProps = HTMLAttributes<HTMLElement> & { tone?: CardTone; stack?: boolea
 
 export function Card({ tone = 'white', stack, as = 'section', className = '', ...rest }: CardProps) {
   const Tag = as
-  return <Tag className={`panel${tone !== 'white' ? ' tone-' + tone : ''}${stack ? ' stack' : ''}${className ? ' ' + className : ''}`} {...rest} />
+  return (
+    <Tag
+      className={`panel${tone !== 'white' ? ' tone-' + tone : ''}${stack ? ' stack' : ''}${className ? ' ' + className : ''}`}
+      {...rest}
+    />
+  )
 }
 
 /** ページの頭。小見出し・大見出し・リード文（明朝）・右側の操作。 */
-export function PageHead({ eyebrow, title, lead, actions, children }: { eyebrow?: ReactNode; title?: ReactNode; lead?: ReactNode; actions?: ReactNode; children?: ReactNode }) {
+export function PageHead({
+  eyebrow,
+  title,
+  lead,
+  actions,
+  children,
+}: {
+  eyebrow?: ReactNode
+  title?: ReactNode
+  lead?: ReactNode
+  actions?: ReactNode
+  children?: ReactNode
+}) {
   return (
     <div className="pagehead">
       <div>
@@ -73,10 +90,24 @@ export function PageHead({ eyebrow, title, lead, actions, children }: { eyebrow?
 }
 
 /** 切り替え（どれか1つを選ぶ）。 */
-export function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: [T, string][]; onChange: (v: T) => void }) {
+export function Segmented<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: T
+  options: [T, string][]
+  onChange: (v: T) => void
+}) {
   return (
     <div className="seg" role="group" aria-label={label}>
-      {options.map(([k, t]) => <button type="button" key={k} aria-pressed={value === k} onClick={() => onChange(k)}>{t}</button>)}
+      {options.map(([k, t]) => (
+        <button type="button" key={k} aria-pressed={value === k} onClick={() => onChange(k)}>
+          {t}
+        </button>
+      ))}
     </div>
   )
 }

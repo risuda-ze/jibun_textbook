@@ -6,8 +6,20 @@ vi.mock('idb-keyval', async (orig) => {
   const m = await orig<typeof import('idb-keyval')>()
   return {
     ...m,
-    set: async (k: IDBValidKey, v: unknown) => { if (fail.set > 0) { fail.set--; throw new Error('quota') } return m.set(k, v) },
-    del: async (k: IDBValidKey) => { if (fail.del > 0) { fail.del--; throw new Error('io') } return m.del(k) },
+    set: async (k: IDBValidKey, v: unknown) => {
+      if (fail.set > 0) {
+        fail.set--
+        throw new Error('quota')
+      }
+      return m.set(k, v)
+    },
+    del: async (k: IDBValidKey) => {
+      if (fail.del > 0) {
+        fail.del--
+        throw new Error('io')
+      }
+      return m.del(k)
+    },
   }
 })
 
@@ -21,7 +33,8 @@ const book = (title = 't') => newTextbook(title, { chapters: [newChapter('c', [n
 
 beforeEach(async () => {
   await clear()
-  fail.set = 0; fail.del = 0
+  fail.set = 0
+  fail.del = 0
   await init()
 })
 
@@ -40,41 +53,59 @@ describe('store（#80）', () => {
   })
   it('init: 設定が読めなくても教科書は本棚に出る', async () => {
     await set('tb:' + book('a').id, book('a'))
-    await set('settings', 1)  // 壊れた設定（get は成功するが形が違う）
+    await set('settings', 1) // 壊れた設定（get は成功するが形が違う）
     await init()
     expect(getStateForTest().books).toHaveLength(1)
     expect(getStateForTest().ai.kind).toBe('anthropic')
   })
   it('putBook: 書き込みに失敗したら、その教科書だけ元に戻す', async () => {
-    const a = book('a'); const b = book('b')
-    putBook(a); putBook(b); await tick()
-    fail.set = 1
-    updateBook(a.id, (d) => { d.title = 'a2' })
+    const a = book('a')
+    const b = book('b')
+    putBook(a)
+    putBook(b)
     await tick()
-    const titles = getStateForTest().books.map((x) => x.title).sort()
+    fail.set = 1
+    updateBook(a.id, (d) => {
+      d.title = 'a2'
+    })
+    await tick()
+    const titles = getStateForTest()
+      .books.map((x) => x.title)
+      .sort()
     expect(titles).toEqual(['a', 'b'])
     expect(getStateForTest().toast?.msg).toContain('保存できませんでした')
   })
   it('putBook: 1回目が失敗しても2回目が成功していれば2回目の内容が残る', async () => {
     const a = book('a')
-    putBook(a); await tick()
+    putBook(a)
+    await tick()
     fail.set = 1
-    updateBook(a.id, (d) => { d.title = 'a2' })   // 失敗する
-    updateBook(a.id, (d) => { d.title = 'a3' })   // 成功する
+    updateBook(a.id, (d) => {
+      d.title = 'a2'
+    }) // 失敗する
+    updateBook(a.id, (d) => {
+      d.title = 'a3'
+    }) // 成功する
     await tick()
     expect(getStateForTest().books.find((x) => x.id === a.id)?.title).toBe('a3')
     expect(((await get('tb:' + a.id)) as { title: string }).title).toBe('a3')
   })
   it('removeBook: 消せなかったら本棚に戻して知らせる。消せたら元に戻すで復活する', async () => {
-    const a = book('a'); const b = book('b')
-    putBook(a); putBook(b); await tick()
+    const a = book('a')
+    const b = book('b')
+    putBook(a)
+    putBook(b)
+    await tick()
     fail.del = 1
-    removeBook(a.id); await tick()
+    removeBook(a.id)
+    await tick()
     expect(getStateForTest().books.map((x) => x.id)).toContain(a.id)
     expect(getStateForTest().toast?.msg).toContain('消せませんでした')
-    removeBook(a.id); await tick()
+    removeBook(a.id)
+    await tick()
     expect(getStateForTest().books.map((x) => x.id)).not.toContain(a.id)
-    getStateForTest().toast?.undo?.(); await tick()
+    getStateForTest().toast?.undo?.()
+    await tick()
     expect(getStateForTest().books.map((x) => x.id)).toContain(a.id)
   })
   it('setDraft: 節ごとに下書きを持ち、空にすると消える', () => {

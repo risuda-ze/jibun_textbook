@@ -88,7 +88,10 @@ export const TextbookZ = z.object({
 export function findDuplicateIds(tb: Textbook): string[] {
   const seen = new Set<string>()
   const dup = new Set<string>()
-  const see = (id: string) => { if (seen.has(id)) dup.add(id); else seen.add(id) }
+  const see = (id: string) => {
+    if (seen.has(id)) dup.add(id)
+    else seen.add(id)
+  }
   see(tb.id)
   for (const c of tb.chapters) {
     see(c.id)
@@ -108,7 +111,10 @@ export function renumberDuplicateIds(tb: Textbook): { tb: Textbook; count: numbe
   const seen = new Set<string>()
   let count = 0
   const fix = <T extends { id: string }>(x: T): T => {
-    if (seen.has(x.id)) { count++; return { ...x, id: uid() } }
+    if (seen.has(x.id)) {
+      count++
+      return { ...x, id: uid() }
+    }
     seen.add(x.id)
     return x
   }
@@ -151,8 +157,18 @@ export function newBlock(by: Block['by'], md: string, extra: Partial<Block> = {}
 
 export function newLesson(title: string, extra: Partial<Lesson> = {}): Lesson {
   return {
-    id: uid(), title, minutes: 45, isTask: false, done: false, review: false, summary: '',
-    tasks: [], clues: { queries: [], links: [], how: [] }, blocks: [], materials: [], ...extra,
+    id: uid(),
+    title,
+    minutes: 45,
+    isTask: false,
+    done: false,
+    review: false,
+    summary: '',
+    tasks: [],
+    clues: { queries: [], links: [], how: [] },
+    blocks: [],
+    materials: [],
+    ...extra,
   }
 }
 
@@ -163,7 +179,14 @@ export function newChapter(title: string, lessons: Lesson[] = []): Chapter {
 export function newTextbook(title: string, extra: Partial<Textbook> = {}): Textbook {
   const t = nowIso()
   return {
-    schemaVersion: 1, id: uid(), title, goal: '', input: { prompt: '', can: '', time: '', env: '' },
-    createdAt: t, updatedAt: t, chapters: [], ...extra,
+    schemaVersion: 1,
+    id: uid(),
+    title,
+    goal: '',
+    input: { prompt: '', can: '', time: '', env: '' },
+    createdAt: t,
+    updatedAt: t,
+    chapters: [],
+    ...extra,
   }
 }

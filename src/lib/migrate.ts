@@ -13,9 +13,7 @@ export type Migration = (raw: Raw) => Raw
  */
 export const migrations: Record<number, Migration> = {}
 
-export type MigrateResult =
-  | { ok: true; tb: Textbook; from: number; steps: string[] }
-  | { ok: false; reason: string; from: number | null }
+export type MigrateResult = { ok: true; tb: Textbook; from: number; steps: string[] } | { ok: false; reason: string; from: number | null }
 
 const isObj = (x: unknown): x is Raw => !!x && typeof x === 'object' && !Array.isArray(x)
 const validIso = (x: unknown): x is string => typeof x === 'string' && !Number.isNaN(Date.parse(x))

@@ -29,17 +29,39 @@ export type State = {
 }
 
 let state: State = {
-  ready: false, books: [], bookId: null, lessonId: null, screen: 'shelf', ai: DEFAULT_AI, lastExport: {}, wide: false, drafts: {}, broken: [], repairTarget: null, toast: null,
+  ready: false,
+  books: [],
+  bookId: null,
+  lessonId: null,
+  screen: 'shelf',
+  ai: DEFAULT_AI,
+  lastExport: {},
+  wide: false,
+  drafts: {},
+  broken: [],
+  repairTarget: null,
+  toast: null,
 }
 const listeners = new Set<() => void>()
-const emit = () => listeners.forEach((l) => l())
-const setState = (p: Partial<State>) => { state = { ...state, ...p }; emit() }
+const emit = () => {
+  for (const l of listeners) l()
+}
+const setState = (p: Partial<State>) => {
+  state = { ...state, ...p }
+  emit()
+}
 
 /** テスト専用。画面は useApp() を使う */
 export const getStateForTest = (): State => state
 
 export function useApp(): State {
-  return useSyncExternalStore((cb) => { listeners.add(cb); return () => listeners.delete(cb) }, () => state)
+  return useSyncExternalStore(
+    (cb) => {
+      listeners.add(cb)
+      return () => listeners.delete(cb)
+    },
+    () => state,
+  )
 }
 
 const TB = 'tb:'
@@ -60,8 +82,14 @@ export async function init(): Promise<void> {
       // 版の移行と既知の不整合の修復は migrate() に寄せ、JSON 読込と同じ結果にする（#65）
       const r = migrate(raw)
       // 直せない教科書は黙って捨てず、本棚で知らせて生データを書き出すか Help で直せるようにする（#17）
-      if (!r.ok) { broken.push({ key: k, raw }); continue }
-      if (r.steps.length) { repaired++; await set(k, r.tb).catch(() => {}) }
+      if (!r.ok) {
+        broken.push({ key: k, raw })
+        continue
+      }
+      if (r.steps.length) {
+        repaired++
+        await set(k, r.tb).catch(() => {})
+      }
       books.push(r.tb)
     }
   } catch {
@@ -86,9 +114,16 @@ export async function init(): Promise<void> {
 
 /** 設定を端末に保存する。失敗を握りつぶさず、呼び元が知らせられるよう真偽を返す（#80） */
 const saveSettings = (): Promise<boolean> =>
-  set(SETTINGS, { ai: state.ai, lastExport: state.lastExport, wide: state.wide } satisfies Settings).then(() => true, () => false)
+  set(SETTINGS, { ai: state.ai, lastExport: state.lastExport, wide: state.wide } satisfies Settings).then(
+    () => true,
+    () => false,
+  )
 const SAVE_FAILED = '端末に保存できませんでした。空き容量を確認してください。'
-const warnIfFailed = (p: Promise<boolean>): Promise<boolean> => p.then((ok) => { if (!ok) toast(SAVE_FAILED); return ok })
+const warnIfFailed = (p: Promise<boolean>): Promise<boolean> =>
+  p.then((ok) => {
+    if (!ok) toast(SAVE_FAILED)
+    return ok
+  })
 
 let toastSeq = 0
 let toastTimer: ReturnType<typeof setTimeout> | undefined
@@ -96,7 +131,12 @@ export function toast(msg: string, undo?: () => void): void {
   clearTimeout(toastTimer)
   const t = { id: ++toastSeq, msg, undo }
   setState({ toast: t })
-  toastTimer = setTimeout(() => { if (state.toast?.id === t.id) setState({ toast: null }) }, undo ? 7000 : 2600)
+  toastTimer = setTimeout(
+    () => {
+      if (state.toast?.id === t.id) setState({ toast: null })
+    },
+    undo ? 7000 : 2600,
+  )
 }
 export const clearToast = () => setState({ toast: null })
 
@@ -116,7 +156,10 @@ export function openBook(id: string, screen: Screen = 'road'): void {
 }
 
 export const selectLesson = (lessonId: string): void => setState({ lessonId })
-export function openLesson(lessonId: string): void { setState({ lessonId, screen: 'lesson' }); window.scrollTo(0, 0) }
+export function openLesson(lessonId: string): void {
+  setState({ lessonId, screen: 'lesson' })
+  window.scrollTo(0, 0)
+}
 
 /** 教科書ごとの書き込みの連番。失敗した書き込みが最新かどうかを見る（#80） */
 const writeSeq = new Map<string, number>()
