@@ -1,3 +1,4 @@
+import { L } from './labels'
 import { useMemo, useState } from 'react'
 import { getProvider, type RedesignPlan, type RedesignScope, type Usage } from '../ai'
 import { applyChapterPlan, applyCoursePlan, applyLessonRegen, diffLessonRegen, diffTextbooks, DIFF_LABEL, type DiffRow } from '../lib/protect'
@@ -69,7 +70,7 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
       </div>
       <div className="row">
         <input type="text" id="redotext" value={order} onChange={(e) => setOrder(e.target.value)} placeholder="どう変えたいか（例: 理論は短く、実践を先に）" style={{ flex: '1 1 280px' }} />
-        <Button v="soft" disabled={p.busy} onClick={propose} progress={p.busy ? stepPercent(p.step, 1) : null}>{p.busy ? '案を作成中…' : plan ? '別の案を出す' : '変更案を出してもらう'}</Button>
+        <Button v="soft" disabled={p.busy} onClick={propose} progress={p.busy ? stepPercent(p.step, 1) : null}>{p.busy ? '案を作成中…' : plan ? '別の案を出す' : L.propose}</Button>
         {p.busy && <RunControls detail={p.detail} startedAt={p.startedAt} endedAt={p.endedAt} onStop={p.stop} />}
       </div>
       {p.error && <p className="err" role="alert">{p.error}</p>}
@@ -217,9 +218,9 @@ export function Roadmap({ tb }: { tb: Textbook }) {
             </div>
             <div className="row"><StatusChip lesson={sel.lesson} /></div>
             <p className="sub">{sel.lesson.summary || (sel.lesson.blocks.length ? '本文あり。' : 'まだ資料がありません。AIに生成させるか、自分で書き始めてください。')}</p>
-            <GenerateControls g={g} lessonId={sel.lesson.id} label="この節の資料を生成" show={sel.lesson.blocks.length === 0} onDone={() => openLesson(sel.lesson.id)}
+            <GenerateControls g={g} lessonId={sel.lesson.id} label={L.generateLesson} show={sel.lesson.blocks.length === 0} onDone={() => openLesson(sel.lesson.id)}
               actions={<>
-                <Button v={sel.lesson.blocks.length ? 'soft' : 'ghost'} onClick={() => openLesson(sel.lesson.id)}>{sel.lesson.blocks.length ? 'レッスンを開く' : '自分で書き始める'}</Button>
+                <Button v={sel.lesson.blocks.length ? 'soft' : 'ghost'} onClick={() => openLesson(sel.lesson.id)}>{sel.lesson.blocks.length ? 'レッスンを開く' : L.startWriting}</Button>
                 <Button v="outline" sm onClick={() => removeLesson(sel.lesson.id)}>この節を消す</Button>
               </>} />
             <div><div className="sub" style={{ marginBottom: 4 }}>教科書の育ち具合</div><Meter tb={tb} /></div>

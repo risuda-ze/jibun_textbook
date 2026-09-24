@@ -1,3 +1,4 @@
+import { L } from './labels'
 import { useEffect, useRef, useState } from 'react'
 import { htmlToMd, mdToHtml, toggleTask } from '../lib/md'
 import { shrinkImage } from '../lib/image'
@@ -200,7 +201,7 @@ export function Composer({ draft, onChange, onSubmit }: { draft: NoteDraft; onCh
         <Button v="outline" sm onClick={() => file.current?.click()}>画像を入れる</Button>
         <Button v="outline" sm onClick={() => setPad(true)}>図を描く</Button>
         <input type="text" id="src" value={source} onChange={(e) => set({ source: e.target.value })} placeholder="出典URL（任意）" style={{ flex: '1 1 180px' }} />
-        <Button v="primary" onClick={submit}>書き込む</Button>
+        <Button v="primary" onClick={submit}>{L.write}</Button>
       </div>
     </div>
   )

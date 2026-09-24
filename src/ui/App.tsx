@@ -5,11 +5,12 @@ import { Roadmap } from "./Roadmap";
 import { LessonPage } from "./LessonPage";
 import { Book } from "./Book";
 import { Help } from "./Help";
+import { L } from "./labels";
 
 const TABS: [Screen, string, boolean][] = [
     ["shelf", "本棚", false],
     ["new", "つくる", false],
-    ["road", "ロードマップ", true],
+    ["road", L.roadmap, true],
     ["lesson", "レッスン", true],
     ["book", "教科書", true],
 ];

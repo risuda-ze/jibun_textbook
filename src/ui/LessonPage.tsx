@@ -1,3 +1,4 @@
+import { L } from './labels'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { allLessons, findLesson, lessonNo, minePercent } from '../lib/status'
 import { go, openLesson, putBook, setDraft as storeDraft, setWide, snapshot, toast, updateLesson, useApp } from '../store'
@@ -118,7 +119,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
         <div className="row">
           {/* 表示領域の切り替え（#53）。スマホ幅では CSS で隠す（元から1列で画面いっぱい） */}
           <Button v="ghost" className="widebtn" aria-pressed={wide} onClick={() => setWide(!wide)}>{wide ? '幅を戻す' : '広げる'}</Button>
-          <Button v="ghost" onClick={() => go('road')}>ロードマップ</Button>
+          <Button v="ghost" onClick={() => go('road')}>{L.roadmap}</Button>
           {next && <Button v="ghost" onClick={() => openLesson(next.id)}>次へ {lessonNo(tb, next.id)}</Button>}
         </div>
       </div>
@@ -128,7 +129,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
           {l.blocks.length === 0 && (
             <Card stack>
               <p>この節はまだ資料がありません。AIに下書きを作らせるか、下の欄から自分で書き始めてください。</p>
-              <GenerateControls g={g} lessonId={l.id} label="資料を生成"
+              <GenerateControls g={g} lessonId={l.id} label={L.generate}
                 note={<span className="sub">使うAI: {ai.kind === 'anthropic' ? ai.model : ai.kind === 'demo' ? 'デモ応答' : '未対応の接続先'}（「つくる」画面で切り替え）</span>} />
             </Card>
           )}

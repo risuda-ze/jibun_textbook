@@ -1,3 +1,4 @@
+import { L } from '../src/ui/labels'
 import { expect, test } from '@playwright/test'
 
 // #65: 版の移行と不整合の修復。Help の「読み込めない場合、まずはこちら」で試せる。JSON 読込でも自動で直る
@@ -9,7 +10,7 @@ const file = (name: string, obj: unknown) => ({ name, mimeType: 'application/jso
 
 test('Help で id が重複した JSON を選ぶと、直した所が見えて本棚に追加できる', async ({ page }) => {
   await page.goto('./')
-  await page.getByRole('button', { name: 'Help' }).click()
+  await page.getByRole('button', { name: L.help }).click()
   await page.locator('#repairfile').setInputFiles(file('dup.textbook.json', DUP))
   const result = page.getByLabel('直した結果')
   await expect(result).toContainText('dup.textbook.json')
@@ -19,18 +20,18 @@ test('Help で id が重複した JSON を選ぶと、直した所が見えて�
   await expect(page.getByRole('status')).toContainText('直した所')
 
   // 同じ本の古いファイルを Help から入れようとすると、本棚と同じ確認が出る（#78）
-  await page.getByRole('button', { name: 'Help' }).click()
+  await page.getByRole('button', { name: L.help }).click()
   await page.locator('#repairfile').setInputFiles(file('old.textbook.json', { ...DUP, updatedAt: '2025-01-01T00:00:00.000Z', chapters: [{ id: 'c1', title: '第1章', lessons: [{ id: 'l1', title: '節1' }] }] }))
   await page.getByLabel('直した結果').getByRole('button', { name: '本棚に追加' }).click()
   const dialog = page.getByRole('alertdialog')
   await expect(dialog).toContainText('読み込もうとしたファイルの方が古いです')
-  await dialog.getByRole('button', { name: 'やめる' }).click()
+  await dialog.getByRole('button', { name: L.stop }).click()
   await expect(page.getByRole('heading', { name: '直す本' })).toBeVisible()
 })
 
 test('直せない JSON は理由と問い合わせへの導線が出る', async ({ page }) => {
   await page.goto('./')
-  await page.getByRole('button', { name: 'Help' }).click()
+  await page.getByRole('button', { name: L.help }).click()
   await page.locator('#repairfile').setInputFiles(file('future.textbook.json', { ...DUP, schemaVersion: 99 }))
   const result = page.getByLabel('直した結果')
   await expect(result).toContainText('schemaVersion: 99')
