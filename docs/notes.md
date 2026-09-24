@@ -218,3 +218,10 @@ zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても
 | `anthropic-*.js`（AI を使うときだけ） | （初回に含む） | 197.70 kB / 52.45 kB |
 
 - 初回表示の gzip は **183 → 131 kB（−29%）**。`index-*.js` に `anthropic-version` / `dangerouslyAllowBrowser` / `api.anthropic.com` の文字列が無いことを grep で確認
+
+## 2026-09-24 の判断（#13・画像の説明）
+
+- 保存済みの画像の説明は、画像を `<button class="imgbtn">` で包んでクリック（と Enter）で入力欄を開く。`<img onClick>` だとキーボードで開けないため。通読（`read`）では包まない
+- 入力欄の `NoteDraft.images` は `{ dataUrl, alt }[]` にした。下書きは端末に保存しないので移行は無い
+- `figcaption` は `alt` が空なら出さない。`<img alt>` は空なら従来どおり「自分で入れた画像」
+

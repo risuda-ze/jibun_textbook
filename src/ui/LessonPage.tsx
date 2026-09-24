@@ -191,7 +191,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
       const b = newBlock('me', n.md.trim(), {
         source: n.source.trim(),
         quote: n.quote,
-        images: n.images.map((dataUrl) => ({ id: uid(), dataUrl, alt: '' })),
+        images: n.images.map((im) => ({ id: uid(), ...im })),
       })
       d.blocks.splice(insAt ?? d.blocks.length, 0, b)
     })
@@ -304,6 +304,12 @@ export function LessonPage({ tb }: { tb: Textbook }) {
                         if (x) x.images = x.images.filter((im) => im.id !== imgId)
                       }),
                     )
+                  }
+                  onAlt={(imgId, alt) =>
+                    updateLesson(tb.id, l.id, (d) => {
+                      const im = d.blocks.find((y) => y.id === b.id)?.images.find((y) => y.id === imgId)
+                      if (im) im.alt = alt
+                    })
                   }
                 />
               </Fragment>
