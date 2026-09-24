@@ -8,7 +8,7 @@ import { SIZE_WARN_BYTES, byteSize, exportJson, fileName, formatSize } from '../
 import { downloadText } from '../lib/download'
 import type { AiError, Progress, Usage } from '../ai/types'
 import { useEffect, useRef, useState, type InputHTMLAttributes } from 'react'
-import { Button, Card, Pill, Segmented } from './kit'
+import { Button, Card, Pill, Segmented, type Busy } from './kit'
 
 export function StatusChip({ lesson }: { lesson: Lesson }) {
   const s = lessonStatus(lesson)
@@ -142,27 +142,12 @@ export function useElapsed(running: boolean, startedAt: number | null, endedAt: 
 /** ボタンの塗りに使う進み具合（%）。段階が終わった分だけ進む（3段階なら 0 / 33 / 67 / 100） */
 export const stepPercent = (step: number, total: number): number => Math.round((Math.max(0, Math.min(step, total)) / total) * 100)
 
-/** 進行中の一言。今していること（検索語など）と経過秒数。ボタンの脇に置く */
-export function Working({
-  running,
-  detail,
-  startedAt,
-  endedAt,
-}: {
-  running: boolean
-  detail: string
-  startedAt: number | null
-  endedAt: number | null
-}) {
-  const sec = useElapsed(running, startedAt, endedAt)
-  if (!running) return null
-  return (
-    <span className="sub working" role="status">
-      {detail || '実行中…'}
-      {sec !== null && <span className="mono">・{sec}秒</span>}
-    </span>
-  )
-}
+/**
+ * 進行中の文を「ボタンに出す現状」と「補足」に分ける（#77）。
+ * 調査中の検索語（`検索: …`）は長くてボタンに収まらないので、段階の文は残したまま hint（ボタンの title）に入れる
+ */
+export const splitDetail = (cur: { detail: string; hint: string }, d: string): { detail: string; hint: string } =>
+  d.startsWith('検索: ') ? { detail: cur.detail, hint: d } : { detail: d, hint: '' }
 
 export function Steps({ labels, step, detail }: { labels: string[]; step: number; detail: string }) {
   return (
@@ -272,51 +257,40 @@ export function UsageLine({ usage }: { usage: Usage | null }) {
   )
 }
 
-/** 進行中の表示（今していること・経過秒数）と「やめる」（#14）。進行中のボタンの脇に置く */
-export function RunControls({
-  detail,
-  startedAt,
-  endedAt,
-  onStop,
-}: {
-  detail: string
-  startedAt: number | null
-  endedAt: number | null
-  onStop: () => void
-}) {
+/** 「やめる」（#14）。進行中のボタンの脇に置く。今していることと経過秒数はボタンの中に出る（#77） */
+export function StopButton({ onStop }: { onStop: () => void }) {
   return (
-    <>
-      <Working running detail={detail} startedAt={startedAt} endedAt={endedAt} />
-      <Button v="outline" sm onClick={onStop}>
-        {L.stop}
-      </Button>
-    </>
+    <Button v="outline" sm onClick={onStop}>
+      {L.stop}
+    </Button>
   )
 }
 
 /**
  * AI の作業を1回走らせる（#82）。busy・段階・今していること・経過時間・エラー・中止をまとめて持つ。
- * つくる（設計）と、ロードマップの「設計を直す」で使う。自分でやめたときはエラーにせず短く知らせる（#14）
+ * つくる（設計）と、ロードマップの「設計を直す」で使う。自分でやめたときはエラーにせず短く知らせる（#14）。
+ * `working` はそのままボタンの `busy` に渡す（#77）
  */
 export function useAiRun() {
   const [busy, setBusy] = useState(false)
   const [step, setStep] = useState(-1)
-  const [detail, setDetail] = useState('')
+  const [text, setText] = useState({ detail: '', hint: '' })
   const [startedAt, setStartedAt] = useState<number | null>(null)
   const [endedAt, setEndedAt] = useState<number | null>(null)
   const [error, setError] = useState('')
   const abort = useAbort()
+  const seconds = useElapsed(busy, startedAt, endedAt)
   async function run<T>(fn: (progress: Progress, signal: AbortSignal) => Promise<T>, doneStep?: number): Promise<T | null> {
     setBusy(true)
     setError('')
     setStep(0)
-    setDetail('')
+    setText({ detail: '', hint: '' })
     setStartedAt(Date.now())
     setEndedAt(null)
     try {
       const r = await fn((s, d) => {
         setStep(s)
-        setDetail(d)
+        setText((cur) => splitDetail(cur, d))
       }, abort.start())
       if (doneStep !== undefined) setStep(doneStep)
       return r
@@ -330,5 +304,6 @@ export function useAiRun() {
       setBusy(false)
     }
   }
-  return { busy, step, detail, startedAt, endedAt, error, setError, run, stop: abort.stop }
+  const working: Busy | null = busy ? { label: text.detail, seconds, title: text.hint } : null
+  return { busy, step, detail: text.detail, hint: text.hint, working, error, setError, run, stop: abort.stop }
 }

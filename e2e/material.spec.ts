@@ -1,6 +1,6 @@
 import { L } from '../src/ui/labels'
 import { expect, test } from '@playwright/test'
-import { demoBook } from './helpers'
+import { busyButton, demoBook } from './helpers'
 
 // #63: 資料をひとつ渡して節の資料を生成する（ファイル1つ／貼り付け・「この資料だけから作る」）
 const md = (name: string, body: string) => ({ name, mimeType: 'text/markdown', buffer: Buffer.from(body) })
@@ -54,5 +54,5 @@ test('渡せない種類や大きすぎるファイルは理由つきで断る',
   await expect(page.getByRole('alert').filter({ hasText: '貼り付けた文' })).toContainText('大きすぎて')
   await page.getByRole('button', { name: L.generateLesson }).click()
   await expect(page.locator('.toast')).toContainText('貼り付けた文は大きすぎて')
-  await expect(page.getByRole('button', { name: L.generating })).toHaveCount(0)
+  await expect(busyButton(page)).toHaveCount(0)
 })

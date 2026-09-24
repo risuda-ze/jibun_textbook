@@ -1,7 +1,7 @@
 import { L } from '../src/ui/labels'
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
-import { PNG, blankBook, demoBook, isPhone, writeNote } from './helpers'
+import { PNG, blankBook, busyButton, demoBook, isPhone, writeNote } from './helpers'
 
 test('完了条件1: 自由入力 → 確認質問 → 設計案 → ロードマップに並ぶ', async ({ page }) => {
   await demoBook(page)
@@ -298,11 +298,11 @@ test('AI の作業中は押したボタンが進行中の色になり、終わ�
   await page.locator('#goal').fill('ゲージの確認')
   await page.getByRole('button', { name: L.design }).click()
   await page.getByRole('button', { name: 'スキップ' }).click()
-  // 設計を作っている間、上のボタンが進行中（灰色→青で塗られる）
-  const making = page.getByRole('button', { name: '設計しています…' })
+  // 設計を作っている間、上のボタンが進行中（灰色→青で塗られる）。今していることと秒数はボタンの中に出る（#77）
+  const making = busyButton(page)
   await expect(making).toHaveClass(/gauge/)
-  await expect(making).toHaveAttribute('aria-busy', 'true')
-  await expect(page.getByRole('status')).toContainText(/秒/)
+  await expect(making.getByRole('status')).toContainText(/中…・\d+秒$/)
+  await expect(page.locator('.working')).toHaveCount(1)
   await expect(page.getByText('Step 2 コース設計案')).toBeVisible()
   // 終わると元に戻る
   const again = page.getByRole('button', { name: 'もう一度調べ直す' })
@@ -312,8 +312,9 @@ test('AI の作業中は押したボタンが進行中の色になり、終わ�
   // 設計を直してもらう: そのボタンが進行中になり、一覧が薄くなる
   await page.locator('#tweak').fill('実践を先に')
   await page.getByRole('button', { name: '設計を直してもらう' }).click()
-  const redoing = page.getByRole('button', { name: '直しています…' })
+  const redoing = busyButton(page)
   await expect(redoing).toHaveClass(/gauge/)
+  await expect(redoing).toContainText(/秒/)
   await expect(page.locator('.outline.dim')).toBeVisible()
   await expect(page.getByRole('button', { name: '設計を直してもらう' })).not.toHaveClass(/gauge/)
   await expect(page.locator('.outline.dim')).toHaveCount(0)
@@ -323,7 +324,8 @@ test('AI の作業中は押したボタンが進行中の色になり、終わ�
   await page.getByRole('button', { name: '設計を直す' }).click()
   const redo = page.getByLabel('設計を直す', { exact: true })
   await redo.getByRole('button', { name: L.propose }).click()
-  await expect(redo.getByRole('button', { name: '案を作成中…' })).toHaveClass(/gauge/)
+  // 1段階だけ（デモは 200ms）なので、進行中の印と中の文を1回の待ちで確かめる
+  await expect(redo.locator('button[aria-busy="true"].gauge')).toContainText('案を作成中…')
   await expect(redo.getByRole('button', { name: '別の案を出す' })).not.toHaveClass(/gauge/)
 })
 
