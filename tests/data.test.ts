@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   TextbookZ,
+  clearLesson,
   findDuplicateIds,
   newBlock,
   newChapter,
@@ -158,5 +159,35 @@ describe('id の一意性（#36）', () => {
     const { tb, count } = renumberDuplicateIds(src)
     expect(count).toBe(0)
     expect(tb).toEqual(src)
+  })
+})
+
+describe('資料を消す（#104）', () => {
+  it('本文・手を動かす・参考情報・資料の名前・完了と再確認の印が消え、id・題名・時間・課題の節か・狙いは残る', () => {
+    const l = newLesson('節', {
+      minutes: 30,
+      isTask: true,
+      summary: '狙い',
+      done: true,
+      review: true,
+      tasks: [{ text: 'やる', checked: true }],
+      clues: { queries: ['q'], links: [{ title: 'A', url: 'https://a.example/', fetchedAt: '' }], how: ['h'] },
+      blocks: [newBlock('ai', '下書き'), newBlock('me', '自分のノート')],
+      materials: ['notes.md'],
+    })
+    const c = clearLesson(l)
+    expect(c).toEqual({
+      ...l,
+      blocks: [],
+      tasks: [],
+      clues: { queries: [], links: [], how: [] },
+      materials: [],
+      done: false,
+      review: false,
+    })
+    expect([c.id, c.title, c.minutes, c.isTask, c.summary]).toEqual([l.id, '節', 30, true, '狙い'])
+    // 元の節は変えない
+    expect(l.blocks).toHaveLength(2)
+    expect(l.done).toBe(true)
   })
 })

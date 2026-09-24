@@ -1,9 +1,9 @@
 import { L } from './labels'
-import type { Lesson, Textbook } from '../types'
+import { clearLesson, type Lesson, type Textbook } from '../types'
 import { STATUS_LABEL, lessonStatus, statusCounts, type Status } from '../lib/status'
 import { MODELS, type AiKind } from '../ai/types'
 import { WEB_SEARCH_USD_PER_1000 } from '../ai/anthropic'
-import { markExported, setAi, toast, useApp } from '../store'
+import { markExported, putBook, setAi, snapshot, toast, updateLesson, useApp } from '../store'
 import { SIZE_WARN_BYTES, byteSize, exportJson, fileName, formatSize } from '../lib/io'
 import { downloadText } from '../lib/download'
 import type { AiError, Progress, Usage } from '../ai/types'
@@ -18,6 +18,14 @@ export function StatusChip({ lesson }: { lesson: Lesson }) {
       {lesson.review && <Pill tone="review">再確認</Pill>}
     </>
   )
+}
+
+/** 「資料を消す」（#104）。確認のあと節の資料をまっさらにし、元に戻せる知らせを出す。ロードマップとレッスンで共用 */
+export function clearLessonWithUndo(tb: Textbook, lessonId: string): void {
+  if (!window.confirm('この節の資料をすべて消します。自分のノートも消えます。')) return
+  const before = snapshot(tb.id)
+  updateLesson(tb.id, lessonId, (l) => Object.assign(l, clearLesson(l)))
+  toast('資料を消しました', before ? () => putBook(before) : undefined)
 }
 
 const METER_COLOR: Record<Status, string> = { done: 'var(--st-done)', me: 'var(--st-me)', ai: 'var(--st-ai)', none: 'transparent' }
