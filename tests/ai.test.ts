@@ -144,9 +144,14 @@ describe('調査（1段目）', () => {
 
 describe('構造化（2段目）', () => {
   it('ツールを付けず、output_config.format を付ける', async () => {
-    const { client, calls } = fake([], [{ parsed_output: { questions: ['a', 'b', 'c', 'd'] }, stop_reason: 'end_turn' }])
-    const qs = await new AnthropicProvider(settings, client).askQuestions({ prompt: 'Rust', can: '', time: '', env: '' })
-    expect(qs).toEqual(['a', 'b', 'c'])
+    const { client, calls } = fake(
+      [],
+      [{ parsed_output: { questions: ['a', 'b', 'c', 'd'] }, stop_reason: 'end_turn', usage: { input_tokens: 10, output_tokens: 3 } }],
+    )
+    const r = await new AnthropicProvider(settings, client).askQuestions({ prompt: 'Rust', can: '', time: '', env: '' })
+    expect(r.questions).toEqual(['a', 'b', 'c'])
+    // 使った量も返す（#88）
+    expect(r.usage).toEqual({ inputTokens: 10, outputTokens: 3, searches: 0 })
     expect(calls.parse[0].tools).toBeUndefined()
     expect((calls.parse[0].output_config as { format: unknown }).format).toBeTruthy()
     expect(calls.parse[0].model).toBe('claude-sonnet-5')
@@ -303,6 +308,20 @@ describe('生成の中止（#14）', () => {
     const c = new AbortController()
     const p = new DemoProvider().generateLesson(tb, lessonId, () => {}, { signal: c.signal })
     c.abort()
+    await expect(p).rejects.toMatchObject({ code: 'aborted' })
+  })
+  it('確認質問も signal で中止できる（#88）', async () => {
+    const input = { prompt: 'x', can: '', time: '', env: '' }
+    const { client, calls } = fake([], [])
+    const c = new AbortController()
+    c.abort()
+    await expect(new AnthropicProvider(settings, client).askQuestions(input, { signal: c.signal })).rejects.toMatchObject({
+      code: 'aborted',
+    })
+    expect(calls.parse).toHaveLength(0)
+    const d = new AbortController()
+    const p = new DemoProvider().askQuestions(input, { signal: d.signal })
+    d.abort()
     await expect(p).rejects.toMatchObject({ code: 'aborted' })
   })
 })

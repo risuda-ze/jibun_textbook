@@ -1,6 +1,6 @@
 import { L } from '../src/ui/labels'
 import { expect, test } from '@playwright/test'
-import { busyButton, demoBook } from './helpers'
+import { busyButton, demoBook, nav } from './helpers'
 
 // #63: 資料をひとつ渡して節の資料を生成する（ファイル1つ／貼り付け・「この資料だけから作る」）
 const md = (name: string, body: string) => ({ name, mimeType: 'text/markdown', buffer: Buffer.from(body) })
@@ -21,8 +21,7 @@ test('レッスン: ファイルを渡して「この資料だけから作る」
   // JSON には資料の本文は入らない（名前だけ）
   const [dl] = await Promise.all([
     page.waitForEvent('download'),
-    page
-      .getByRole('tab', { name: /本棚/ })
+    nav(page, /本棚/)
       .click()
       .then(() => page.getByRole('button', { name: 'JSON書出' }).first().click()),
   ])
