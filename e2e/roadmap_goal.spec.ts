@@ -1,6 +1,6 @@
 import { L } from '../src/ui/labels'
 import { expect, test } from '@playwright/test'
-import { demoBook } from './helpers'
+import { demoBook, nav } from './helpers'
 
 test('コースと節の狙いをロードマップで書き換えられ、保存され、資料の生成に入る（#103）', async ({ page }) => {
   await demoBook(page)
@@ -14,7 +14,7 @@ test('コースと節の狙いをロードマップで書き換えられ、保�
   await summary.blur()
 
   // 本棚にも出る（状態に入った）。再読み込みしても残る（IndexedDB に入った）
-  await page.getByRole('tab', { name: /本棚/ }).click()
+  await nav(page, /本棚/).click()
   await expect(page.getByText('自分の道具を自分で直せるようになる')).toBeVisible()
   await page.reload()
   await page.getByRole('button', { name: '開く' }).click()

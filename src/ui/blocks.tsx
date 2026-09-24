@@ -33,7 +33,22 @@ export function Editable({ md, onCommit }: { md: string; onCommit: (md: string) 
         if (files.some((f) => f.type.startsWith('image/')))
           return toast('本文には画像を貼れません。ノートの「画像を入れる」を使ってください')
         const text = e.clipboardData.getData('text/plain')
-        if (text) document.execCommand('insertText', false, text)
+        const sel = getSelection()
+        if (!text || !sel?.rangeCount || !e.currentTarget.contains(sel.getRangeAt(0).startContainer)) return
+        // execCommand('insertText') は非推奨なので Range で差し込む（#88）。改行は <br>（marked の breaks と往復が合う）。カレットは差し込んだ文の直後
+        const range = sel.getRangeAt(0)
+        range.deleteContents()
+        const frag = document.createDocumentFragment()
+        text.split(/\r?\n/).forEach((line, i) => {
+          if (i) frag.appendChild(document.createElement('br'))
+          frag.appendChild(document.createTextNode(line))
+        })
+        const last = frag.lastChild as Node
+        range.insertNode(frag)
+        range.setStartAfter(last)
+        range.collapse(true)
+        sel.removeAllRanges()
+        sel.addRange(range)
       }}
       onFocus={(e) => {
         before.current = e.currentTarget.innerHTML

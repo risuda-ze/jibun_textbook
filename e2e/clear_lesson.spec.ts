@@ -25,7 +25,7 @@ test('資料を消す → 元に戻す → ロードマップからも消して�
   await expect(page.getByRole('button', { name: L.generate })).toHaveCount(0)
 
   // ロードマップの「選択中の節」からも消せて、そのまま生成し直せる
-  await page.getByRole('button', { name: L.roadmap, exact: true }).click()
+  await page.getByRole('main').getByRole('button', { name: L.roadmap, exact: true }).click()
   await page.getByRole('button', { name: L.clearLesson }).click()
   await expect(page.getByRole('button', { name: L.generateLesson })).toBeVisible()
   await expect(page.getByRole('button', { name: L.clearLesson })).toHaveCount(0)

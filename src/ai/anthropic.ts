@@ -194,14 +194,16 @@ export class AnthropicProvider implements AiProvider {
     }
   }
 
-  async askQuestions(input: CourseInput): Promise<string[]> {
+  async askQuestions(input: CourseInput, opts: AiOpts = {}) {
+    const usage = zeroUsage()
     const r = await this.structure(
       SYS,
       `${describeInput(input)}\n\nこの人に合うコースを設計する前に確かめたいことを、2〜3個の質問にする。答えが設計を変える質問だけにする。分野に合わせて具体的に聞く。`,
       z.object({ questions: z.array(z.string()) }),
-      zeroUsage(),
+      usage,
+      opts.signal,
     )
-    return r.questions.slice(0, 3)
+    return { questions: r.questions.slice(0, 3), usage }
   }
 
   async designCourse(input: CourseInput, qa: QA[], note: string, onProgress: Progress, opts: AiOpts = {}) {

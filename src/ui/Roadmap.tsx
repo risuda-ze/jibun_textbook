@@ -292,7 +292,7 @@ export function Roadmap({ tb }: { tb: Textbook }) {
       </div>
 
       {/* PC幅: タイムライン */}
-      <div className="tl" tabIndex={0} aria-label="ロードマップのタイムライン">
+      <div className="tl" tabIndex={0} role="region" aria-label="ロードマップのタイムライン">
         <div className="tl-inner">
           <div className="tl-row tl-ruler">
             <div className="tl-label">3時間ごと</div>
@@ -311,20 +311,24 @@ export function Roadmap({ tb }: { tb: Textbook }) {
                 {c.title}
               </div>
               <div className="tl-lane" style={{ width: W }}>
-                {clips.map(({ l, left }, li) => (
-                  <button
-                    type="button"
-                    key={l.id}
-                    className={`clip ${lessonStatus(l)} ${l.isTask ? 'task' : ''}`}
-                    style={{ left: left * PXMIN, width: Math.max(20, l.minutes) * PXMIN - 3 }}
-                    aria-pressed={sel?.lesson.id === l.id}
-                    title={`${ci + 1}-${li + 1} ${l.title}（${l.minutes}分・${STATUS_LABEL[lessonStatus(l)]}）`}
-                    onClick={() => selectLesson(l.id)}
-                  >
-                    {ci + 1}-{li + 1} {l.title}
-                    {l.review && <span className="flagdot" aria-label="再確認" />}
-                  </button>
-                ))}
+                {clips.map(({ l, left }, li) => {
+                  const title = `${ci + 1}-${li + 1} ${l.title}（${l.minutes}分・${STATUS_LABEL[lessonStatus(l)]}）`
+                  return (
+                    <button
+                      type="button"
+                      key={l.id}
+                      className={`clip ${lessonStatus(l)} ${l.isTask ? 'task' : ''}`}
+                      style={{ left: left * PXMIN, width: Math.max(20, l.minutes) * PXMIN - 3 }}
+                      aria-pressed={sel?.lesson.id === l.id}
+                      title={title}
+                      aria-label={title}
+                      onClick={() => selectLesson(l.id)}
+                    >
+                      {ci + 1}-{li + 1} {l.title}
+                      {l.review && <span className="flagdot" aria-label="再確認" />}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           ))}

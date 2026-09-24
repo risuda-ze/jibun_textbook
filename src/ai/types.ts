@@ -75,7 +75,7 @@ export type RedesignPlan =
   | { scope: 'course'; chapters: PlanChapter[] }
 
 export interface AiProvider {
-  askQuestions(input: CourseInput, opts?: AiOpts): Promise<string[]>
+  askQuestions(input: CourseInput, opts?: AiOpts): Promise<{ questions: string[]; usage: Usage }>
   designCourse(
     input: CourseInput,
     qa: QA[],

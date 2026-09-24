@@ -48,9 +48,15 @@ const wait = (ms = DEMO_DELAY_MS, signal?: AbortSignal) =>
 const topicOf = (i: CourseInput): string => (i.prompt.trim().split(/[。\n、,.]/)[0] || '学びたいこと').slice(0, 24)
 
 export class DemoProvider implements AiProvider {
-  async askQuestions(): Promise<string[]> {
-    await wait()
-    return ['「できるようになった」と言えるのはどんな状態？ 成果物の例があると設計しやすい。', '好きな学び方、避けたい学び方はある？']
+  async askQuestions(_input: CourseInput, opts: AiOpts = {}) {
+    await wait(DEMO_DELAY_MS, opts.signal)
+    return {
+      questions: [
+        '「できるようになった」と言えるのはどんな状態？ 成果物の例があると設計しやすい。',
+        '好きな学び方、避けたい学び方はある？',
+      ],
+      usage: zeroUsage(),
+    }
   }
 
   async designCourse(input: CourseInput, _qa: QA[], note: string, onProgress: Progress, opts: AiOpts = {}) {
