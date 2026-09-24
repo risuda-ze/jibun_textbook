@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { allLessons, isMine, reviewCount } from '../lib/status'
-import { openLesson, setWide, updateLesson, useApp } from '../store'
+import { openLesson, setWide, useApp } from '../store'
 import type { Block, Lesson, Textbook } from '../types'
 import { BlockRow } from './blocks'
-import { downloadBook } from './common'
+import { downloadBook, patchBlock } from './common'
 import { Button, PageHead, Pill, Segmented } from './kit'
 
 type Filter = 'all' | 'me' | 'review'
@@ -89,9 +89,8 @@ export function Book({ tb }: { tb: Textbook }) {
                     block={b}
                     read
                     onCheck={(md) =>
-                      updateLesson(tb.id, l.id, (d) => {
-                        const x = d.blocks.find((y) => y.id === b.id)
-                        if (x) x.md = md
+                      patchBlock(tb.id, l.id, b.id, (x) => {
+                        x.md = md
                       })
                     }
                   />

@@ -9,7 +9,7 @@ import type { Block, NoteDraft } from '../types'
 import { Button } from './kit'
 
 /** 見たまま編集。表示は md→HTML、フォーカスが外れた時に変更があれば HTML→md で確定する。 */
-export function Editable({ md, onCommit }: { md: string; onCommit: (md: string) => void }) {
+function Editable({ md, onCommit }: { md: string; onCommit: (md: string) => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const before = useRef('')
   useEffect(() => {
@@ -201,7 +201,7 @@ const PENS: [string, string][] = [
   ['#ffffff', '消しゴム'],
 ]
 
-export function DrawPad({ onSave, onClose }: { onSave: (dataUrl: string) => void; onClose: () => void }) {
+function DrawPad({ onSave, onClose }: { onSave: (dataUrl: string) => void; onClose: () => void }) {
   const cv = useRef<HTMLCanvasElement>(null)
   const [pen, setPen] = useState(PENS[0][0])
   const drawing = useRef(false)

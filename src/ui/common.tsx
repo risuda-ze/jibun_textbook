@@ -1,11 +1,10 @@
 import { L } from './labels'
-import { clearLesson, type Lesson, type Textbook } from '../types'
+import { clearLesson, type Block, type Lesson, type Textbook } from '../types'
 import { STATUS_LABEL, lessonStatus, statusCounts, type Status } from '../lib/status'
-import { MODELS, WEB_SEARCH_USD_PER_1000, type AiKind } from '../ai/types'
+import { MODELS, PROGRESS, WEB_SEARCH_USD_PER_1000, type AiError, type AiKind, type Progress, type Usage } from '../ai/types'
 import { markExported, putBook, setAi, snapshot, toast, updateLesson, useApp } from '../store'
 import { SIZE_WARN_BYTES, byteSize, exportJson, fileName, formatSize } from '../lib/io'
 import { downloadText } from '../lib/download'
-import { PROGRESS, type AiError, type Progress, type Usage } from '../ai/types'
 import { useEffect, useRef, useState, type InputHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 import { Button, Card, Pill, Segmented, type Busy } from './kit'
 
@@ -19,12 +18,24 @@ export function StatusChip({ lesson }: { lesson: Lesson }) {
   )
 }
 
+/** 元に戻せる操作の型（#128）。変更の前に snapshot を取り、変更のあと「元に戻す」付きのトーストを出す */
+export function withUndo(tbId: string, msg: string, fn: () => void): void {
+  const before = snapshot(tbId)
+  fn()
+  toast(msg, before ? () => putBook(before) : undefined)
+}
+
+/** 本文の1要素を書き換える（#128）。無ければ何もしない。レッスンと通読で共用 */
+export const patchBlock = (tbId: string, lessonId: string, blockId: string, fn: (x: Block) => void): void =>
+  updateLesson(tbId, lessonId, (l) => {
+    const x = l.blocks.find((y) => y.id === blockId)
+    if (x) fn(x)
+  })
+
 /** 「資料を消す」（#104）。確認のあと節の資料をまっさらにし、元に戻せる知らせを出す。ロードマップとレッスンで共用 */
 export function clearLessonWithUndo(tb: Textbook, lessonId: string): void {
   if (!window.confirm('この節の資料をすべて消します。自分のノートも消えます。')) return
-  const before = snapshot(tb.id)
-  updateLesson(tb.id, lessonId, (l) => Object.assign(l, clearLesson(l)))
-  toast('資料を消しました', before ? () => putBook(before) : undefined)
+  withUndo(tb.id, '資料を消しました', () => updateLesson(tb.id, lessonId, (l) => Object.assign(l, clearLesson(l))))
 }
 
 const METER_COLOR: Record<Status, string> = { done: 'var(--st-done)', me: 'var(--st-me)', ai: 'var(--st-ai)', none: 'transparent' }
@@ -166,24 +177,6 @@ export function Steps({ labels, step, detail }: { labels: string[]; step: number
 }
 
 /**
- * 生成の中止（#14）。start() で新しい AbortController を作って signal を返し、stop() で中止する。
- * 画面を離れる（unmount）ときも自動で中止する。
- */
-export function useAbort(): { start: () => AbortSignal; stop: () => void } {
-  const ref = useRef<AbortController | null>(null)
-  useEffect(() => () => ref.current?.abort(), [])
-  return {
-    start: () => {
-      ref.current?.abort()
-      const c = new AbortController()
-      ref.current = c
-      return c.signal
-    },
-    stop: () => ref.current?.abort(),
-  }
-}
-
-/**
  * 題名などの入力欄（#80）。文字は手元で持ち、300ms 打鍵が止まるか欄を離れたときだけ確定する。
  * 1文字ごとに教科書全体をクローンして IndexedDB に書かないため
  */
@@ -289,7 +282,9 @@ export function useAiRun() {
   const [startedAt, setStartedAt] = useState<number | null>(null)
   const [endedAt, setEndedAt] = useState<number | null>(null)
   const [error, setError] = useState('')
-  const abort = useAbort()
+  // 中止（#14）。run ごとに新しい AbortController を作り、画面を離れる（unmount）ときも中止する
+  const abort = useRef<AbortController | null>(null)
+  useEffect(() => () => abort.current?.abort(), [])
   const seconds = useElapsed(busy, startedAt, endedAt)
   async function run<T>(fn: (progress: Progress, signal: AbortSignal) => Promise<T>, doneStep?: number): Promise<T | null> {
     setBusy(true)
@@ -298,11 +293,13 @@ export function useAiRun() {
     setText({ detail: '', hint: '' })
     setStartedAt(Date.now())
     setEndedAt(null)
+    abort.current?.abort()
+    abort.current = new AbortController()
     try {
       const r = await fn((s, d) => {
         setStep(s)
         setText((cur) => splitDetail(cur, d))
-      }, abort.start())
+      }, abort.current.signal)
       if (doneStep !== undefined) setStep(doneStep)
       return r
     } catch (e) {
@@ -316,5 +313,5 @@ export function useAiRun() {
     }
   }
   const working: Busy | null = busy ? { label: text.detail, seconds, title: text.hint } : null
-  return { busy, step, detail: text.detail, hint: text.hint, working, error, setError, run, stop: abort.stop }
+  return { busy, step, detail: text.detail, hint: text.hint, working, error, setError, run, stop: () => abort.current?.abort() }
 }

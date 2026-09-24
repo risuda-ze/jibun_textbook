@@ -26,6 +26,7 @@ import {
   downloadBook,
   stepPercent,
   useAiRun,
+  withUndo,
 } from './common'
 import { GenerateControls, useGenerate } from './GenerateControls'
 import { Button, Card, Pill, Segmented, type PillTone } from './kit'
@@ -91,14 +92,14 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
 
   function adopt() {
     if (!after) return
-    const before = snapshot(tb.id)
-    putBook(after)
-    if (!findLesson(after, lesson.id)) {
-      const c = currentLesson(after)
-      if (c) selectLesson(c.id)
-    }
-    onClose()
-    toast('変更案を反映しました', before ? () => putBook(before) : undefined)
+    withUndo(tb.id, '変更案を反映しました', () => {
+      putBook(after)
+      if (!findLesson(after, lesson.id)) {
+        const c = currentLesson(after)
+        if (c) selectLesson(c.id)
+      }
+      onClose()
+    })
   }
 
   return (
@@ -248,10 +249,10 @@ export function Roadmap({ tb }: { tb: Textbook }) {
   }
   /** 並べ替え（#11）。純粋関数の結果で置き換え、元に戻せるトーストを出す。選択は動かした節のまま */
   function move(fn: (d: Textbook) => Textbook, lessonId: string, msg: string) {
-    const before = snapshot(tb.id)
-    updateBook(tb.id, (d) => Object.assign(d, fn(d)))
-    selectLesson(lessonId)
-    toast(msg, before ? () => putBook(before) : undefined)
+    withUndo(tb.id, msg, () => {
+      updateBook(tb.id, (d) => Object.assign(d, fn(d)))
+      selectLesson(lessonId)
+    })
   }
 
   /**

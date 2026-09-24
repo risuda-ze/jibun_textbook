@@ -310,8 +310,7 @@ main.stack {
 }
 
 /* ---------- ピル（kit.tsx の Pill） ---------- */
-.chip,
-.flag {
+.chip {
   display: inline-flex;
   align-items: center;
   border-radius: var(--radius-pills);
@@ -342,7 +341,7 @@ main.stack {
   background: var(--color-peach);
   color: var(--color-ink-black);
 }
-.flag {
+.chip.review {
   background: var(--st-review);
   color: #fff;
 }
