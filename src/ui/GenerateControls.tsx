@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { AiSettings } from '../ai'
+import type { AiSettings } from '../ai/types'
 import { useApp } from '../store'
 import type { Textbook } from '../types'
 import { StopButton, stepPercent, useElapsed } from './common'

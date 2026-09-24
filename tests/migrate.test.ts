@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { CURRENT_VERSION, migrate } from '../src/lib/migrate'
+import { CURRENT_VERSION, migrate, migrations } from '../src/lib/migrate'
 import { TextbookZ, newBlock, newChapter, newLesson, newTextbook, renumberDuplicateIds } from '../src/types'
 
 const v1 = () => JSON.parse(readFileSync('tests/fixtures/textbook_v1.json', 'utf8')) as Record<string, unknown>
@@ -33,36 +33,19 @@ describe('migrate（#65）', () => {
     // 見本: 版 0 は題名を name に持っていた、という想定
     const old = { ...v1(), schemaVersion: 0, name: '古い題名' } as Record<string, unknown>
     delete old.title
-    const r = migrate(old, { table: { 0: (o) => ({ ...o, title: o.name }) } })
-    expect(r.ok).toBe(true)
-    if (r.ok) {
-      expect(r.from).toBe(0)
-      expect(r.tb.title).toBe('古い題名')
-      expect(r.tb.schemaVersion).toBe(1)
-      expect(r.steps).toEqual(['版 0 から 1 に移行しました'])
+    migrations[0] = (o) => ({ ...o, title: o.name })
+    try {
+      const r = migrate(old)
+      expect(r.ok).toBe(true)
+      if (r.ok) {
+        expect(r.from).toBe(0)
+        expect(r.tb.title).toBe('古い題名')
+        expect(r.tb.schemaVersion).toBe(1)
+        expect(r.steps).toEqual(['版 0 から 1 に移行しました'])
+      }
+    } finally {
+      delete migrations[0]
     }
-  })
-  it('2段の移行も順に当たる（テスト用に今の版を 2 にする）', () => {
-    const calls: number[] = []
-    const r = migrate(
-      { ...v1(), schemaVersion: 0 },
-      {
-        current: 2,
-        table: {
-          0: (o) => {
-            calls.push(0)
-            return o
-          },
-          1: (o) => {
-            calls.push(1)
-            return o
-          },
-        },
-      },
-    )
-    // 版 2 の形は TextbookZ（版 1）に合わないので検証で落ちるが、移行は順に呼ばれている
-    expect(calls).toEqual([0, 1])
-    expect(r.ok).toBe(false)
   })
   it('id の重複と日時の欠落を直し、steps に残す', () => {
     const tb = newTextbook('t', { chapters: [newChapter('c', [newLesson('a', { blocks: [newBlock('ai', 'x')] }), newLesson('b')])] })

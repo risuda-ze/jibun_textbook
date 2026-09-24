@@ -1,4 +1,5 @@
-import { getProvider, type AiError, type AiSettings, type LessonDraft, type ResearchInfo, type Usage } from '../ai'
+import { getProvider } from '../ai'
+import type { AiError, AiSettings, LessonDraft, ResearchInfo, Usage } from '../ai/types'
 import { setRunning, toast, updateLesson, type GenState } from '../store'
 import { newBlock, type Lesson, type Textbook } from '../types'
 import { splitDetail } from './common'
@@ -83,8 +84,7 @@ export async function generateInto(
       ),
     )
     // Web 調査の状態（途中で切れた・検索が失敗した）を知らせる（#17 #81）。下書きは入るが、根拠が足りない可能性がある
-    const info = draft.research ?? (draft.truncated ? { truncated: true, searchErrors: [] } : undefined)
-    toast(`資料を生成しました${usageNote(usage)}${researchNote(usage, info)}`)
+    toast(`資料を生成しました${usageNote(usage)}${researchNote(usage, draft.research)}`)
     return true
   } catch (e) {
     const err = e as AiError

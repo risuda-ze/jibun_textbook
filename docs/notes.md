@@ -222,3 +222,12 @@ zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても
 - 入力欄の `NoteDraft.images` は `{ dataUrl, alt }[]` にした。下書きは端末に保存しないので移行は無い
 - `figcaption` は `alt` が空なら出さない。`<img alt>` は空なら従来どおり「自分で入れた画像」
 
+
+## 2026-09-25 の判断（#126 #127 #130・保守性）
+
+- 工場関数（`newBlock` / `newLesson` / `newTextbook`）は必須項目だけを `*Z.parse()` に通し、`extra` はその上に spread する。`extra` を parse に入れない理由は、zod が入れ子を複製して `newTextbook('本', { chapters: [ch] })` の `ch` と同一でなくなるため（`tests/protect.test.ts` は同一性で守る節を確かめる）。JSON の形とキーの順は前と同じ（`tests/data.test.ts` が直書きの形と照合）
+- 未実装の接続先（OpenAI互換・ローカル）は型・選択肢・文・分岐ごと消した。端末の設定に `compat` / `local` が残っていても `store.init` が `anthropic` に寄せる。Phase 2 で実装するときに `AiKind` と `KINDS` に戻す
+- `migrate()` の `opts` を消したので、2段の移行の単体（今の版を 2 に差し替える）は消した。版 2 ができたら旧版の見本 JSON で実際の移行関数を試す（規約どおり）
+- `kb`（資料の大きさ）は `formatSize` に寄せていない。表記が `200KB` → `200 KB` に変わり、Help の行・e2e・messages の KEY を同じ PR で直す必要があるため（別 PR）
+- AI 層の記号は `../ai/types` からだけ import する。`../ai` は `getProvider` だけ（`export * from './types'` は消した）
+- `MATERIAL_MSG.unreadable` の詳細は固定文（`ファイルを読めませんでした。`）。`file.text()` の例外文は英語で、前の FileReader の包みも固定文だったので出る文は変わらない

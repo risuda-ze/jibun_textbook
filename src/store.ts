@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { del, get, keys, set } from 'idb-keyval'
+import { del, entries, get, set } from 'idb-keyval'
 import { isDraftEmpty, nowIso, type Lesson, type NoteDraft, type Textbook } from './types'
 import { DEFAULT_AI, type AiSettings } from './ai/types'
 import { currentLesson, findLesson } from './lib/status'
@@ -81,9 +81,8 @@ export async function init(): Promise<void> {
   // 教科書と設定は別々に読む。設定1件が読めなくても教科書は本棚に出す（#80）
   let booksFailed = false
   try {
-    for (const k of await keys()) {
+    for (const [k, raw] of await entries()) {
       if (typeof k !== 'string' || !k.startsWith(TB)) continue
-      const raw = await get(k)
       // 版の移行と既知の不整合の修復は migrate() に寄せ、JSON 読込と同じ結果にする（#65）
       const r = migrate(raw)
       // 直せない教科書は黙って捨てず、本棚で知らせて生データを書き出すか Help で直せるようにする（#17）
@@ -150,24 +149,21 @@ export const clearToast = () => setState({ toast: null })
 
 export const currentBook = (s: State = state): Textbook | null => s.books.find((b) => b.id === s.bookId) ?? null
 
-export function go(screen: Screen): void {
-  setState({ screen })
+/** 画面を切り替えて先頭へ戻す。同時に変える状態（開く教科書・節など）は p で渡す */
+export function go(screen: Screen, p: Partial<State> = {}): void {
+  setState({ ...p, screen })
   window.scrollTo(0, 0)
 }
 
-export function openBook(id: string, screen: Screen = 'road'): void {
+export function openBook(id: string): void {
   const b = state.books.find((x) => x.id === id)
   if (!b) return
   const cur = currentLesson(b) ?? b.chapters[0]?.lessons[0] ?? null
-  setState({ bookId: id, lessonId: cur?.id ?? null, screen })
-  window.scrollTo(0, 0)
+  go('road', { bookId: id, lessonId: cur?.id ?? null })
 }
 
 export const selectLesson = (lessonId: string): void => setState({ lessonId })
-export function openLesson(lessonId: string): void {
-  setState({ lessonId, screen: 'lesson' })
-  window.scrollTo(0, 0)
-}
+export const openLesson = (lessonId: string): void => go('lesson', { lessonId })
 
 /** 教科書ごとの書き込みの連番。失敗した書き込みが最新かどうかを見る（#80） */
 const writeSeq = new Map<string, number>()
@@ -175,8 +171,8 @@ const writeSeq = new Map<string, number>()
 /** 教科書を置き換えて保存する。touch=false は読み込み時など updatedAt を保ちたいとき。 */
 export function putBook(tb: Textbook, touch = true): void {
   const next = touch ? { ...tb, updatedAt: nowIso() } : tb
-  const before = state.books.find((b) => b.id === next.id)
   const i = state.books.findIndex((b) => b.id === next.id)
+  const before: Textbook | undefined = state.books[i]
   const books = i >= 0 ? state.books.map((b) => (b.id === next.id ? next : b)) : [next, ...state.books]
   setState({ books })
   const seq = (writeSeq.get(next.id) ?? 0) + 1
@@ -192,10 +188,7 @@ export function putBook(tb: Textbook, touch = true): void {
 }
 
 /** 生データを Help の修復画面に渡して開く（#65） */
-export function openRepair(name: string, raw: unknown): void {
-  setState({ repairTarget: { name, raw }, screen: 'help' })
-  window.scrollTo(0, 0)
-}
+export const openRepair = (name: string, raw: unknown): void => go('help', { repairTarget: { name, raw } })
 export const clearRepairTarget = (): void => setState({ repairTarget: null })
 
 /** 生成の進行中の状態を置き換える。null で外す（#87） */

@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { Clues, CourseInput, Textbook } from '../types'
 import type { PlanChapter, PlanLesson } from '../lib/protect'
 import { AI_MSG } from '../lib/messages'
@@ -60,11 +61,18 @@ export const zeroUsage = (): Usage => ({ inputTokens: 0, outputTokens: 0, search
 
 export type QA = { q: string; a: string }
 
-export type CourseDesign = {
-  title: string
-  goal: string
-  chapters: { title: string; lessons: { title: string; minutes: number; isTask: boolean; summary: string }[] }[]
-}
+/** AI の出力（設計）のスキーマ。保存形式の types.ts の TextbookZ とは別物。anthropic.ts が構造化出力に使い、型はここから取る */
+export const DesignOutZ = z.object({
+  title: z.string(),
+  goal: z.string(),
+  chapters: z.array(
+    z.object({
+      title: z.string(),
+      lessons: z.array(z.object({ title: z.string(), minutes: z.number(), isTask: z.boolean(), summary: z.string() })),
+    }),
+  ),
+})
+export type CourseDesign = z.infer<typeof DesignOutZ>
 
 /** Web 調査の状態（#81）。途中で切れた（max_tokens か pause_turn の上限）、検索が失敗した回数と理由 */
 export type ResearchInfo = { truncated: boolean; searchErrors: string[] }
@@ -72,8 +80,8 @@ export type ResearchInfo = { truncated: boolean; searchErrors: string[] }
 export type LessonDraft = {
   blocks: string[]
   tasks: string[]
-  clues: Clues /** Web 調査が途中で切れた（#17） */
-  truncated?: boolean /** 調査の状態（#81） */
+  clues: Clues
+  /** 調査の状態（#81）。Web 調査をしていなければ無い */
   research?: ResearchInfo
 }
 

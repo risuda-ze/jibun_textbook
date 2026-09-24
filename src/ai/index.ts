@@ -10,5 +10,3 @@ export async function getProvider(s: AiSettings): Promise<AiProvider> {
   const { AnthropicProvider } = await import('./anthropic')
   return new AnthropicProvider(s)
 }
-
-export * from './types'

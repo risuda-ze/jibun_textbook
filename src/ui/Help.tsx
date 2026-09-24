@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { migrate } from '../lib/migrate'
-import { formatSize, readTextbookFile, type ParseResult } from '../lib/io'
+import { migrate, type MigrateResult } from '../lib/migrate'
+import { formatSize, readTextbookFile } from '../lib/io'
 import { AI_KEY, KEY, MATERIAL_KEY } from '../lib/messages'
 import { PDF_LIMIT_BYTES, TEXT_LIMIT_BYTES, TOTAL_LIMIT_BYTES } from '../lib/material'
 import { clearRepairTarget, go, useApp } from '../store'
 import { downloadBook } from './common'
 import { OlderCard, importTextbook, type Older } from './import'
-import { MAX_SEARCH_DESIGN, MAX_SEARCH_LESSON, WEB_SEARCH_USD_PER_1000 } from '../ai'
+import { MAX_SEARCH_DESIGN, MAX_SEARCH_LESSON, WEB_SEARCH_USD_PER_1000 } from '../ai/types'
 import { Button, Card, PageHead } from './kit'
 
 const REPO = 'https://github.com/risuda-ze/jibun_textbook'
@@ -78,7 +78,7 @@ export const TROUBLES: { when: string; next: string }[] = [
 function Repair() {
   const { books, repairTarget } = useApp()
   const file = useRef<HTMLInputElement>(null)
-  const [res, setRes] = useState<{ name: string; r: ParseResult } | null>(null)
+  const [res, setRes] = useState<{ name: string; r: MigrateResult } | null>(null)
   const [older, setOlder] = useState<Older | null>(null)
   useEffect(() => {
     if (!repairTarget) return

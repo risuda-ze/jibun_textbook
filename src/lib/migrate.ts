@@ -22,23 +22,20 @@ const validIso = (x: unknown): x is string => typeof x === 'string' && !Number.i
  * 生の JSON を今の版の教科書にする（#65）。
  * 版を読み → 移行関数を1段ずつ当て → 既知の不整合を直し → スキーマで検証する。
  * 直した内容は `steps` に日本語で残す（空なら手を入れていない）。
- * `opts` はテスト用（移行表と今の版を差し替える）。
  */
-export function migrate(raw: unknown, opts: { table?: Record<number, Migration>; current?: number } = {}): MigrateResult {
-  const table = opts.table ?? migrations
-  const current = opts.current ?? CURRENT_VERSION
+export function migrate(raw: unknown): MigrateResult {
   if (!isObj(raw)) return { ok: false, reason: MSG.notTextbook, from: null }
   const v = raw.schemaVersion
   if (typeof v !== 'number' || !Number.isInteger(v)) {
     return { ok: false, reason: MSG.noVersion, from: null }
   }
-  if (v > current) {
+  if (v > CURRENT_VERSION) {
     return { ok: false, reason: MSG.newer(v), from: v }
   }
   const steps: string[] = []
   let obj: Raw = raw
-  for (let i = v; i < current; i++) {
-    const fn = table[i]
+  for (let i = v; i < CURRENT_VERSION; i++) {
+    const fn = migrations[i]
     if (!fn) return { ok: false, reason: MSG.noMigration(i), from: v }
     obj = { ...fn(obj), schemaVersion: i + 1 }
     steps.push(`版 ${i} から ${i + 1} に移行しました`)
