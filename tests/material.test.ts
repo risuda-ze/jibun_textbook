@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { MATERIAL_MSG } from '../src/lib/messages'
 import { PASTED_NAME, PDF_LIMIT_BYTES, TEXT_LIMIT_BYTES, checkSize, classify, pastedMaterial, readMaterial } from '../src/lib/material'
 
 describe('渡す資料（#63）', () => {
@@ -13,7 +14,7 @@ describe('渡す資料（#63）', () => {
   })
   it('上限を超えたら理由を返す。先頭だけ使うことはしない', () => {
     expect(checkSize('text', TEXT_LIMIT_BYTES)).toBeNull()
-    expect(checkSize('text', TEXT_LIMIT_BYTES + 1)).toContain('200KB')
+    expect(checkSize('text', TEXT_LIMIT_BYTES + 1)).toBe(MATERIAL_MSG.tooBig('文字', '200KB', '200KB'))
     expect(checkSize('pdf', PDF_LIMIT_BYTES)).toBeNull()
     expect(checkSize('pdf', PDF_LIMIT_BYTES + 1)).toContain('10MB')
   })
@@ -33,7 +34,7 @@ describe('渡す資料（#63）', () => {
   it('渡せない種類・大きすぎるファイルは理由つきで断る', async () => {
     expect(await readMaterial(new File(['x'], 'photo.png', { type: 'image/png' }))).toMatchObject({
       ok: false,
-      reason: expect.stringContaining('渡せない種類'),
+      reason: MATERIAL_MSG.badKind('photo.png'),
     })
     const big = new File([new Uint8Array(TEXT_LIMIT_BYTES + 1)], 'big.txt', { type: 'text/plain' })
     expect(await readMaterial(big)).toMatchObject({ ok: false, reason: expect.stringContaining('200KB') })
