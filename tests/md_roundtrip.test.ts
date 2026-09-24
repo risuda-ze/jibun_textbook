@@ -84,4 +84,16 @@ describe('見たまま編集で文字として打った記法（#76）', () => {
     expect(mdToHtml(md)).not.toContain('<a ')
     expect(mdToHtml(md)).toContain('[メモ](後で)')
   })
+  it('**文** と `文` は太字・コードの記法に戻り、描画で strong / code になる（#145）', () => {
+    const md = htmlToMd('<p>それぞれの効果を確認する。**パンク・膨張**：パスの点を `Alt` で動かす</p>')
+    expect(md).toBe('それぞれの効果を確認する。**パンク・膨張**：パスの点を `Alt` で動かす')
+    expect(mdToHtml(md)).toContain('<strong>パンク・膨張</strong>')
+    expect(mdToHtml(md)).toContain('<code>Alt</code>')
+    expect(stable(md)).toBe(true)
+  })
+  it('片割れの **・式の中の *・空白で始まる中身は文字のまま（#145）', () => {
+    const md = htmlToMd('<p>2 * 3 = 6 と **強調 の片割れ と ** 空 ** と *斜体*</p>')
+    expect(md).toBe('2 \\* 3 = 6 と \\*\\*強調 の片割れ と \\*\\* 空 \\*\\* と \\*斜体\\*')
+    expect(mdToHtml(md)).not.toMatch(/<strong>|<em>/)
+  })
 })
