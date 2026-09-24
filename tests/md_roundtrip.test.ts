@@ -68,3 +68,18 @@ describe('崩れる・落ちる（意図したものと、直す対象）', () =
     expect(mdToHtml('<img src=x onerror="alert(1)"><script>alert(1)</script>')).not.toMatch(/onerror|<script/)
   })
 })
+
+describe('見たまま編集で文字として打った記法（#76）', () => {
+  it('[文](http(s) の URL) はリンクの記法に戻り、描画でリンクになる', () => {
+    const md = htmlToMd('<p>編集中に [ツール](https://creatools.dev/color-palette) を使うと</p>')
+    expect(md).toBe('編集中に [ツール](https://creatools.dev/color-palette) を使うと')
+    expect(mdToHtml(md)).toContain('<a href="https://creatools.dev/color-palette">ツール</a>')
+    expect(stable(md)).toBe(true)
+  })
+  it('URL でないものは文字のまま（リンクにしない）', () => {
+    const md = htmlToMd('<p>[メモ](後で) と [x](javascript:alert(1)) を書く</p>')
+    expect(md).toBe('\\[メモ\\](後で) と \\[x\\](javascript:alert(1)) を書く')
+    expect(mdToHtml(md)).not.toContain('<a ')
+    expect(mdToHtml(md)).toContain('[メモ](後で)')
+  })
+})
