@@ -55,23 +55,17 @@
 
 - default ブランチは **`production`**（配信される状態）。統合ブランチは **`develop`**
 - 作業は Issue ごとに `feat/<Issue番号>_<概要>` を `develop` から切り、`develop` に向けて PR を出す。`develop → production` も PR で行う
-- Rulesets により `develop` と `production` は直接 push できず、線形履歴（squash か rebase でマージ）と CI の3ジョブ成功が必須
+- Rulesets により `develop` と `production` は直接 push できず、線形履歴（squash か rebase でマージ）と CI の成功が必須
 - 配信用のタグ `vX.Y.Z` は `production` のコミットに打つ。タグは打ち直せない（`version-rule`）ので、打つ前に対象コミットを確かめる
 
 ### CI（`.github/workflows/ci.yml`）
 
-Pull Request と `develop` / `production` への push で3つのジョブが走る。配信はしない。
+Pull Request と `develop` / `production` への push で走る。配信はしない。ジョブの内容と落ちる条件は `ci.yml` を参照。
 （push を `develop` と `production` に絞るのは、PR を開いているブランチで push と pull_request の両方が発火して同じコミットが2回走るのを防ぐため。ブランチの検証は PR で行う）
-
-| ジョブ | 内容 | 落ちる条件 |
-|---|---|---|
-| `check` | `npm run typecheck` → `npm test` → `npm run build` | 型エラー・単体テスト失敗・ビルド失敗 |
-| `audit` | `npm audit --audit-level=high` | **high 以上の脆弱性が1件でもある**。moderate 以下は Dependabot の更新 PR に任せる |
-| `e2e` | Playwright（Chromium）で `npm run e2e`。デモ応答だけを使い外部につながない | 通しテスト失敗。失敗時は `playwright-report/` と `test-results/` が artifact に残る |
 
 Dependabot（`.github/dependabot.yml`）は npm を毎週月曜、GitHub Actions を毎月見て更新 PR を出す。
 minor と patch は1本にまとめる。Dependabot alerts と security updates はリポジトリ設定で有効にしてある。
-Rulesets: `develop-rule` と `production-rule` が PR 必須・線形履歴・required checks（CI の3ジョブ）を課す。`version-rule` は `v*` タグの更新と削除を禁止する。
+Rulesets: `develop-rule` と `production-rule` が PR 必須・線形履歴・required checks（`ci.yml` のジョブ）を課す。`version-rule` は `v*` タグの更新と削除を禁止する。
 
 ### 配信（`.github/workflows/deploy.yml`）
 
@@ -99,6 +93,17 @@ GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`v*` タグ�
 
   失敗した配信は `gh run rerun <run id> --failed` で再実行できる（タグは打ち直せない）
 
+### 発行（`.github/workflows/release.yml`）
+
+`v*` タグを打つと、その時点の `dist/` を zip にして GitHub Release に添付する（`softprops/action-gh-release`）。配信（`deploy.yml`）と同じトリガーなので、**タグ = Release + 配信**。
+
+1. `package.json` の `version` を上げてコミットし、`production` まで入れる
+2. `production` のそのコミットに `git tag vX.Y.Z && git push origin vX.Y.Z`。`release.yml` と `deploy.yml` が走る
+3. タグ名は `vX.Y.Z` だけを受け付ける。両ワークフローの最初のステップで形式を確かめ、違えば何もしない
+4. 手動で発行し直す: `gh workflow run release.yml --ref production -f tag=vX.Y.Z`
+
+zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても動かない。Pages 配下で動く前提の成果物。
+
 ## 文言のルール（2026-09-22・#4）
 
 画面に出る **文** は敬体（です・ます）で統一する。**単語・句** は今のまま。
@@ -108,7 +113,7 @@ GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`v*` タグ�
 - 文末は「〜します」「〜しました」「〜できません」「〜してください」。体言止めの文は敬体に直す（「節がない。」→「節がありません。」）
 - 語彙は変えない（「消す」を「削除する」にしない）。文体だけを揃える
 - AI へのプロンプト（`src/ai/anthropic.ts` の system / user prompt）と、デモ応答が返す教科書の本文（`src/ai/demo.ts`）は画面の文言ではないので対象外。デモ応答の進行表示（「Web調査はしません」）は対象
-- e2e（`e2e/flow.spec.ts`）は画面の文をそのまま照合しているので、文を変えたら追随させる
+- e2e が操作に使う文言は `src/ui/labels.ts` に置き、UI と e2e が同じ定数を読む（#84）。文を変えるときはそこを直す
 
 ## 2026-09-22 の判断（Issue 本文に無いもの）
 
@@ -120,21 +125,6 @@ GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`v*` タグ�
 ## 実APIで分かったこと
 
 （キーを入れて試したら、ここに書く）
-
-### 発行（`.github/workflows/release.yml`）
-
-`v*` タグを打つと、その時点の `dist/` を zip にして GitHub Release に添付する（`softprops/action-gh-release`）。配信（`deploy.yml`）と同じトリガーなので、**タグ = Release + 配信**。
-
-1. `package.json` の `version` を上げてコミットし、`production` まで入れる
-2. `production` のそのコミットに `git tag vX.Y.Z && git push origin vX.Y.Z`。`release.yml` と `deploy.yml` が走る
-3. タグ名は `vX.Y.Z` だけを受け付ける。両ワークフローの最初のステップで形式を確かめ、違えば何もしない
-4. 手動で発行し直す: `gh workflow run release.yml --ref production -f tag=vX.Y.Z`
-
-**v0.1.0 の発行（初回生成 `6a96429`）**: この時点のコミットに `release.yml` は無いので、タグを push しても自動では走らない。
-`gh workflow run release.yml --ref production -f tag=v0.1.0` で発行する（この PR が `production` に入った後）。**配信はしない**。理由: Pages には既に新しい `production` の内容が配信されており、
-v0.1.0（初回生成の状態）を配信すると画面が巻き戻るため。v0.1.0 は「この時点の状態」を固定して参照するための Release で、配信の対象は次のタグから。
-
-zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても動かない。Pages 配下で動く前提の成果物。
 
 ## 2026-09-23 の判断（#12）
 

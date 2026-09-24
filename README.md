@@ -64,8 +64,7 @@ Android の Chrome で上の URL を開き、メニューから「ホーム画�
 - `docs/notes.md` — 実装メモ。仕様で曖昧だった所の判断、CI と配信、実 API で分かったこと
 - `docs/security.md` — セキュリティ要件と現状の充足状況
 - `docs/markdown_roundtrip.md` — 見たまま編集の往復で記法ごとに何が保たれるか
-- `docs/test_report.md` — テスト結果
-- `docs/backlog.md` — あとでやること
+- あとでやることは GitHub Issues（追跡 #7）
 - 仕様と意思決定の原本は別リポジトリ（brain vault）にあり、作業指示は GitHub Issues で受け取ります
 
 ## 考えるべきこと

@@ -71,9 +71,9 @@
 
 | 要件 | 現状 | 判定 | 対応方針 |
 |---|---|---|---|
-| 秘密情報がコミット履歴に無い | `git log -p --all` を `sk-ant-` で検索 → ヒットは e2e の偽キー `sk-ant-e2e-SECRET-KEY`（`e2e/flow.spec.ts` 221行）の1件のみ。本物のキーは無い。`.env` は `.gitignore` 済みで履歴にも無い | 済 | 偽キーはそのままでよい（形式だけの文字列） |
+| 秘密情報がコミット履歴に無い | `git log -p --all` を `sk-ant-` で検索 → ヒットは e2e の偽キー `sk-ant-e2e-SECRET-KEY`（`e2e/` 内）の1件のみ。本物のキーは無い。`.env` は `.gitignore` 済みで履歴にも無い | 済 | 偽キーはそのままでよい（形式だけの文字列） |
 | 教科書データが無い | `*.textbook.json` は `.gitignore` 済み。履歴にも無い | 済 | — |
-| 公開して問題ないファイルだけか | 追跡 79 ファイル。`src/` `tests/` `e2e/` `public/` `scripts/` `docs/` `DESIGN.md` `CLAUDE.md` `.claude/`（エージェント定義 8 件・スキル 7 件・`settings.json`）。**要判断**: (a) `DESIGN.md` は Notion のサイトを参照して書いたスタイル記述で、Notion のロゴ・画像・コードは含まない。(b) `.claude/settings.json` の allow に `C:\dev\note\brain\...` のローカルパスが入っている（個人の環境が分かる。秘密ではない）。(c) `.claude/agents` `.claude/skills` は汎用の作業手順で、個人情報は無い。`settings.local.json` はグローバル ignore で追跡外 | 要確認（人が判断） | (b) が気になるなら該当行を消す。それ以外は公開して差し支えないと判断する |
+| 公開して問題ないファイルだけか | 追跡しているのは `src/` `tests/` `e2e/` `public/` `scripts/` `docs/` `DESIGN.md` `CLAUDE.md` `.claude/`（エージェント定義 8 件・スキル 7 件・`settings.json`）。**要判断**: (a) `DESIGN.md` は Notion のサイトを参照して書いたスタイル記述で、Notion のロゴ・画像・コードは含まない。(b) `.claude/settings.json` の allow に `C:\dev\note\brain\...` のローカルパスが入っている（個人の環境が分かる。秘密ではない）。(c) `.claude/agents` `.claude/skills` は汎用の作業手順で、個人情報は無い。`settings.local.json` はグローバル ignore で追跡外 | 要確認（人が判断） | (b) が気になるなら該当行を消す。それ以外は公開して差し支えないと判断する |
 | `test-results/` `dist/` `playwright-report/` を追跡しない | `.gitignore` 済み。追跡ファイルに無い | 済 | — |
 | Actions の権限が最小 | `ci.yml` は `contents: read`。`deploy.yml` は `pages: write` `id-token: write` のみ。`release.yml`（#1）は `contents: write` が要る | 済 | — |
 | ブランチ保護 | Rulesets で設定済み: `develop-rule` / `production-rule` は PR 必須・線形履歴・required checks（`型・単体・ビルド` `依存の脆弱性（high 以上で失敗）` `通し（Playwright）`）。`version-rule` は `v*` タグの更新・削除を禁止 | 済 | 1人運用で詰みうる「Code Owners のレビュー必須」「最新 push の承認必須」は要見直し |
@@ -87,20 +87,9 @@
 | 保存失敗を見逃さない | `putBook()` は書き込み失敗で画面の変更も取り消し、トーストで知らせる（#17） | 済 | — |
 | 「別の本として追加」で元を壊さない | `asCopy()` が `id` を振り直す | 済 | — |
 
-## 「未」「要確認」のまとめ（別 Issue の候補）
+## 「未」「要確認」のまとめ
 
-既存 Issue に含まれるもの:
-
-- 読み込み JSON のサイズ上限 / 貼り付けの生 HTML / `truncated` の表示 / 保存失敗の扱い → #17
-- 書き出し忘れの知らせをレッスン画面にも → #16
-- ブランチ保護 → #8（public 化後）
-
-新しく起こす候補:
-
-1. ~~URL のスキーム検証~~ → #35 で対応済み（描画時に無害化）
-2. ~~`id` の一意性検証~~ → #36 で対応済み
-3. ~~CSP の導入~~ → #37 で対応済み（本番ビルドの meta）
-4. **実 API での確認**（人が行う）: エラー文にキーが混ざらないこと、検索回数の実測、`navigator.storage.persisted()` の結果
+残りは #38（実 API での確認）。
 
 ## 根拠
 

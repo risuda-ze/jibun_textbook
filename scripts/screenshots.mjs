@@ -12,6 +12,8 @@ for (const [name, opts] of [
 ]) {
   const ctx = await browser.newContext({ ...opts, serviceWorkers: 'block' })
   const page = await ctx.newPage()
+  // 画面の切り替え（上のナビ）。タブではなく nav + aria-current（#88）。e2e/helpers.ts の nav と同じ
+  const nav = (name) => page.getByRole('navigation', { name: '画面' }).getByRole('button', { name })
   const shot = (n) => page.screenshot({ path: `${out}/${name}_${n}.png`, fullPage: true })
   await page.goto(base)
   await page.getByRole('button', { name: 'AIと新規作成' }).click()
@@ -33,15 +35,15 @@ for (const [name, opts] of [
   await page.locator('#note').fill('二つ目の節のメモ。')
   await page.getByRole('button', { name: '書き込む' }).click()
   await page.getByLabel('完了', { exact: true }).check()
-  await page.getByRole('button', { name: 'ロードマップ', exact: true }).click()
+  await nav(/ロードマップ/).click()
   await page.getByRole('button', { name: '設計を直す' }).click()
   await page.locator('#redotext').fill('実践を先に')
   await page.getByRole('button', { name: '変更案を出してもらう' }).click()
   await page.locator('.diff li').first().waitFor()
   await shot('3_roadmap')
-  await page.getByRole('tab', { name: /教科書/ }).click()
+  await nav(/教科書/).click()
   await shot('5_book')
-  await page.getByRole('tab', { name: /本棚/ }).click()
+  await nav(/本棚/).click()
   await shot('1_shelf')
   await ctx.close()
 }
