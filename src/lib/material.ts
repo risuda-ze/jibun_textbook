@@ -4,6 +4,8 @@ import { MATERIAL_MSG } from './messages'
 /** 渡せる資料の上限（#63）。txt/md はプロンプトに入るので小さく、PDF は API の document 入力に渡す */
 export const TEXT_LIMIT_BYTES = 200 * 1024
 export const PDF_LIMIT_BYTES = 10 * 1024 * 1024
+/** 複数の資料の合計の上限（#69）。PDF 2つ分。base64 で 4/3 に膨らんでも API のリクエスト上限 32MB に収まる */
+export const TOTAL_LIMIT_BYTES = 20 * 1024 * 1024
 export const PASTED_NAME = '貼り付けた文'
 
 /** 拡張子と MIME から種類を決める。渡せない種類は null */
@@ -21,6 +23,15 @@ export function checkSize(kind: MaterialKind, size: number): string | null {
   const limit = kind === 'pdf' ? PDF_LIMIT_BYTES : TEXT_LIMIT_BYTES
   if (size <= limit) return null
   return MATERIAL_MSG.tooBig(kind === 'pdf' ? 'PDF' : '文字', kb(size), kb(limit))
+}
+
+/** 資料の合計の大きさ */
+export const totalSize = (mats: Material[]): number => mats.reduce((n, m) => n + m.size, 0)
+
+/** 合計が上限を超えていれば理由、収まっていれば null（#69） */
+export function checkTotal(size: number): string | null {
+  if (size <= TOTAL_LIMIT_BYTES) return null
+  return MATERIAL_MSG.tooBigTotal(kb(size), kb(TOTAL_LIMIT_BYTES))
 }
 
 export type ReadResult = { ok: true; material: Material } | { ok: false; reason: string }

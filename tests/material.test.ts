@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { MATERIAL_MSG } from '../src/lib/messages'
-import { PASTED_NAME, PDF_LIMIT_BYTES, TEXT_LIMIT_BYTES, checkSize, classify, pastedMaterial, readMaterial } from '../src/lib/material'
+import {
+  PASTED_NAME,
+  PDF_LIMIT_BYTES,
+  TEXT_LIMIT_BYTES,
+  TOTAL_LIMIT_BYTES,
+  checkSize,
+  checkTotal,
+  classify,
+  pastedMaterial,
+  readMaterial,
+  totalSize,
+} from '../src/lib/material'
+import { emptyMaterialInput, materialError, toMaterials } from '../src/ui/material'
 
 describe('渡す資料（#63）', () => {
   it('種類は拡張子か MIME で決め、それ以外は渡せない', () => {
@@ -17,6 +29,18 @@ describe('渡す資料（#63）', () => {
     expect(checkSize('text', TEXT_LIMIT_BYTES + 1)).toBe(MATERIAL_MSG.tooBig('文字', '200KB', '200KB'))
     expect(checkSize('pdf', PDF_LIMIT_BYTES)).toBeNull()
     expect(checkSize('pdf', PDF_LIMIT_BYTES + 1)).toContain('10MB')
+  })
+  it('複数の資料は合計にも上限がある（#69）', () => {
+    const pdf = (name: string, size: number) => ({ kind: 'pdf' as const, name, size, data: '' })
+    const two = [pdf('a.pdf', PDF_LIMIT_BYTES), pdf('b.pdf', PDF_LIMIT_BYTES)]
+    expect(totalSize(two)).toBe(TOTAL_LIMIT_BYTES)
+    expect(checkTotal(TOTAL_LIMIT_BYTES)).toBeNull()
+    expect(checkTotal(TOTAL_LIMIT_BYTES + 1)).toBe(MATERIAL_MSG.tooBigTotal('20MB', '20MB'))
+    // 画面の入力: ファイルそれぞれと貼り付けが別の資料になり、合計は貼り付けも含む
+    const m = { ...emptyMaterialInput(), files: two, pasted: ' 字幕 ' }
+    expect(toMaterials(m).map((x) => x.name)).toEqual(['a.pdf', 'b.pdf', PASTED_NAME])
+    expect(materialError(m)).toBe(`資料の${MATERIAL_MSG.tooBigTotal('20MB', '20MB')}`)
+    expect(materialError({ ...m, pasted: '' })).toBeNull()
   })
   it('txt/md は文字として読む', async () => {
     const r = await readMaterial(new File(['# メモ\n所有権'], 'notes.md', { type: 'text/markdown' }))

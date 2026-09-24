@@ -16,6 +16,7 @@ describe('失敗文の一元化（#78）', () => {
     expect(AI_MSG.api(500, 'boom')).toBe('APIエラーが発生しました（500）: boom')
     expect(MATERIAL_MSG.badKind('a.png')).toContain(MATERIAL_KEY.badKind)
     expect(MATERIAL_MSG.tooBig('文字', '300KB', '200KB')).toContain(MATERIAL_KEY.tooBig)
+    expect(MATERIAL_MSG.tooBigTotal('30MB', '20MB')).toBe(`${MATERIAL_KEY.tooBigTotal}（30MB。上限は 20MB）。`)
     expect(MATERIAL_MSG.unreadable('a.txt', 'x')).toBe(`「a.txt」${MATERIAL_KEY.unreadable}。x`)
   })
   it('MSG は KEY の語を含む', () => {
