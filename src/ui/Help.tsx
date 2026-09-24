@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { migrate } from '../lib/migrate'
-import { readTextbookFile, type ParseResult } from '../lib/io'
-import { KEY } from '../lib/messages'
+import { formatSize, readTextbookFile, type ParseResult } from '../lib/io'
+import { AI_KEY, KEY, MATERIAL_KEY } from '../lib/messages'
+import { PDF_LIMIT_BYTES, TEXT_LIMIT_BYTES, TOTAL_LIMIT_BYTES } from '../lib/material'
 import { clearRepairTarget, go, useApp } from '../store'
 import { downloadBook } from './common'
 import { OlderCard, importTextbook, type Older } from './import'
-import { MAX_SEARCH_DESIGN, MAX_SEARCH_LESSON, WEB_SEARCH_USD_PER_1000 } from '../ai/anthropic'
+import { MAX_SEARCH_DESIGN, MAX_SEARCH_LESSON, WEB_SEARCH_USD_PER_1000 } from '../ai'
 import { Button, Card, PageHead } from './kit'
 
 const REPO = 'https://github.com/risuda-ze/jibun_textbook'
 
 /**
- * JSON が読み込めない時に出る文と、次に試すこと（#64）。
- * 「…と出る」の行は `src/lib/messages.ts` の KEY から組み、実際の失敗文と必ず一致させる（#78・`tests/messages.test.ts`）。
+ * JSON が読み込めない時・AI が失敗した時・資料を渡せない時に出る文と、次に試すこと（#64 #102）。
+ * 「…と出る」の行は `src/lib/messages.ts` の KEY / AI_KEY / MATERIAL_KEY から組み、実際の文と必ず一致させる（#78・`tests/messages.test.ts`）。
  */
 export const TROUBLES: { when: string; next: string }[] = [
   {
@@ -42,6 +43,34 @@ export const TROUBLES: { when: string; next: string }[] = [
   {
     when: '本棚に「読めない教科書」が出る',
     next: '端末に保存されたデータが壊れています。カードの「Help で直す」で版の移行と修復を試せます。直らなければ「生データを書き出す」で控えを取ってから消去し、書き出してあった JSON を読み込み直してください。',
+  },
+  {
+    when: `AI を使うときに「${AI_KEY.nokey}」と出る`,
+    next: '「使うAI」で API キーを入力してください。キーなしで動線を試すなら「デモ応答」を選んでください。',
+  },
+  {
+    when: `AI を使うときに「${AI_KEY.auth}」「${AI_KEY.permission}」と出る`,
+    next: 'キーの打ち間違いか、キーの権限が足りません。Anthropic のコンソールでキーを確かめて入れ直してください。権限の場合はモデルを変えるか、Web 調査を「検索なし」にしてください。',
+  },
+  {
+    when: `AI を使うときに「${AI_KEY.rate}」と出る`,
+    next: 'Anthropic 側の利用上限です。しばらく待ってから、もう一度試してください。続くなら、コンソールで残高と上限を確かめてください。',
+  },
+  {
+    when: `AI を使うときに「${AI_KEY.network}」と出る`,
+    next: '端末がインターネットにつながっていないか、API に届いていません。接続を確かめて、もう一度試してください。',
+  },
+  {
+    when: `AI を使うときに「${AI_KEY.refusal}」と出る`,
+    next: '教科書は変わりません。学びたいことや注文の言い回しを変えるか、モデルを切り替えると通ることがあります。',
+  },
+  {
+    when: `AI を使うときに「${AI_KEY.api}（…）」と出る`,
+    next: '括弧の中が Anthropic の状態番号、その後ろが理由です。教科書は変わりません。時間を置いて試し、続くなら理由の文を添えて「不具合を知らせる」から知らせてください。',
+  },
+  {
+    when: `資料を渡すときに「${MATERIAL_KEY.badKind}」「${MATERIAL_KEY.tooBig}」「${MATERIAL_KEY.tooBigTotal}」「〈ファイル名〉${MATERIAL_KEY.unreadable}」と出る`,
+    next: `渡せるのは .txt / .md / .pdf で、上限は文字が ${formatSize(TEXT_LIMIT_BYTES)}、PDF が ${formatSize(PDF_LIMIT_BYTES)}、合計が ${formatSize(TOTAL_LIMIT_BYTES)} です。種類と大きさを確かめてください。読めない場合はファイルが壊れているか、開いたままの可能性があります。`,
   },
 ]
 
@@ -213,7 +242,7 @@ export function Help() {
 
       <Card as="section" stack aria-labelledby="help-trouble">
         <h2 id="help-trouble">読み込めない場合、まずはこちら</h2>
-        <p className="sub">本棚の「JSON読込」で出た文を探して、次に試すことを見てください。</p>
+        <p className="sub">本棚の「JSON読込」・AI の生成・資料を渡すときに出た文を探して、次に試すことを見てください。</p>
         <dl className="help-list">
           {TROUBLES.map((t) => (
             <div key={t.when}>

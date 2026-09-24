@@ -10,6 +10,9 @@ export const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA
 
 export const isPhone = (page: Page) => (page.viewportSize()?.width ?? 1000) < 820
 
+/** 画面の切り替え（上のナビ）。タブではなく nav + aria-current（#88） */
+export const nav = (page: Page, name: RegExp) => page.getByRole('navigation', { name: '画面' }).getByRole('button', { name })
+
 /** 進行中のボタン（#77）。中の文は「{現状}・{N秒}」なので名前では探さず aria-busy で探す */
 export const busyButton = (page: Page) => page.locator('button[aria-busy="true"]')
 

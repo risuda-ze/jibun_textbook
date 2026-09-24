@@ -31,14 +31,14 @@ export function App() {
     <div className={`app${wide ? ' wide' : ''}`}>
       <header className="bar">
         <div className="brand">じぶん教科書</div>
-        <nav className="tabs" role="tablist">
+        {/* 本物のタブ操作（tabpanel・矢印キー）は無いので nav + aria-current にする（#88） */}
+        <nav className="tabs" aria-label="画面">
           {TABS.map(([k, label, needsBook]) => (
             <button
               type="button"
               key={k}
               className="tab"
-              role="tab"
-              aria-selected={screen === k}
+              aria-current={screen === k ? 'page' : undefined}
               disabled={needsBook && !tb}
               onClick={() => go(k)}
             >

@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, type ButtonHTMLAttributes, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
+import { PROGRESS } from '../ai/types'
 
 /**
  * 共通コンポーネント。見た目の正は DESIGN.md（暖色の紙のキャンバス・白いカード・細い罫線・青は主操作だけ）。
@@ -57,7 +58,7 @@ export function Button({
   if (busy && width.current !== null) st.width = width.current
   // role="status" の中の文はボタンの名前に数えられない（読み上げで名無しになる）ので、同じ文を aria-label にも入れる
   const sec = busy && busy.seconds !== null ? `・${busy.seconds}秒` : ''
-  const busyText = busy ? (busy.label || '実行中…') + sec : ''
+  const busyText = busy ? (busy.label || PROGRESS.running) + sec : ''
   return (
     <button
       ref={ref}
@@ -71,7 +72,7 @@ export function Button({
     >
       {busy ? (
         <span className="working" role="status">
-          {busy.label || '実行中…'}
+          {busy.label || PROGRESS.running}
           {sec && <span className="mono">{sec}</span>}
         </span>
       ) : (

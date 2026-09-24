@@ -1,7 +1,7 @@
 import { L } from './labels'
 import { useState } from 'react'
 import { researchNote } from './generate'
-import { getProvider, type CourseDesign, type QA, type Usage } from '../ai'
+import { PROGRESS, getProvider, type CourseDesign, type QA, type Usage } from '../ai'
 import { openBook, putBook, toast, useApp } from '../store'
 import { newChapter, newLesson, newTextbook, type CourseInput } from '../types'
 import { AiBar, Steps, StopButton, UsageLine, stepPercent, useAiRun } from './common'
@@ -9,12 +9,20 @@ import { Button, Card, PageHead } from './kit'
 
 const STEP_LABELS = ['学びたいことを分解', 'Webを調査', 'コース設計を作成']
 
+/** 確認質問と設計で使った量を合算する（#88） */
+const addUsage = (a: Usage | null, b: Usage): Usage => ({
+  inputTokens: (a?.inputTokens ?? 0) + b.inputTokens,
+  outputTokens: (a?.outputTokens ?? 0) + b.outputTokens,
+  searches: (a?.searches ?? 0) + b.searches,
+})
+
 export function Create() {
   const { ai } = useApp()
   const [input, setInput] = useState<CourseInput>({ prompt: '', can: '', time: '', env: '' })
   const [qa, setQa] = useState<QA[] | null>(null)
   const [showQa, setShowQa] = useState(false)
-  const [asking, setAsking] = useState(false)
+  // 確認質問の実行（中止と使用量つき）（#88）
+  const a = useAiRun()
   // 設計の実行（busy・段階・今していること・経過時間・エラー・中止）（#82）
   const d = useAiRun()
   // 「設計を直してもらう」から始めたか（どのボタンを進行中にするかを決める）
@@ -24,32 +32,28 @@ export function Create() {
   const [off, setOff] = useState<Set<number>>(new Set())
   const [note, setNote] = useState('')
   const field = (k: keyof CourseInput) => (e: { target: { value: string } }) => setInput({ ...input, [k]: e.target.value })
-  const busyAny = asking || d.busy
+  const busyAny = a.busy || d.busy
 
   async function ask() {
     if (!input.prompt.trim()) return toast('学びたいことを書いてから進んでください')
     d.setError('')
     setDesign(null)
-    setAsking(true)
-    try {
-      const qs = await getProvider(ai).askQuestions(input)
-      setQa(qs.map((q) => ({ q, a: '' })))
-      setShowQa(true)
-    } catch (e) {
-      d.setError((e as Error).message)
-    }
-    setAsking(false)
+    const r = await a.run(async (_, signal) => (await getProvider(ai)).askQuestions(input, { signal }))
+    if (!r) return
+    setUsage(r.usage)
+    setQa(r.questions.map((q) => ({ q, a: '' })))
+    setShowQa(true)
   }
 
   async function run(extraNote = '') {
     setRedoing(!!extraNote)
     const r = await d.run(
-      (progress, signal) => getProvider(ai).designCourse(input, qa ?? [], extraNote, progress, { signal }),
+      async (progress, signal) => (await getProvider(ai)).designCourse(input, qa ?? [], extraNote, progress, { signal }),
       STEP_LABELS.length,
     )
     if (!r) return
     setDesign(r.design)
-    setUsage(r.usage)
+    setUsage((u) => addUsage(u, r.usage))
     setOff(new Set())
     setShowQa(false)
     // 調査が切れた・検索が失敗した（#81）
@@ -121,20 +125,20 @@ export function Create() {
               v={design ? 'soft' : 'primary'}
               onClick={ask}
               disabled={busyAny}
-              progress={asking ? 0 : d.busy && !redoing ? stepPercent(d.step, STEP_LABELS.length) : null}
-              busy={asking ? { label: '質問を作成中…', seconds: null } : d.busy && !redoing ? d.working : null}
+              progress={a.busy ? 0 : d.busy && !redoing ? stepPercent(d.step, STEP_LABELS.length) : null}
+              busy={a.busy ? { label: PROGRESS.asking, seconds: null } : d.busy && !redoing ? d.working : null}
             >
               {design ? 'もう一度調べ直す' : L.design}
             </Button>
-            {d.busy && !redoing ? (
-              <StopButton onStop={d.stop} />
+            {a.busy || (d.busy && !redoing) ? (
+              <StopButton onStop={a.busy ? a.stop : d.stop} />
             ) : (
               <span className="sub">全部自由入力です。先に設計だけ作り、資料は節ごとに後で生成します。</span>
             )}
           </div>
-          {d.error && (
+          {(a.error || d.error) && (
             <p className="err" role="alert">
-              {d.error}
+              {a.error || d.error}
             </p>
           )}
         </Card>

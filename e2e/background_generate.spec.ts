@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { L } from '../src/ui/labels'
-import { busyButton, demoBook } from './helpers'
+import { busyButton, demoBook, nav } from './helpers'
 
 // #87: 生成の途中で別の画面を見に行っても止まらない。止まるのは「やめる」だけ
 test('ロードマップで生成を始めて教科書タブへ移り、戻ってきても生成は続いていて、終わると本文が入る', async ({ page }) => {
@@ -8,10 +8,10 @@ test('ロードマップで生成を始めて教科書タブへ移り、戻っ�
   await page.getByRole('button', { name: L.generateLesson }).click()
   await expect(page.getByRole('button', { name: L.stop })).toBeVisible()
   // 別の画面へ
-  await page.getByRole('tab', { name: /教科書/ }).click()
-  await expect(page.getByRole('tab', { name: /教科書/ })).toHaveAttribute('aria-selected', 'true')
+  await nav(page, /教科書/).click()
+  await expect(nav(page, /教科書/)).toHaveAttribute('aria-current', 'page')
   // 戻ると、まだ進行中
-  await page.getByRole('tab', { name: /ロードマップ/ }).click()
+  await nav(page, /ロードマップ/).click()
   await expect(busyButton(page)).toBeVisible()
   await expect(page.getByRole('button', { name: L.stop })).toBeVisible()
   // 終わると本文が入る（画面を離れていたので自動でレッスンには移らない。自分で開く）

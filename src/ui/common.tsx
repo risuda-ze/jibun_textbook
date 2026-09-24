@@ -2,11 +2,11 @@ import { L } from './labels'
 import { clearLesson, type Lesson, type Textbook } from '../types'
 import { STATUS_LABEL, lessonStatus, statusCounts, type Status } from '../lib/status'
 import { MODELS, type AiKind } from '../ai/types'
-import { WEB_SEARCH_USD_PER_1000 } from '../ai/anthropic'
+import { WEB_SEARCH_USD_PER_1000 } from '../ai'
 import { markExported, putBook, setAi, snapshot, toast, updateLesson, useApp } from '../store'
 import { SIZE_WARN_BYTES, byteSize, exportJson, fileName, formatSize } from '../lib/io'
 import { downloadText } from '../lib/download'
-import type { AiError, Progress, Usage } from '../ai/types'
+import { PROGRESS, type AiError, type Progress, type Usage } from '../ai/types'
 import { useEffect, useRef, useState, type InputHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 import { Button, Card, Pill, Segmented, type Busy } from './kit'
 
@@ -165,7 +165,7 @@ export function Steps({ labels, step, detail }: { labels: string[]; step: number
           <span className="dot" />
           <span>
             {l}
-            <small>{step > i ? '済み' : step === i ? detail || '実行中…' : '待機'}</small>
+            <small>{step > i ? '済み' : step === i ? detail || PROGRESS.running : '待機'}</small>
           </span>
         </li>
       ))}

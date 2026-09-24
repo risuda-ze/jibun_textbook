@@ -1,6 +1,6 @@
 import { L } from '../src/ui/labels'
 import { expect, test } from '@playwright/test'
-import { blankBook, isPhone } from './helpers'
+import { blankBook, isPhone, nav } from './helpers'
 
 test('レッスンの表示領域を広げる／戻す。設定は端末に残る（#53）', async ({ page }) => {
   await blankBook(page)
@@ -18,7 +18,7 @@ test('レッスンの表示領域を広げる／戻す。設定は端末に残�
   expect((await app.boundingBox())!.width).toBeGreaterThan(before)
 
   // 通読にも効き、再読み込み後も残る
-  await page.getByRole('tab', { name: /教科書/ }).click()
+  await nav(page, /教科書/).click()
   await expect(app).toHaveClass(/wide/)
   await page.reload()
   await page.getByRole('button', { name: '開く' }).click()
@@ -28,6 +28,6 @@ test('レッスンの表示領域を広げる／戻す。設定は端末に残�
   // 戻す。本棚では元から効かない
   await page.getByRole('button', { name: '幅を戻す' }).click()
   await expect(app).not.toHaveClass(/wide/)
-  await page.getByRole('tab', { name: /本棚/ }).click()
+  await nav(page, /本棚/).click()
   await expect(app).not.toHaveClass(/wide/)
 })

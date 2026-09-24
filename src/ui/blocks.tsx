@@ -33,7 +33,22 @@ export function Editable({ md, onCommit }: { md: string; onCommit: (md: string) 
         if (files.some((f) => f.type.startsWith('image/')))
           return toast('本文には画像を貼れません。ノートの「画像を入れる」を使ってください')
         const text = e.clipboardData.getData('text/plain')
-        if (text) document.execCommand('insertText', false, text)
+        const sel = getSelection()
+        if (!text || !sel?.rangeCount || !e.currentTarget.contains(sel.getRangeAt(0).startContainer)) return
+        // execCommand('insertText') は非推奨なので Range で差し込む（#88）。改行は <br>（marked の breaks と往復が合う）。カレットは差し込んだ文の直後
+        const range = sel.getRangeAt(0)
+        range.deleteContents()
+        const frag = document.createDocumentFragment()
+        text.split(/\r?\n/).forEach((line, i) => {
+          if (i) frag.appendChild(document.createElement('br'))
+          frag.appendChild(document.createTextNode(line))
+        })
+        const last = frag.lastChild as Node
+        range.insertNode(frag)
+        range.setStartAfter(last)
+        range.collapse(true)
+        sel.removeAllRanges()
+        sel.addRange(range)
       }}
       onFocus={(e) => {
         before.current = e.currentTarget.innerHTML
@@ -59,10 +74,44 @@ type RowProps = {
   onCheck?: (md: string) => void
   onDelete?: () => void
   onRemoveImage?: (imageId: string) => void
+  /** 保存済みの画像の説明（alt）を書き換えたとき（#13） */
+  onAlt?: (imageId: string, alt: string) => void
 }
 
-export function BlockRow({ block: b, read, onCommit, onCheck, onDelete, onRemoveImage }: RowProps) {
+/** 画像の説明の入力欄（#13）。入力欄と保存後の両方で使う。Enter で blur（確定は親の onBlur） */
+function AltInput({
+  value,
+  onChange,
+  onBlur,
+  autoFocus,
+}: {
+  value: string
+  onChange: (alt: string) => void
+  onBlur?: () => void
+  autoFocus?: boolean
+}) {
+  return (
+    <input
+      type="text"
+      className="alt"
+      value={value}
+      placeholder="この画像の説明（任意）"
+      aria-label="画像の説明"
+      // biome-ignore lint/a11y/noAutofocus: クリックで開いた欄なので、そのまま打てるのが自然
+      autoFocus={autoFocus}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+      }}
+    />
+  )
+}
+
+export function BlockRow({ block: b, read, onCommit, onCheck, onDelete, onRemoveImage, onAlt }: RowProps) {
   const [cls, mk, tt] = MARK(b)
+  // 説明を書いている画像の id と打っている文。クリックで開き、blur で確定して閉じる（#13）
+  const [altOf, setAltOf] = useState<{ id: string; text: string } | null>(null)
   // 本文のチェックボックスのクリックを拾い、Markdown 側を反転して保存する。DOM の切り替えは保存後の再描画に任せる
   const onBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const t = e.target
@@ -96,19 +145,36 @@ export function BlockRow({ block: b, read, onCommit, onCheck, onDelete, onRemove
           <Editable md={b.md} onCommit={(m) => onCommit?.(m)} />
         )}
         {b.images.map((im) => (
-          <span className="imgwrap" key={im.id}>
+          <figure className="imgwrap" key={im.id}>
             {/* JSON 由来の画像は data:image/ だけを表示する（#35） */}
-            {isImageDataUrl(im.dataUrl) ? (
+            {!isImageDataUrl(im.dataUrl) ? (
+              <span className="sub">表示できない画像です</span>
+            ) : read ? (
               <img src={im.dataUrl} alt={im.alt || '自分で入れた画像'} />
             ) : (
-              <span className="sub">表示できない画像です</span>
+              <button type="button" className="imgbtn" title="クリックで説明を書く" onClick={() => setAltOf({ id: im.id, text: im.alt })}>
+                <img src={im.dataUrl} alt={im.alt || '自分で入れた画像'} />
+              </button>
+            )}
+            {!read && altOf?.id === im.id ? (
+              <AltInput
+                value={altOf.text}
+                autoFocus
+                onChange={(text) => setAltOf({ id: im.id, text })}
+                onBlur={() => {
+                  if (altOf.text !== im.alt) onAlt?.(im.id, altOf.text)
+                  setAltOf(null)
+                }}
+              />
+            ) : (
+              im.alt && <figcaption className="sub">{im.alt}</figcaption>
             )}
             {!read && (
-              <button type="button" onClick={() => onRemoveImage?.(im.id)} aria-label="この画像を外す">
+              <button type="button" className="rm" onClick={() => onRemoveImage?.(im.id)} aria-label="この画像を外す">
                 ×
               </button>
             )}
-          </span>
+          </figure>
         ))}
         {b.source && (
           <div className="src">
@@ -230,7 +296,7 @@ export function Composer({ draft, onChange, onSubmit }: { draft: NoteDraft; onCh
       if (!f.type.startsWith('image/')) continue
       try {
         const url = await shrinkImage(f)
-        set({ images: [...latest.current.images, url] })
+        set({ images: [...latest.current.images, { dataUrl: url, alt: '' }] })
       } catch {
         toast('画像を読み込めませんでした。')
       }
@@ -308,12 +374,21 @@ export function Composer({ draft, onChange, onSubmit }: { draft: NoteDraft; onCh
       />
       {images.length > 0 && (
         <div className="atts">
-          {images.map((u, i) => (
+          {images.map((im, i) => (
             <figure key={i}>
-              <img src={u} alt={`入れる画像 ${i + 1}`} />
-              <button type="button" onClick={() => set({ images: images.filter((_, j) => j !== i) })} aria-label="この画像を外す">
+              <img src={im.dataUrl} alt={im.alt || `入れる画像 ${i + 1}`} />
+              <button
+                type="button"
+                className="rm"
+                onClick={() => set({ images: images.filter((_, j) => j !== i) })}
+                aria-label="この画像を外す"
+              >
                 ×
               </button>
+              <AltInput
+                value={im.alt}
+                onChange={(alt) => set({ images: latest.current.images.map((x, j) => (j === i ? { ...x, alt } : x)) })}
+              />
             </figure>
           ))}
         </div>
@@ -323,7 +398,7 @@ export function Composer({ draft, onChange, onSubmit }: { draft: NoteDraft; onCh
           onClose={() => setPad(false)}
           onSave={async (u) => {
             const s = await shrinkImage(u).catch(() => u)
-            set({ images: [...latest.current.images, s] })
+            set({ images: [...latest.current.images, { dataUrl: s, alt: '' }] })
             setPad(false)
           }}
         />

@@ -1,7 +1,7 @@
 import { L } from '../src/ui/labels'
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
-import { PNG, blankBook, busyButton, demoBook, isPhone, writeNote } from './helpers'
+import { PNG, blankBook, busyButton, demoBook, isPhone, nav, writeNote } from './helpers'
 
 test('完了条件1: 自由入力 → 確認質問 → 設計案 → ロードマップに並ぶ', async ({ page }) => {
   await demoBook(page)
@@ -44,10 +44,10 @@ test('完了条件4: 完了と再確認の印がロードマップと本棚に�
   await expect(page.locator('.pagehead .flag')).toBeVisible()
   await page.getByLabel('完了', { exact: true }).check()
   await expect(page.locator('.pagehead .chip.done')).toBeVisible()
-  await page.getByRole('button', { name: L.roadmap, exact: true }).click()
+  await page.getByRole('main').getByRole('button', { name: L.roadmap, exact: true }).click()
   await expect(page.locator('.detail .chip.done').locator('visible=true').first()).toBeVisible()
   await expect(page.locator('.detail .flag').locator('visible=true').first()).toBeVisible()
-  await page.getByRole('tab', { name: /本棚/ }).click()
+  await nav(page, /本棚/).click()
   await expect(page.getByText('すべて完了')).toBeVisible()
   await expect(page.getByText('再確認 1件')).toBeVisible()
   await expect(page.getByText('完了 1 / 書き込みあり 0')).toBeVisible()
@@ -61,7 +61,7 @@ test('完了条件5: 設計を直す。差分を見て採用。守る対象は�
   await page.getByLabel('完了', { exact: true }).check()
   await page.getByRole('button', { name: /次へ 1-2/ }).click()
   await writeNote(page, '二つ目の節のノート')
-  await page.getByRole('button', { name: L.roadmap, exact: true }).click()
+  await page.getByRole('main').getByRole('button', { name: L.roadmap, exact: true }).click()
 
   await page.getByRole('button', { name: '設計を直す' }).click()
   const redo = page.getByLabel('設計を直す', { exact: true })
@@ -83,7 +83,7 @@ test('完了条件5: 設計を直す。差分を見て採用。守る対象は�
   await expect(list.getByText('ゴールから逆算して地図を描く', { exact: false }).first()).toBeVisible()
 
   // 守られたノートがそのまま残っている
-  await page.getByRole('tab', { name: /教科書/ }).click()
+  await nav(page, /教科書/).click()
   await expect(page.getByText('守られるべきノート')).toBeVisible()
   await expect(page.getByText('二つ目の節のノート')).toBeVisible()
 })
@@ -92,7 +92,7 @@ test('完了条件6: 通読。絞り込みと書き手の印の切り替え', as
   await demoBook(page)
   await page.getByRole('button', { name: L.generateLesson }).click()
   await writeNote(page, '通読で見えるノート')
-  await page.getByRole('tab', { name: /教科書/ }).click()
+  await nav(page, /教科書/).click()
   const book = page.locator('article.book')
   await expect(book.getByText('通読で見えるノート')).toBeVisible()
   await expect(book.getByText('この節の狙い')).toBeVisible()
@@ -117,14 +117,14 @@ test('完了条件7: JSONの書き出しと読み込み。キーは入らない�
   await writeNote(page, '端末をまたぐノート')
 
   // APIキーを設定してから書き出す
-  await page.getByRole('tab', { name: /つくる/ }).click()
+  await nav(page, /つくる/).click()
   await page.getByRole('button', { name: 'Anthropic API' }).click()
   await page.getByRole('button', { name: '入れる' }).click()
   await page.locator('#ai_key').fill('sk-ant-e2e-SECRET-KEY')
   await page.getByRole('button', { name: '保存' }).click()
   await expect(page.getByText('APIキー 設定済み')).toBeVisible()
 
-  await page.getByRole('tab', { name: /本棚/ }).click()
+  await nav(page, /本棚/).click()
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'JSON書出' }).click()])
   expect(dl.suggestedFilename()).toBe('新しい教科書.textbook.json')
   const json = readFileSync((await dl.path())!, 'utf8')
@@ -169,7 +169,7 @@ test('完了条件7: JSONの書き出しと読み込み。キーは入らない�
   await page.reload()
   await expect(page.getByRole('heading', { name: 'スマホで続きを書いた' })).toBeVisible()
   // キーは端末に残るが、画面には出さない
-  await page.getByRole('tab', { name: /つくる/ }).click()
+  await nav(page, /つくる/).click()
   await expect(page.getByText('APIキー 設定済み')).toBeVisible()
   await expect(page.locator('body')).not.toContainText('SECRET')
 })
@@ -201,7 +201,7 @@ test('ノートの下書きは差し込み位置や節の切り替えで消え�
   // 別の節へ行くと、その節の下書きは空。戻ると元の下書きが残っている
   await page.getByRole('button', { name: /次へ 1-2/ }).click()
   await expect(page.locator('#note')).toHaveValue('')
-  await page.getByRole('button', { name: L.roadmap, exact: true }).click()
+  await page.getByRole('main').getByRole('button', { name: L.roadmap, exact: true }).click()
   await page.getByRole('button', { name: /続きから 1-1/ }).click()
   await expect(page.locator('#note')).toHaveValue('まだ書きかけ')
   await expect(page.locator('.atts img')).toHaveCount(1)
@@ -286,7 +286,7 @@ test('CSP 違反が出ない（本番ビルドの meta CSP）', async ({ page })
   await writeNote(page, 'CSP の確認')
   await expect(page.locator('.doc [data-by="me"] img')).toHaveCount(1)
   // 書き出し（blob URL のダウンロード）
-  await page.getByRole('button', { name: L.roadmap, exact: true }).click()
+  await page.getByRole('main').getByRole('button', { name: L.roadmap, exact: true }).click()
   await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'JSONを書き出す' }).click()])
   expect(violations).toEqual([])
 })
@@ -341,11 +341,11 @@ test('本文のチェックリストはクリックで切り替わり、保存�
   await boxes.nth(0).click()
   await expect(boxes.nth(0)).toBeChecked()
   // 別の画面へ行って戻っても残る
-  await page.getByRole('button', { name: L.roadmap, exact: true }).click()
+  await page.getByRole('main').getByRole('button', { name: L.roadmap, exact: true }).click()
   await page.getByRole('button', { name: /続きから 1-1/ }).click()
   await expect(page.locator('.doc [data-by="me"] input[type="checkbox"]').nth(0)).toBeChecked()
   // 通読でも切り替えられる
-  await page.getByRole('tab', { name: /教科書/ }).click()
+  await nav(page, /教科書/).click()
   const bookBoxes = page.locator('.book input[type="checkbox"]')
   await expect(bookBoxes).toHaveCount(2)
   await bookBoxes.nth(1).click()

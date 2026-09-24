@@ -1,6 +1,16 @@
 import type { CourseInput, Textbook } from '../types'
 import { findLesson, isProtectedLesson } from '../lib/status'
-import { abortError, zeroUsage, type AiOpts, type AiProvider, type Progress, type QA, type RedesignPlan, type RedesignScope } from './types'
+import {
+  PROGRESS,
+  abortError,
+  zeroUsage,
+  type AiOpts,
+  type AiProvider,
+  type Progress,
+  type QA,
+  type RedesignPlan,
+  type RedesignScope,
+} from './types'
 
 /**
  * デモ応答。APIキーなしで動線を試すためのサンプルを返す。通しテストもこれを使う。
@@ -38,18 +48,24 @@ const wait = (ms = DEMO_DELAY_MS, signal?: AbortSignal) =>
 const topicOf = (i: CourseInput): string => (i.prompt.trim().split(/[。\n、,.]/)[0] || '学びたいこと').slice(0, 24)
 
 export class DemoProvider implements AiProvider {
-  async askQuestions(): Promise<string[]> {
-    await wait()
-    return ['「できるようになった」と言えるのはどんな状態？ 成果物の例があると設計しやすい。', '好きな学び方、避けたい学び方はある？']
+  async askQuestions(_input: CourseInput, opts: AiOpts = {}) {
+    await wait(DEMO_DELAY_MS, opts.signal)
+    return {
+      questions: [
+        '「できるようになった」と言えるのはどんな状態？ 成果物の例があると設計しやすい。',
+        '好きな学び方、避けたい学び方はある？',
+      ],
+      usage: zeroUsage(),
+    }
   }
 
   async designCourse(input: CourseInput, _qa: QA[], note: string, onProgress: Progress, opts: AiOpts = {}) {
     const t = topicOf(input)
-    onProgress(0, '分解中…')
+    onProgress(0, PROGRESS.splitting)
     await wait(DEMO_DELAY_MS, opts.signal)
-    onProgress(1, 'デモ応答中…')
+    onProgress(1, PROGRESS.demo)
     await wait(DEMO_DELAY_MS, opts.signal)
-    onProgress(2, '設計中…')
+    onProgress(2, PROGRESS.designing)
     await wait(DEMO_DELAY_MS, opts.signal)
     const L = (title: string, minutes = 45, isTask = false) => ({ title, minutes, isTask, summary: `${title}ができるようになる。` })
     const design = {
@@ -74,7 +90,7 @@ export class DemoProvider implements AiProvider {
       ],
     }
     if (note) design.chapters[1].lessons.splice(1, 0, L(`注文を反映: ${note.slice(0, 20)}`, 45))
-    onProgress(3, '設計ができた')
+    onProgress(3, PROGRESS.designed)
     return { design, usage: zeroUsage() }
   }
 
@@ -83,9 +99,9 @@ export class DemoProvider implements AiProvider {
     // 渡された資料（#63）は本文に名前と先頭だけ写して、動線を確かめられるようにする
     const mats = opts.materials ?? []
     const sourceOnly = !!opts.sourceOnly && mats.length > 0
-    onProgress(0, 'デモ応答中…')
+    onProgress(0, PROGRESS.demo)
     await wait(DEMO_DELAY_MS, opts.signal)
-    onProgress(1, sourceOnly ? '資料から作成中…' : '資料を作成中…')
+    onProgress(1, sourceOnly ? PROGRESS.writingFromMaterial : PROGRESS.writing)
     await wait(DEMO_DELAY_MS, opts.signal)
     const t = f.lesson.title
     const matLine = mats.length
@@ -104,13 +120,13 @@ export class DemoProvider implements AiProvider {
         how: ['本文の例を自分の環境で再現する', '公式の一次情報と照らす'],
       },
     }
-    onProgress(2, '資料ができた')
+    onProgress(2, PROGRESS.written)
     return { draft, usage: zeroUsage() }
   }
 
   async proposeRedesign(tb: Textbook, scope: RedesignScope, lessonId: string, order: string, onProgress: Progress, opts: AiOpts = {}) {
     const f = findLesson(tb, lessonId)!
-    onProgress(0, '案を作成中…')
+    onProgress(0, PROGRESS.proposing)
     await wait(DEMO_DELAY_MS, opts.signal)
     const tag = order ? `（${order.slice(0, 16)}）` : '（見直し）'
     let plan: RedesignPlan

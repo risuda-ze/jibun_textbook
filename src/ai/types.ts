@@ -1,5 +1,6 @@
 import type { Clues, CourseInput, Textbook } from '../types'
 import type { PlanChapter, PlanLesson } from '../lib/protect'
+import { AI_MSG } from '../lib/messages'
 
 export type AiKind = 'anthropic' | 'compat' | 'local' | 'demo'
 export type SearchMode = 'builtin' | 'none'
@@ -14,6 +15,15 @@ export type AiSettings = {
 
 export const DEFAULT_AI: AiSettings = { kind: 'anthropic', model: 'claude-sonnet-5', apiKey: '', search: 'builtin' }
 
+/**
+ * 1リクエストあたりの Web 検索の上限（max_uses）。Help の Q&A と AiBar の説明もこの値を出す。
+ * anthropic.ts ではなくここに置くのは、画面がこの値のために SDK を静的に読み込まないため（#10）
+ */
+export const MAX_SEARCH_DESIGN = 8
+export const MAX_SEARCH_LESSON = 5
+/** Anthropic の Web 検索の料金（検索 1000 回あたり・ドル）。表示用 */
+export const WEB_SEARCH_USD_PER_1000 = 10
+
 export const MODELS: { id: string; label: string }[] = [
   { id: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
   { id: 'claude-opus-5', label: 'Claude Opus 5' },
@@ -22,6 +32,21 @@ export const MODELS: { id: string; label: string }[] = [
 ]
 
 export type Progress = (step: number, detail: string) => void
+
+/** 進行中の文（#77 #102）。デモ応答と実 API が同じ語を出す。ボタンの中に「{現状}・{N秒}」で出る */
+export const PROGRESS = {
+  running: '実行中…',
+  asking: '質問を作成中…',
+  splitting: '分解中…',
+  searching: 'Web調査中…',
+  designing: '設計中…',
+  designed: '設計ができた',
+  writing: '資料を作成中…',
+  writingFromMaterial: '資料から作成中…',
+  written: '資料ができた',
+  proposing: '案を作成中…',
+  demo: 'デモ応答中…',
+} as const
 
 /** 渡す資料（#63）。txt/md は文字、PDF は base64。教科書の JSON には入れない */
 export type MaterialKind = 'text' | 'pdf'
@@ -59,7 +84,7 @@ export type RedesignPlan =
   | { scope: 'course'; chapters: PlanChapter[] }
 
 export interface AiProvider {
-  askQuestions(input: CourseInput, opts?: AiOpts): Promise<string[]>
+  askQuestions(input: CourseInput, opts?: AiOpts): Promise<{ questions: string[]; usage: Usage }>
   designCourse(
     input: CourseInput,
     qa: QA[],
@@ -92,7 +117,7 @@ export class AiError extends Error {
 }
 
 /** 自分でやめたときのエラー（#14） */
-export const abortError = (): AiError => new AiError('aborted', '生成をやめました。')
+export const abortError = (): AiError => new AiError('aborted', AI_MSG.aborted)
 export function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw abortError()
 }

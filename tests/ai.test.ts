@@ -3,7 +3,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { AnthropicProvider, type MessagesLike } from '../src/ai/anthropic'
 import { DemoProvider } from '../src/ai/demo'
 import { getProvider } from '../src/ai'
-import { AiError, DEFAULT_AI, zeroUsage, type AiSettings } from '../src/ai/types'
+import { DEFAULT_AI, zeroUsage, type AiSettings } from '../src/ai/types'
+import { AI_MSG } from '../src/lib/messages'
 import { newChapter, newLesson, newTextbook } from '../src/types'
 
 const settings: AiSettings = { ...DEFAULT_AI, apiKey: 'test' }
@@ -143,9 +144,14 @@ describe('調査（1段目）', () => {
 
 describe('構造化（2段目）', () => {
   it('ツールを付けず、output_config.format を付ける', async () => {
-    const { client, calls } = fake([], [{ parsed_output: { questions: ['a', 'b', 'c', 'd'] }, stop_reason: 'end_turn' }])
-    const qs = await new AnthropicProvider(settings, client).askQuestions({ prompt: 'Rust', can: '', time: '', env: '' })
-    expect(qs).toEqual(['a', 'b', 'c'])
+    const { client, calls } = fake(
+      [],
+      [{ parsed_output: { questions: ['a', 'b', 'c', 'd'] }, stop_reason: 'end_turn', usage: { input_tokens: 10, output_tokens: 3 } }],
+    )
+    const r = await new AnthropicProvider(settings, client).askQuestions({ prompt: 'Rust', can: '', time: '', env: '' })
+    expect(r.questions).toEqual(['a', 'b', 'c'])
+    // 使った量も返す（#88）
+    expect(r.usage).toEqual({ inputTokens: 10, outputTokens: 3, searches: 0 })
     expect(calls.parse[0].tools).toBeUndefined()
     expect((calls.parse[0].output_config as { format: unknown }).format).toBeTruthy()
     expect(calls.parse[0].model).toBe('claude-sonnet-5')
@@ -259,10 +265,15 @@ describe('設計を直す', () => {
 })
 
 describe('接続先の切り替え', () => {
-  it('キー未設定・未対応の接続先は分かる言葉で断る', () => {
-    expect(() => getProvider({ ...DEFAULT_AI, apiKey: '' })).toThrowError(AiError)
-    expect(() => getProvider({ ...DEFAULT_AI, kind: 'local' })).toThrowError(/まだ使用できません/)
-    expect(getProvider({ ...DEFAULT_AI, kind: 'demo' })).toBeTruthy()
+  it('キー未設定・未対応の接続先は分かる言葉で断る', async () => {
+    await expect(getProvider({ ...DEFAULT_AI, apiKey: '' })).rejects.toThrowError(AI_MSG.nokey)
+    await expect(getProvider({ ...DEFAULT_AI, kind: 'local' })).rejects.toThrowError(AI_MSG.unsupported)
+  })
+  it('デモは即座に、Anthropic は動的 import で AiProvider を返す（#10）', async () => {
+    expect(await getProvider({ ...DEFAULT_AI, kind: 'demo' })).toBeInstanceOf(DemoProvider)
+    const p = await getProvider(settings)
+    expect(p).toBeInstanceOf(AnthropicProvider)
+    expect(typeof p.generateLesson).toBe('function')
   })
 })
 
@@ -302,6 +313,20 @@ describe('生成の中止（#14）', () => {
     const c = new AbortController()
     const p = new DemoProvider().generateLesson(tb, lessonId, () => {}, { signal: c.signal })
     c.abort()
+    await expect(p).rejects.toMatchObject({ code: 'aborted' })
+  })
+  it('確認質問も signal で中止できる（#88）', async () => {
+    const input = { prompt: 'x', can: '', time: '', env: '' }
+    const { client, calls } = fake([], [])
+    const c = new AbortController()
+    c.abort()
+    await expect(new AnthropicProvider(settings, client).askQuestions(input, { signal: c.signal })).rejects.toMatchObject({
+      code: 'aborted',
+    })
+    expect(calls.parse).toHaveLength(0)
+    const d = new AbortController()
+    const p = new DemoProvider().askQuestions(input, { signal: d.signal })
+    d.abort()
     await expect(p).rejects.toMatchObject({ code: 'aborted' })
   })
 })
