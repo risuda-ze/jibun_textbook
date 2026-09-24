@@ -451,21 +451,22 @@ export function Roadmap({ tb }: { tb: Textbook }) {
               show={sel.lesson.blocks.length === 0}
               onDone={() => openLesson(sel.lesson.id)}
               actions={
-                <>
-                  <Button v={sel.lesson.blocks.length ? 'soft' : 'ghost'} onClick={() => openLesson(sel.lesson.id)}>
-                    {sel.lesson.blocks.length ? 'レッスンを開く' : L.startWriting}
-                  </Button>
-                  <Button v="outline" sm onClick={() => removeLesson(sel.lesson.id)}>
-                    この節を消す
-                  </Button>
-                  {sel.lesson.blocks.length > 0 && (
-                    <Button v="outline" sm onClick={() => clearLessonWithUndo(tb, sel.lesson.id)}>
-                      {L.clearLesson}
-                    </Button>
-                  )}
-                </>
+                <Button v={sel.lesson.blocks.length ? 'soft' : 'ghost'} onClick={() => openLesson(sel.lesson.id)}>
+                  {sel.lesson.blocks.length ? 'レッスンを開く' : L.startWriting}
+                </Button>
               }
             />
+            {/* 消す系は主操作の並びから離して右寄せに（#90） */}
+            <div className="row" style={{ justifyContent: 'flex-end' }}>
+              <Button v="outline" sm onClick={() => removeLesson(sel.lesson.id)}>
+                この節を消す
+              </Button>
+              {sel.lesson.blocks.length > 0 && (
+                <Button v="outline" sm onClick={() => clearLessonWithUndo(tb, sel.lesson.id)}>
+                  {L.clearLesson}
+                </Button>
+              )}
+            </div>
             <div>
               <div className="sub" style={{ marginBottom: 4 }}>
                 教科書の育ち具合

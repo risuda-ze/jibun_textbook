@@ -5,6 +5,7 @@ import type { Textbook } from '../types'
 import { StopButton, stepPercent, useElapsed } from './common'
 import { GEN_STEPS, startGeneration, stopGeneration } from './generate'
 import { Button } from './kit'
+import { L } from './labels'
 import { MaterialPanel, emptyMaterialInput, type MaterialInput } from './material'
 
 /**
@@ -33,8 +34,11 @@ export function useGenerate(tb: Textbook, ai: AiSettings) {
 export type Generate = ReturnType<typeof useGenerate>
 
 /**
- * 生成ボタン（押すと進行中の色になり、今していることと経過秒数が中に出る #50 #55 #77）・やめる（#14）・同じ行の他のボタン・資料を渡す欄（#63）。
- * `show=false` なら生成ボタンと資料の欄を出さず、`actions` だけの行にする（本文がある節）
+ * 資料の生成のひとまとまり（#90 #91）。レッスンとロードマップで同じ形。
+ * 枠の中に「資料を渡す」→「資料を生成」を左から並べ、渡す欄はその下に開く。
+ * 生成ボタンは押すと進行中の色になり、今していることと経過秒数が中に出る（#50 #55 #77）。「やめる」はその右（#14）。
+ * `actions`（レッスンを開く／自分で書き始める）は枠の次の行、`note`（使うAI）は枠の下の sub。
+ * `show=false` なら枠を出さず `actions` の行だけにする（本文がある節）
  */
 export function GenerateControls({
   g,
@@ -57,27 +61,29 @@ export function GenerateControls({
   const seconds = useElapsed(!!running, running?.startedAt ?? null, running?.endedAt ?? null)
   return (
     <>
-      <div className="row">
-        {show && (
-          <Button
-            v="soft"
-            disabled={g.busy}
-            onClick={() => {
-              void g.start(lessonId).then((ok) => {
-                if (ok) onDone?.()
-              })
-            }}
-            progress={running ? stepPercent(running.step, GEN_STEPS) : null}
-            busy={running ? { label: running.detail, seconds, title: running.hint } : null}
-          >
-            {label}
-          </Button>
-        )}
-        {running && <StopButton onStop={() => g.stop(lessonId)} />}
-        {show && !running && note}
-        {actions}
-      </div>
-      {show && <MaterialPanel value={g.mat} onChange={g.setMat} disabled={g.busy} />}
+      {show && (
+        <div className="gengroup" role="group" aria-label={L.generateGroup}>
+          <div className="eyebrow">{L.generateGroup}</div>
+          <MaterialPanel value={g.mat} onChange={g.setMat} disabled={g.busy}>
+            <Button
+              v="soft"
+              disabled={g.busy}
+              onClick={() => {
+                void g.start(lessonId).then((ok) => {
+                  if (ok) onDone?.()
+                })
+              }}
+              progress={running ? stepPercent(running.step, GEN_STEPS) : null}
+              busy={running ? { label: running.detail, seconds, title: running.hint } : null}
+            >
+              {label}
+            </Button>
+            {running && <StopButton onStop={() => g.stop(lessonId)} />}
+          </MaterialPanel>
+        </div>
+      )}
+      {show && note}
+      {actions && <div className="row">{actions}</div>}
     </>
   )
 }
