@@ -335,6 +335,45 @@ export function Roadmap({ tb }: { tb: Textbook }) {
 
       {sel ? (
         <Card className="detail" id="detail">
+          {/* 章構成を左（広い）、選択中の節を右に置く（#89）。読み上げ順も同じ */}
+          <div className="chapterpane">
+            <div className="eyebrow">CH{sel.ci + 1}</div>
+            <TitleInput
+              key={sel.chapter.id}
+              className="titleinput"
+              aria-label="章の名前"
+              value={sel.chapter.title}
+              onCommit={(v) =>
+                updateBook(tb.id, (d) => {
+                  d.chapters[sel.ci].title = v
+                })
+              }
+            />
+            <ul className="lessonlist">
+              {sel.chapter.lessons.map((l, li) => (
+                <li key={l.id}>
+                  <button type="button" aria-current={l.id === sel.lesson.id} onClick={() => selectLesson(l.id)}>
+                    <span className="mono sub">
+                      {sel.ci + 1}-{li + 1}
+                    </span>
+                    <span>
+                      {l.isTask && '◆ '}
+                      {l.title}
+                    </span>
+                    <span className="row" style={{ justifyContent: 'flex-end' }}>
+                      <StatusChip lesson={l} />
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {/* この章への操作は章構成の右下に。コース全体への「章を足す」はカードの外に置く */}
+            <div className="row" style={{ marginTop: 8, justifyContent: 'flex-end' }}>
+              <Button v="outline" sm onClick={() => addLesson(sel.chapter.id)}>
+                この章に節を足す
+              </Button>
+            </div>
+          </div>
           <div className="stack">
             <div>
               <div className="eyebrow">
@@ -386,44 +425,6 @@ export function Roadmap({ tb }: { tb: Textbook }) {
                 教科書の育ち具合
               </div>
               <Meter tb={tb} />
-            </div>
-          </div>
-          <div className="chapterpane">
-            <div className="eyebrow">CH{sel.ci + 1}</div>
-            <TitleInput
-              key={sel.chapter.id}
-              className="titleinput"
-              aria-label="章の名前"
-              value={sel.chapter.title}
-              onCommit={(v) =>
-                updateBook(tb.id, (d) => {
-                  d.chapters[sel.ci].title = v
-                })
-              }
-            />
-            <ul className="lessonlist">
-              {sel.chapter.lessons.map((l, li) => (
-                <li key={l.id}>
-                  <button type="button" aria-current={l.id === sel.lesson.id} onClick={() => selectLesson(l.id)}>
-                    <span className="mono sub">
-                      {sel.ci + 1}-{li + 1}
-                    </span>
-                    <span>
-                      {l.isTask && '◆ '}
-                      {l.title}
-                    </span>
-                    <span className="row" style={{ justifyContent: 'flex-end' }}>
-                      <StatusChip lesson={l} />
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {/* この章への操作は章構成の右下に。コース全体への「章を足す」はカードの外に置く */}
-            <div className="row" style={{ marginTop: 8, justifyContent: 'flex-end' }}>
-              <Button v="outline" sm onClick={() => addLesson(sel.chapter.id)}>
-                この章に節を足す
-              </Button>
             </div>
           </div>
         </Card>

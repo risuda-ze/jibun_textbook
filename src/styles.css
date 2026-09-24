@@ -830,7 +830,7 @@ label.f {
 }
 .detail {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
   gap: var(--s32);
 }
 .lessonlist {
