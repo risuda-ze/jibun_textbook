@@ -205,7 +205,7 @@ main.stack {
   color: var(--color-ink-black);
   background: var(--wash);
 }
-.tab[aria-selected="true"] {
+.tab[aria-current="page"] {
   color: var(--color-ink-black);
   font-weight: 600;
   background: var(--wash);

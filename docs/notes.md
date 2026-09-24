@@ -197,3 +197,10 @@ zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても
 - `AI_KEY` は Help に行がある語だけ（nokey / auth / permission / rate / network / refusal / api）。行の無い文（parse・unsupported・noLesson・aborted）は `AI_MSG` にだけ置く。`AiError` の `code` は変えない（`auth` に auth と permission の2文がある）
 - **トースト（30件）は集めない**。操作の結果の文で、1か所ずつ文脈に依存するため
 - 進行中の文（「Web調査中…」など）は Help と無関係なので `messages.ts` ではなく `src/ai/types.ts` の `PROGRESS` に置く。デモ応答と実 API、`Button` の既定「実行中…」が同じ定数を読む。文言は変えていない
+
+## 2026-09-24 の判断（#88 の3・5・6）
+
+- 確認質問（`askQuestions`）も `opts.signal` で中止でき、`{ questions, usage }` を返す。つくるは `useAiRun` を質問用にもう1つ持ち（`a`）、「やめる」と中止の知らせを設計と同じ経路で扱う。使用量は質問＋設計（＋直してもらう）の合算を `UsageLine` に出す。質問をやり直すと合算は質問の分からやり直す
+- 上のナビは `role="tablist"` をやめて `<nav aria-label="画面">` ＋ 押されている画面に `aria-current="page"`。`tabpanel` も矢印キー操作も無いので、タブと名乗らない方が実装と一致する。e2e は `e2e/helpers.ts` の `nav(page, /レッスン/)` で探す
+- ロードマップの `.tl` は `role="region"`、`.clip` は `title` と同じ文を `aria-label` にも入れる（hover の `title` は残す）
+- 見たまま編集の貼り付けは `document.execCommand('insertText')`（非推奨）をやめ、`Selection`/`Range` で差し込む（選択を消す → 文字ノードを `insertNode` → カレットをその直後へ）。改行は `<br>` にする。`marked` は `breaks: true` なので md との往復が合う。`onBeforeInput` の `insertFromPaste` にしなかったのは、結局 preventDefault して自分で差し込むのは同じで、`onPaste` の方が画像の判定（`clipboardData.files`）をそのまま使えるため。失うのは Ctrl+Z で貼り付けだけを戻す操作（確定は blur 時の HTML 比較なので保存には影響しない）
