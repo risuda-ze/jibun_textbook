@@ -3,22 +3,14 @@ import {
     dropBroken,
     go,
     openRepair,
-    markExported,
     openBook,
     putBook,
     removeBook,
-    toast,
     useApp,
 } from "../store";
-import { newChapter, newLesson, newTextbook, type Textbook } from "../types";
-import {
-    SIZE_WARN_BYTES,
-    byteSize,
-    exportJson,
-    fileName,
-    formatSize,
-    readTextbookFile,
-} from "../lib/io";
+import { newChapter, newLesson, newTextbook } from "../types";
+import { readTextbookFile } from "../lib/io";
+import { downloadText } from "../lib/download";
 import { OlderCard, importTextbook, type Older } from "./import";
 import {
     allLessons,
@@ -27,28 +19,8 @@ import {
     lessonNo,
     reviewCount,
 } from "../lib/status";
-import { Meter } from "./common";
+import { Meter, downloadBook } from "./common";
 import { Button, Card, PageHead, Pill } from "./kit";
-
-export function downloadBook(tb: Textbook): void {
-    const json = exportJson(tb);
-    const size = byteSize(json);
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(
-        new Blob([json], { type: "application/json" }),
-    );
-    a.download = fileName(tb);
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    markExported(tb.id);
-    toast(
-        size > SIZE_WARN_BYTES
-            ? `書き出しました（${formatSize(size)}）。8MBを超えているので、添付上限に注意してください。`
-            : `書き出しました（${formatSize(size)}）`,
-    );
-}
 
 const daysSince = (iso?: string): number | null =>
     iso ? Math.floor((Date.now() - Date.parse(iso)) / 86400000) : null;
@@ -134,13 +106,7 @@ export function Shelf() {
                         {broken.map((b) => (
                             <span className="row" key={b.key}>
                                 <span className="mono sub">{b.key}</span>
-                                <Button v="outline" sm onClick={() => {
-                                    const a = document.createElement("a");
-                                    a.href = URL.createObjectURL(new Blob([JSON.stringify(b.raw ?? null, null, 1)], { type: "application/json" }));
-                                    a.download = `${b.key.replace(/[^a-z0-9_-]/gi, "_")}.raw.json`;
-                                    document.body.appendChild(a); a.click(); a.remove();
-                                    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-                                }}>生データを書き出す</Button>
+                                <Button v="outline" sm onClick={() => downloadText(`${b.key.replace(/[^a-z0-9_-]/gi, "_")}.raw.json`, JSON.stringify(b.raw ?? null, null, 1))}>生データを書き出す</Button>
                                 <Button v="outline" sm onClick={() => openRepair(b.key, b.raw)}>Help で直す</Button>
                                 <Button v="danger" sm onClick={() => { if (confirm("この生データを端末から消しますか？")) dropBroken(b.key); }}>消去</Button>
                             </span>

@@ -2,7 +2,10 @@ import type { Lesson, Textbook } from '../types'
 import { STATUS_LABEL, lessonStatus, statusCounts, type Status } from '../lib/status'
 import { MODELS, type AiKind } from '../ai/types'
 import { WEB_SEARCH_USD_PER_1000 } from '../ai/anthropic'
-import { setAi, toast, useApp } from '../store'
+import { markExported, setAi, toast, useApp } from '../store'
+import { SIZE_WARN_BYTES, byteSize, exportJson, fileName, formatSize } from '../lib/io'
+import { downloadText } from '../lib/download'
+import type { AiError, Progress, Usage } from '../ai/types'
 import { useEffect, useRef, useState, type InputHTMLAttributes } from 'react'
 import { Button, Card, Pill, Segmented } from './kit'
 
@@ -158,4 +161,61 @@ export function TitleInput({ value, onCommit, ...rest }: { value: string; onComm
       onBlur={commit}
     />
   )
+}
+
+/** 教科書を JSON で書き出す（#82 で Shelf から移動。本棚・ロードマップ・通読・Help で共用） */
+export function downloadBook(tb: Textbook): void {
+  const json = exportJson(tb)
+  const size = byteSize(json)
+  downloadText(fileName(tb), json)
+  markExported(tb.id)
+  toast(size > SIZE_WARN_BYTES
+    ? `書き出しました（${formatSize(size)}）。8MBを超えているので、添付上限に注意してください。`
+    : `書き出しました（${formatSize(size)}）`)
+}
+
+/** 使った量（検索回数・トークン）の1行。無ければ出さない */
+export function UsageLine({ usage }: { usage: Usage | null }) {
+  if (!usage || (!usage.inputTokens && !usage.searches)) return null
+  return <p className="usage">検索 {usage.searches}回 / 入力 {usage.inputTokens.toLocaleString()} / 出力 {usage.outputTokens.toLocaleString()} トークン</p>
+}
+
+/** 進行中の表示（今していること・経過秒数）と「やめる」（#14）。進行中のボタンの脇に置く */
+export function RunControls({ detail, startedAt, endedAt, onStop }: { detail: string; startedAt: number | null; endedAt: number | null; onStop: () => void }) {
+  return (
+    <>
+      <Working running detail={detail} startedAt={startedAt} endedAt={endedAt} />
+      <Button v="outline" sm onClick={onStop}>やめる</Button>
+    </>
+  )
+}
+
+/**
+ * AI の作業を1回走らせる（#82）。busy・段階・今していること・経過時間・エラー・中止をまとめて持つ。
+ * つくる（設計）と、ロードマップの「設計を直す」で使う。自分でやめたときはエラーにせず短く知らせる（#14）
+ */
+export function useAiRun() {
+  const [busy, setBusy] = useState(false)
+  const [step, setStep] = useState(-1)
+  const [detail, setDetail] = useState('')
+  const [startedAt, setStartedAt] = useState<number | null>(null)
+  const [endedAt, setEndedAt] = useState<number | null>(null)
+  const [error, setError] = useState('')
+  const abort = useAbort()
+  async function run<T>(fn: (progress: Progress, signal: AbortSignal) => Promise<T>, doneStep?: number): Promise<T | null> {
+    setBusy(true); setError(''); setStep(0); setDetail(''); setStartedAt(Date.now()); setEndedAt(null)
+    try {
+      const r = await fn((s, d) => { setStep(s); setDetail(d) }, abort.start())
+      if (doneStep !== undefined) setStep(doneStep)
+      return r
+    } catch (e) {
+      if ((e as AiError).code === 'aborted') toast('生成をやめました'); else setError((e as Error).message)
+      setStep(-1)
+      return null
+    } finally {
+      setEndedAt(Date.now())
+      setBusy(false)
+    }
+  }
+  return { busy, step, detail, startedAt, endedAt, error, setError, run, stop: abort.stop }
 }
