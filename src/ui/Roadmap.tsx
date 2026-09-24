@@ -220,7 +220,23 @@ export function Roadmap({ tb }: { tb: Textbook }) {
       for (const c of d.chapters) c.lessons = c.lessons.filter((l) => l.id !== id)
       d.chapters = d.chapters.filter((c) => c.lessons.length)
     })
-    toast(last ? '節を消しました。節が無くなった章も消しました' : '節を消しました', before ? () => putBook(before) : undefined)
+    // 消した節を選んだままにしない（#88）。レッスンタブを押したときに「節が選ばれていません」になるのを防ぐ。元に戻すで選択も戻す
+    const after = {
+      ...tb,
+      chapters: tb.chapters.map((c) => ({ ...c, lessons: c.lessons.filter((l) => l.id !== id) })).filter((c) => c.lessons.length),
+    }
+    const next = (currentLesson(after) ?? after.chapters[0]?.lessons[0])?.id
+    const moved = (!lessonId || lessonId === id) && !!next
+    if (moved) selectLesson(next)
+    toast(
+      last ? '節を消しました。節が無くなった章も消しました' : '節を消しました',
+      before
+        ? () => {
+            putBook(before)
+            if (moved) selectLesson(id)
+          }
+        : undefined,
+    )
   }
 
   return (

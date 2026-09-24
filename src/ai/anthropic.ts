@@ -88,7 +88,8 @@ function toAiError(e: unknown): AiError {
   if (e instanceof Anthropic.APIConnectionError)
     return new AiError('network', 'ネットワークに接続できませんでした。接続を確認してから、もう一度お試しください。')
   if (e instanceof Anthropic.APIError) return new AiError('api', `APIエラーが発生しました（${e.status ?? '?'}）: ${e.message}`)
-  if (e instanceof TypeError)
+  // fetch の失敗は TypeError で来る。それ以外の TypeError はコードの不具合なので、接続の案内にせず中身を出す（#88）
+  if (e instanceof TypeError && /fetch|network|Load failed/i.test(e.message))
     return new AiError('network', 'ネットワークに接続できませんでした。接続を確認してから、もう一度お試しください。')
   return new AiError('api', e instanceof Error ? e.message : String(e))
 }

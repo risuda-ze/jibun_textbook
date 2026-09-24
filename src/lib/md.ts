@@ -29,7 +29,8 @@ export function toggleTask(md: string, index: number): string {
 
 export function mdToHtml(md: string): string {
   const html = marked.parse(md, { async: false }) as string
-  return DOMPurify.sanitize(html, { ADD_ATTR: ['target', 'rel'] })
+  // target は許可しない（#88）。marked は target を付けず、本文に直書きした <a target="_blank"> も同一タブに揃える（docs/security.md）
+  return DOMPurify.sanitize(html)
 }
 
 const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', bulletListMarker: '-', emDelimiter: '*' })

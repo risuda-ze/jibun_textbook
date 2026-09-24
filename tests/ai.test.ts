@@ -131,6 +131,11 @@ describe('調査（1段目）', () => {
     const run = (e: Error) => new AnthropicProvider(settings, fake([e]).client).research('s', 'p', 1, zeroUsage())
     await expect(run(new Anthropic.APIConnectionError({ message: 'down' }))).rejects.toMatchObject({ code: 'network' })
     await expect(run(new TypeError('Failed to fetch'))).rejects.toMatchObject({ code: 'network' })
+    // fetch 以外の TypeError はコードの不具合。接続の案内にせず中身を出す（#88）
+    await expect(run(new TypeError("Cannot read properties of undefined (reading 'x')"))).rejects.toMatchObject({
+      code: 'api',
+      message: /undefined/,
+    })
     await expect(run(new Anthropic.AuthenticationError(401, undefined, 'bad key', new Headers()))).rejects.toMatchObject({ code: 'auth' })
     await expect(run(new Anthropic.RateLimitError(429, undefined, 'slow', new Headers()))).rejects.toMatchObject({ code: 'rate' })
   })
