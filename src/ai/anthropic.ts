@@ -6,6 +6,8 @@ import { findLesson, isProtectedLesson, lessonNo } from '../lib/status'
 import { AI_MSG } from '../lib/messages'
 import {
   AiError,
+  MAX_SEARCH_DESIGN,
+  MAX_SEARCH_LESSON,
   PROGRESS,
   abortError,
   throwIfAborted,
@@ -32,11 +34,6 @@ import {
 
 const WEB_SEARCH_TYPE = 'web_search_20260209'
 const MAX_PAUSE_CONTINUES = 5
-/** 1リクエストあたりの Web 検索の上限（max_uses）。Help の Q&A と AiBar の説明もこの値を出す */
-export const MAX_SEARCH_DESIGN = 8
-export const MAX_SEARCH_LESSON = 5
-/** Anthropic の Web 検索の料金（検索 1000 回あたり・ドル）。表示用 */
-export const WEB_SEARCH_USD_PER_1000 = 10
 
 /** テストで差し替えられるよう、使うメソッドだけの最小インターフェース */
 export interface MessagesLike {

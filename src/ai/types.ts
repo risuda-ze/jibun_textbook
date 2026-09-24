@@ -15,6 +15,15 @@ export type AiSettings = {
 
 export const DEFAULT_AI: AiSettings = { kind: 'anthropic', model: 'claude-sonnet-5', apiKey: '', search: 'builtin' }
 
+/**
+ * 1リクエストあたりの Web 検索の上限（max_uses）。Help の Q&A と AiBar の説明もこの値を出す。
+ * anthropic.ts ではなくここに置くのは、画面がこの値のために SDK を静的に読み込まないため（#10）
+ */
+export const MAX_SEARCH_DESIGN = 8
+export const MAX_SEARCH_LESSON = 5
+/** Anthropic の Web 検索の料金（検索 1000 回あたり・ドル）。表示用 */
+export const WEB_SEARCH_USD_PER_1000 = 10
+
 export const MODELS: { id: string; label: string }[] = [
   { id: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
   { id: 'claude-opus-5', label: 'Claude Opus 5' },

@@ -77,7 +77,10 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
 
   async function propose() {
     setPlan(null)
-    const r = await p.run((progress, signal) => getProvider(ai).proposeRedesign(tb, scope, lesson.id, order, progress, { signal }), 1)
+    const r = await p.run(
+      async (progress, signal) => (await getProvider(ai)).proposeRedesign(tb, scope, lesson.id, order, progress, { signal }),
+      1,
+    )
     if (r) {
       setPlan(r.plan)
       setUsage(r.usage)

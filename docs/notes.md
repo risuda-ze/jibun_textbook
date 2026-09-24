@@ -204,3 +204,17 @@ zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても
 - 上のナビは `role="tablist"` をやめて `<nav aria-label="画面">` ＋ 押されている画面に `aria-current="page"`。`tabpanel` も矢印キー操作も無いので、タブと名乗らない方が実装と一致する。e2e は `e2e/helpers.ts` の `nav(page, /レッスン/)` で探す
 - ロードマップの `.tl` は `role="region"`、`.clip` は `title` と同じ文を `aria-label` にも入れる（hover の `title` は残す）
 - 見たまま編集の貼り付けは `document.execCommand('insertText')`（非推奨）をやめ、`Selection`/`Range` で差し込む（選択を消す → 文字ノードを `insertNode` → カレットをその直後へ）。改行は `<br>` にする。`marked` は `breaks: true` なので md との往復が合う。`onBeforeInput` の `insertFromPaste` にしなかったのは、結局 preventDefault して自分で差し込むのは同じで、`onPaste` の方が画像の判定（`clipboardData.files`）をそのまま使えるため。失うのは Ctrl+Z で貼り付けだけを戻す操作（確定は blur 時の HTML 比較なので保存には影響しない）
+
+## 2026-09-24 の判断（#10・AI層の動的 import）
+
+- `getProvider` を非同期にし、Anthropic は `await import('./anthropic')` で読む。デモ応答しか使わない初回表示で `@anthropic-ai/sdk` と zod ヘルパーを読まない
+- `MAX_SEARCH_*` / `WEB_SEARCH_USD_PER_1000` を `anthropic.ts` から `types.ts` へ移した。`common.tsx` と `Help.tsx` が表示のためにこれを `anthropic.ts` から静的 import しており、動的 import にしても SDK が初回チャンクに残るため
+- `vite.config.ts` の `manualChunks` は**入れていない**。SDK は動的 import だけで別チャンクに分かれた。`marked` / `turndown` / `dompurify` を別チャンクにしても `index.html` から `modulepreload` されるため初回に読む JS の合計は変わらない（実測: 323.83 + 83.80 kB ≒ 408 kB）。キャッシュの粒度のためだけに設定を足す価値はまだ無い
+- サイズ（`npx vite build`・raw / gzip）
+
+| チャンク | before | after |
+|---|---|---|
+| 初回表示 `index-*.js` | 607.29 kB / 183.39 kB | 408.11 kB / 130.72 kB |
+| `anthropic-*.js`（AI を使うときだけ） | （初回に含む） | 197.70 kB / 52.45 kB |
+
+- 初回表示の gzip は **183 → 131 kB（−29%）**。`index-*.js` に `anthropic-version` / `dangerouslyAllowBrowser` / `api.anthropic.com` の文字列が無いことを grep で確認

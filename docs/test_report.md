@@ -7,7 +7,7 @@
 | 型チェック | `npm run typecheck` | エラーなし |
 | 単体＋AI層（Vitest） | `npm test` | 4ファイル・39件すべて成功 |
 | 通し（Playwright） | `npm run e2e` | 9シナリオ × PC幅・スマホ幅 = 18件すべて成功 |
-| 本番ビルド | `npm run build` | 成功（JS 約574KB / gzip 約172KB。PWAのprecache 9ファイル） |
+| 本番ビルド | `npm run build` | 成功（初回表示 JS 約408KB / gzip 約131KB、AI 層は別チャンク約198KB / gzip 約52KB（#10）。PWAのprecache 15ファイル） |
 
 ## 完了条件との対応
 

@@ -265,10 +265,15 @@ describe('設計を直す', () => {
 })
 
 describe('接続先の切り替え', () => {
-  it('キー未設定・未対応の接続先は分かる言葉で断る', () => {
-    expect(() => getProvider({ ...DEFAULT_AI, apiKey: '' })).toThrowError(AI_MSG.nokey)
-    expect(() => getProvider({ ...DEFAULT_AI, kind: 'local' })).toThrowError(AI_MSG.unsupported)
-    expect(getProvider({ ...DEFAULT_AI, kind: 'demo' })).toBeTruthy()
+  it('キー未設定・未対応の接続先は分かる言葉で断る', async () => {
+    await expect(getProvider({ ...DEFAULT_AI, apiKey: '' })).rejects.toThrowError(AI_MSG.nokey)
+    await expect(getProvider({ ...DEFAULT_AI, kind: 'local' })).rejects.toThrowError(AI_MSG.unsupported)
+  })
+  it('デモは即座に、Anthropic は動的 import で AiProvider を返す（#10）', async () => {
+    expect(await getProvider({ ...DEFAULT_AI, kind: 'demo' })).toBeInstanceOf(DemoProvider)
+    const p = await getProvider(settings)
+    expect(p).toBeInstanceOf(AnthropicProvider)
+    expect(typeof p.generateLesson).toBe('function')
   })
 })
 
