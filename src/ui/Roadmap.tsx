@@ -13,7 +13,18 @@ import {
 import { STATUS_LABEL, currentLesson, findLesson, lessonNo, lessonStatus } from '../lib/status'
 import { openLesson, putBook, selectLesson, snapshot, toast, updateBook, updateLesson, useApp } from '../store'
 import { newChapter, newLesson, type Lesson, type Textbook } from '../types'
-import { Meter, StatusChip, StopButton, TitleInput, UsageLine, clearLessonWithUndo, downloadBook, stepPercent, useAiRun } from './common'
+import {
+  GoalInput,
+  Meter,
+  StatusChip,
+  StopButton,
+  TitleInput,
+  UsageLine,
+  clearLessonWithUndo,
+  downloadBook,
+  stepPercent,
+  useAiRun,
+} from './common'
 import { GenerateControls, useGenerate } from './GenerateControls'
 import { Button, Card, Pill, Segmented, type PillTone } from './kit'
 
@@ -227,7 +238,17 @@ export function Roadmap({ tb }: { tb: Textbook }) {
               })
             }
           />
-          {tb.goal && <p className="lead">{tb.goal}</p>}
+          <GoalInput
+            className="lead goalinput"
+            aria-label="教科書の狙い"
+            placeholder="このコースの狙い"
+            value={tb.goal}
+            onCommit={(v) =>
+              updateBook(tb.id, (d) => {
+                d.goal = v
+              })
+            }
+          />
         </div>
         <div className="row">
           <Button v="ghost" onClick={() => downloadBook(tb)}>
@@ -394,10 +415,19 @@ export function Roadmap({ tb }: { tb: Textbook }) {
             <div className="row">
               <StatusChip lesson={sel.lesson} />
             </div>
-            <p className="sub">
-              {sel.lesson.summary ||
-                (sel.lesson.blocks.length ? '本文あり。' : 'まだ資料がありません。AIに生成させるか、自分で書き始めてください。')}
-            </p>
+            <GoalInput
+              key={sel.lesson.id}
+              className="sub goalinput"
+              aria-label="節の狙い"
+              placeholder="この節の狙い"
+              value={sel.lesson.summary}
+              onCommit={(v) =>
+                updateLesson(tb.id, sel.lesson.id, (l) => {
+                  l.summary = v
+                })
+              }
+            />
+            {!sel.lesson.blocks.length && <p className="sub">まだ資料がありません。AIに生成させるか、自分で書き始めてください。</p>}
             <GenerateControls
               g={g}
               lessonId={sel.lesson.id}
