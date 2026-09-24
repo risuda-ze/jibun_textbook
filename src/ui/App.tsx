@@ -35,7 +35,7 @@ export function App() {
             <header className="bar">
                 <div className="brand">じぶん教科書</div>
                 <nav className="tabs" role="tablist">
-                    {TABS.map(([k, label, needsBook], i) => (
+                    {TABS.map(([k, label, needsBook]) => (
                         <button
                             key={k}
                             className="tab"
@@ -44,7 +44,6 @@ export function App() {
                             disabled={needsBook && !tb}
                             onClick={() => go(k)}
                         >
-                            <span className="n">{i + 1}</span>
                             {label}
                         </button>
                     ))}
