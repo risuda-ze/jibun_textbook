@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { TextbookZ, findDuplicateIds, newBlock, newChapter, newLesson, newTextbook, renumberDuplicateIds, type Textbook } from '../src/types'
-import { currentLesson, lessonNo, lessonStatus, minePercent, statusCounts } from '../src/lib/status'
+import {
+  TextbookZ,
+  clearLesson,
+  findDuplicateIds,
+  newBlock,
+  newChapter,
+  newLesson,
+  newTextbook,
+  renumberDuplicateIds,
+  type Textbook,
+} from '../src/types'
+import { currentLesson, lessonNo, lessonStatus, minePercent, reviewCount, statusCounts } from '../src/lib/status'
 import { asCopy, decideImport, exportJson, parseImport } from '../src/lib/io'
 import { fitSize } from '../src/lib/image'
 
@@ -26,6 +36,13 @@ describe('節の状態は保存せず導出する', () => {
     expect(lessonStatus(me)).toBe('me')
     expect(lessonStatus(edited)).toBe('me')
     expect(lessonStatus(done)).toBe('done')
+  })
+  it('再確認の件数は旗の数', () => {
+    const tb = book()
+    expect(reviewCount(tb)).toBe(1) // 見本は「完了」の節に旗がある
+    tb.chapters[0].lessons[0].review = true
+    tb.chapters[0].lessons[2].review = true
+    expect(reviewCount(tb)).toBe(3)
   })
   it('再確認の旗は状態と独立', () => {
     expect(done.review).toBe(true)
@@ -68,10 +85,16 @@ describe('JSONの書き出しと読み込み', () => {
     expect(parseImport(JSON.stringify({ schemaVersion: 1, id: 'x' })).ok).toBe(false)
   })
   it('欠けている項目は既定値で補う', () => {
-    const r = parseImport(JSON.stringify({
-      schemaVersion: 1, id: 'a', title: 't', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
-      chapters: [{ id: 'c', title: 'c', lessons: [{ id: 'l', title: 'l' }] }],
-    }))
+    const r = parseImport(
+      JSON.stringify({
+        schemaVersion: 1,
+        id: 'a',
+        title: 't',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        chapters: [{ id: 'c', title: 'c', lessons: [{ id: 'l', title: 'l' }] }],
+      }),
+    )
     expect(r.ok).toBe(true)
     if (r.ok) expect(r.tb.chapters[0].lessons[0]).toMatchObject({ done: false, review: false, blocks: [] })
   })
@@ -81,7 +104,8 @@ describe('読み込み時の上書き判定', () => {
   const base = book()
   const at = (iso: string): Textbook => ({ ...base, updatedAt: iso })
   it('端末に無ければ追加', () => expect(decideImport(undefined, base)).toBe('add'))
-  it('読み込む側が新しければ自動で上書き', () => expect(decideImport(at('2026-09-01T00:00:00Z'), at('2026-09-02T00:00:00Z'))).toBe('overwrite'))
+  it('読み込む側が新しければ自動で上書き', () =>
+    expect(decideImport(at('2026-09-01T00:00:00Z'), at('2026-09-02T00:00:00Z'))).toBe('overwrite'))
   it('読み込む側が古ければ警告', () => expect(decideImport(at('2026-09-02T00:00:00Z'), at('2026-09-01T00:00:00Z'))).toBe('older'))
   it('同じ日時なら何もしない', () => expect(decideImport(at('2026-09-02T00:00:00Z'), at('2026-09-02T00:00:00Z'))).toBe('same'))
   it('別の本として追加するとidが変わる', () => {
@@ -135,5 +159,35 @@ describe('id の一意性（#36）', () => {
     const { tb, count } = renumberDuplicateIds(src)
     expect(count).toBe(0)
     expect(tb).toEqual(src)
+  })
+})
+
+describe('資料を消す（#104）', () => {
+  it('本文・手を動かす・参考情報・資料の名前・完了と再確認の印が消え、id・題名・時間・課題の節か・狙いは残る', () => {
+    const l = newLesson('節', {
+      minutes: 30,
+      isTask: true,
+      summary: '狙い',
+      done: true,
+      review: true,
+      tasks: [{ text: 'やる', checked: true }],
+      clues: { queries: ['q'], links: [{ title: 'A', url: 'https://a.example/', fetchedAt: '' }], how: ['h'] },
+      blocks: [newBlock('ai', '下書き'), newBlock('me', '自分のノート')],
+      materials: ['notes.md'],
+    })
+    const c = clearLesson(l)
+    expect(c).toEqual({
+      ...l,
+      blocks: [],
+      tasks: [],
+      clues: { queries: [], links: [], how: [] },
+      materials: [],
+      done: false,
+      review: false,
+    })
+    expect([c.id, c.title, c.minutes, c.isTask, c.summary]).toEqual([l.id, '節', 30, true, '狙い'])
+    // 元の節は変えない
+    expect(l.blocks).toHaveLength(2)
+    expect(l.done).toBe(true)
   })
 })

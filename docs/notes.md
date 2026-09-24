@@ -87,6 +87,17 @@ GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`v*` タグ�
 注意: ワークフローは**タグ先のコミットに入っている定義**で動く。古いコミットにタグを打つと、その時点に
 `deploy.yml` の新しい定義が無いので自動では走らない。その場合は 4 の手動実行で `ref` にタグを指定する。
 リポジトリ名を変えるなら `vite.config.ts` の `base` も変える。
+- **`github-pages` 環境の配信ルールにタグの許可が要る**。環境の Deployment branches が「production ブランチだけ」だと、タグからの配信は `Tag "vX.Y.Z" is not allowed to deploy to github-pages due to environment protection rules` で失敗する（Release の方は環境を使わないので成功する）。v0.2.0 で起きたので、環境に「tag `v*`」の許可を足した。確認と追加は次のコマンド
+
+  ```bash
+  gh api repos/risuda-ze/jibun_textbook/environments/github-pages/deployment-branch-policies --jq '.branch_policies[] | "\(.type // "branch") \(.name)"'
+  ```
+
+  ```bash
+  gh api -X POST repos/risuda-ze/jibun_textbook/environments/github-pages/deployment-branch-policies -f name='v*' -f type=tag
+  ```
+
+  失敗した配信は `gh run rerun <run id> --failed` で再実行できる（タグは打ち直せない）
 
 ## 文言のルール（2026-09-22・#4）
 
@@ -139,7 +150,7 @@ zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても
 
 ## 2026-09-23 の判断（#36）
 
-- id の一意性は **読み込み（JSON）では弾き、端末内のデータでは振り直して救済**する。`TextbookZ` 自体には `superRefine` を付けず、`TextbookStrictZ` を `parseImport` だけで使う。起動時に弾くと本棚から教科書が消えたように見えるため
+- id の一意性は **読み込み（JSON）では弾き、端末内のデータでは振り直して救済**する（この時点の判断。#65 で読み込みも「振り直して直した所を知らせる」に変え、`TextbookStrictZ` は削除した。`docs/security.md` を参照）。起動時に弾くと本棚から教科書が消えたように見えるため
 - 振り直しは後ろの重複だけを新しい uuid にし、最初の1つは元のまま。件数をトーストで知らせる
 
 ## 2026-09-23 の判断（#37）
@@ -152,7 +163,7 @@ zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても
 
 - 渡し方は **ファイル1つ**（主）と **文字の貼り付け**（従）。YouTube はリンクと題名だけでは本文の材料にならず、字幕はブラウザから取れない（サーバーも持たない）ので、字幕は貼り付けで受ける（相談済み）
 - txt/md はブラウザで読んでプロンプトの text ブロックに入れる。PDF はブラウザで解析せず、Messages API の **document ブロック（base64・`application/pdf`）** で渡す（pdf.js を入れると初回表示の JS が大きく増えるため）。API の上限はリクエスト 32MB・ページ数はモデルの文脈長で変わる（200K 文脈で 100 ページ）。アプリ側の上限は文字 200KB・PDF 10MB
-- 調査（1段目）には文字の資料だけ渡し、PDF は書く段階（2段目）でだけ渡す。同じ PDF を2回送るとトークンを二重に使うため
+- 調査（1段目）には資料の本文を渡さず、名前だけを伝える。資料は書く段階（2段目）でだけ渡す。同じ資料を2回送ると入力トークンを二重に使うため（#79 で文字の資料も同じ扱いにした）。貼り付けた文もファイルと同じ上限（200KB）
 - 「この資料だけから作る」は `web_search` ツールを付けず、プロンプトで「資料に無いことは書かない」と指示する。資料が無ければこのチェックは効かない
 - 教科書の JSON には資料の**名前だけ**（`Lesson.materials`）残す。本文や base64 は入れない。項目の追加だけなので `schemaVersion` は上げない
 - AI 層の `opts.materials` は最初から配列。複数ファイル（#69）は画面側を `multiple` にするだけで済むようにしてある
@@ -164,3 +175,18 @@ zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても
 - `web_search_20260209` と同時に使う場合は `code_execution` を別に付けない（動的フィルタが内部で実行環境を持つため、二重になる）
 - **料金は手元の資料では確認できなかった**。実装するなら公式の料金ページで「取得1回あたりの課金の有無」を確かめてから決める
 - YouTube の再生ページを取っても題名と説明までで字幕は取れない見込み（字幕は別の取得経路）。この方式を足しても YouTube の本文は解決しないため、URL 入力は「必要になったら」に回した
+
+## 2026-09-24 の判断（#87・生成は画面を離れても続ける）
+
+- 資料の生成の進行中の状態を画面（`useState`）から **store の `running`** に移し、中止の口（`AbortController`）は `src/ui/generate.ts` のモジュールが持つ。タブを切り替えたり別の節を選び直したりしても生成は止まらず、戻れば進行中の表示が続く。止まるのは明示の「やめる」だけ
+- 理由: 「調べている間に別の節を読む」自然な操作で、数十秒と課金済みの検索回数を失っていた（`useAbort` が unmount で中止していたため）
+- 画面を離れている間に終わったときは、「終わった後の操作」（ロードマップならレッスンを開く）はしない。勝手に画面が変わると驚くため
+- つくる（設計）と「設計を直す」は今までどおり画面を離れると中止する。結果がその画面の状態にしか無く、続けても受け取れないため
+
+## 2026-09-24 の判断（#77・進行中の文をボタンの中に）
+
+- `Button` の `busy={{ label, seconds, title }}` が「{現状}・{N秒}」を中に出す。幅は**進行中でない間に `useLayoutEffect` で測った値**に固定する。押した瞬間（onClick）に測らないのは、つくるの「スキップ」のように別のボタンから進行中になる経路があるため
+- 検索語（`検索: …`）は `onProgress` の文のまま AI 層から受け取り、画面側の `splitDetail`（`src/ui/common.tsx`）が段階の文と分けて `hint` に入れる。`hint` はボタンの `title` と、つくるの「AIの作業」の段階の下に出す。AI 層のインターフェース（`Progress`）は変えない
+- `Working` と `RunControls` は削除し、「やめる」だけの `StopButton` にした。`L.generating`（生成中…）は使う所が無くなったので削除。e2e は名前ではなく `button[aria-busy="true"]`（`e2e/helpers.ts` の `busyButton`）で進行中のボタンを探す
+- 表に無い文言: つくるの確認質問を考えている間は「質問を作成中…」（秒数なし）。デモ応答の「この資料だけから作る」は「資料から作成中…」で実 API と同じ
+- `role="status"` の中の文は Chrome がボタンの名前に数えない（e2e の snapshot で `button [disabled]:` と名無しになった）。読み上げで名無しにならないよう、同じ文を `aria-label` にも入れる

@@ -20,6 +20,8 @@ describe('見たまま編集とMarkdownの往復', () => {
   })
   it('危険なHTMLは落とす', () => {
     expect(mdToHtml('<img src=x onerror="alert(1)"><script>alert(1)</script>')).not.toMatch(/onerror|<script/)
+    // 本文に直書きした target は落とし、同一タブで開く（#88）
+    expect(mdToHtml('<a href="https://example.com" target="_blank">x</a>')).not.toMatch(/target=/)
   })
 })
 

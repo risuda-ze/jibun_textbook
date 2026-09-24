@@ -6,7 +6,10 @@ const out = process.argv[2] ?? 'test-results/shots'
 const base = 'http://localhost:4173/jibun_textbook/'
 const browser = await chromium.launch()
 
-for (const [name, opts] of [['pc', { viewport: { width: 1280, height: 900 } }], ['phone', devices['Pixel 7']]]) {
+for (const [name, opts] of [
+  ['pc', { viewport: { width: 1280, height: 900 } }],
+  ['phone', devices['Pixel 7']],
+]) {
   const ctx = await browser.newContext({ ...opts, serviceWorkers: 'block' })
   const page = await ctx.newPage()
   const shot = (n) => page.screenshot({ path: `${out}/${name}_${n}.png`, fullPage: true })

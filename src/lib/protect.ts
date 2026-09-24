@@ -82,7 +82,12 @@ export function applyCoursePlan(tb: Textbook, plan: PlanChapter[]): Textbook {
   })
   // 同じ節が2か所に入らないようにする（先勝ち）
   const seen = new Set<string>()
-  const dedup = out.map((c) => ({ ...c, lessons: c.lessons.filter((l) => (seen.has(l.id) ? false : (seen.add(l.id), true))) }))
+  const keepFirst = (id: string): boolean => {
+    if (seen.has(id)) return false
+    seen.add(id)
+    return true
+  }
+  const dedup = out.map((c) => ({ ...c, lessons: c.lessons.filter((l) => keepFirst(l.id)) }))
   return { ...tb, chapters: dedup }
 }
 
@@ -108,7 +113,8 @@ export function diffTextbooks(before: Textbook, after: Textbook, onlyChapterId?:
     for (const l of c.lessons) {
       const bl = bLs.get(l.id)
       if (!bl) rows.push({ kind: 'add', level: 'lesson', text: l.title })
-      else if (isProtectedLesson(bl)) rows.push({ kind: 'keep', level: 'lesson', text: l.title, note: bl.done ? '完了の節' : '自分の書き込みあり' })
+      else if (isProtectedLesson(bl))
+        rows.push({ kind: 'keep', level: 'lesson', text: l.title, note: bl.done ? '完了の節' : '自分の書き込みあり' })
       else if (bl.title !== l.title || bl.summary !== l.summary || bl.minutes !== l.minutes)
         rows.push({ kind: 'change', level: 'lesson', text: l.title, from: bl.title !== l.title ? bl.title : undefined })
       else rows.push({ kind: 'same', level: 'lesson', text: l.title })
@@ -132,7 +138,11 @@ export function diffLessonRegen(lesson: Lesson, newMd: string[]): DiffRow[] {
   const mine = lesson.blocks.filter(isMine).length
   const ai = lesson.blocks.length - mine
   return [
-    { kind: 'change', level: 'lesson', text: `AIの下書き ${ai}件 を、新しい下書き ${newMd.filter((m) => m.trim()).length}件 に置き換えます` },
+    {
+      kind: 'change',
+      level: 'lesson',
+      text: `AIの下書き ${ai}件 を、新しい下書き ${newMd.filter((m) => m.trim()).length}件 に置き換えます`,
+    },
     { kind: 'keep', level: 'lesson', text: `自分のノートと自分で直した文 ${mine}件` },
   ]
 }

@@ -454,6 +454,8 @@ Character marks (round illustrated faces in 2px colored circles) and abstract de
 
 画面側に色・角丸・影を直接書かない。足りない部品は `kit.tsx` に足す。
 
+その場で直せる文字（教科書・章・節の名前、コースと節の狙い）は `TitleInput` / `GoalInput`（`common.tsx`）。地は透明で枠は1px、hover で薄い地、focus で青い枠。書体は表示のとき（見出し・リード文・sub）と同じにし、入力欄らしく見せない。
+
 ## 主操作（青）の割り当て
 
 | 画面 | 青いボタン |

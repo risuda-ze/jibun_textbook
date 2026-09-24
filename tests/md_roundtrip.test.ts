@@ -45,7 +45,11 @@ describe('文字列は変わるが意味は同じ（equiv・stable）', () => {
     ['単一改行（breaks: true で <br>。行末に空白2つ）', '一行目\n二行目', '一行目  \n二行目'],
     ['チェックリスト（記号の後の空白が3つになる。箱はクリックで切り替えられる #56）', '- [ ] 未\n- [x] 済', '-   [ ] 未\n-   [x] 済'],
     ['アスタリスクの文字（\\ でエスケープ）', '価格は 5*3 で 15 です', '価格は 5\\*3 で 15 です'],
-    ['表の中の改行（<br> のまま残る #48）', '| 項目 | 説明 |\n|---|---|\n| A | 一行目<br>二行目 |', '| 項目 | 説明 |\n| --- | --- |\n| A | 一行目<br>二行目 |'],
+    [
+      '表の中の改行（<br> のまま残る #48）',
+      '| 項目 | 説明 |\n|---|---|\n| A | 一行目<br>二行目 |',
+      '| 項目 | 説明 |\n| --- | --- |\n| A | 一行目<br>二行目 |',
+    ],
   ]
   for (const [name, md, expected] of cases) {
     it(name, () => {
@@ -62,5 +66,20 @@ describe('崩れる・落ちる（意図したものと、直す対象）', () =
   })
   it('危険な HTML は落ちる', () => {
     expect(mdToHtml('<img src=x onerror="alert(1)"><script>alert(1)</script>')).not.toMatch(/onerror|<script/)
+  })
+})
+
+describe('見たまま編集で文字として打った記法（#76）', () => {
+  it('[文](http(s) の URL) はリンクの記法に戻り、描画でリンクになる', () => {
+    const md = htmlToMd('<p>編集中に [ツール](https://creatools.dev/color-palette) を使うと</p>')
+    expect(md).toBe('編集中に [ツール](https://creatools.dev/color-palette) を使うと')
+    expect(mdToHtml(md)).toContain('<a href="https://creatools.dev/color-palette">ツール</a>')
+    expect(stable(md)).toBe(true)
+  })
+  it('URL でないものは文字のまま（リンクにしない）', () => {
+    const md = htmlToMd('<p>[メモ](後で) と [x](javascript:alert(1)) を書く</p>')
+    expect(md).toBe('\\[メモ\\](後で) と \\[x\\](javascript:alert(1)) を書く')
+    expect(mdToHtml(md)).not.toContain('<a ')
+    expect(mdToHtml(md)).toContain('[メモ](後で)')
   })
 })

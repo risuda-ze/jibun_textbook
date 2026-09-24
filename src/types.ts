@@ -82,13 +82,16 @@ export const TextbookZ = z.object({
 /**
  * id の一意性（#36）。章・節・ブロック・画像の id は教科書全体で重ならないこと。
  * 重なると findLesson / updateLesson が最初の1つしか扱えず、片方の編集が反映されない。
- * TextbookZ 自体には付けない（端末内の古いデータを読めなくしないため）。読み込み（parseImport）は
- * TextbookStrictZ で弾き、起動時（store.init）は renumberDuplicateIds で振り直して救済する。
+ * TextbookZ 自体には付けない（端末内の古いデータを読めなくしないため）。読み込み（parseImport）も
+ * 起動時（store.init）も migrate() が renumberDuplicateIds で振り直して救済し、直した所を知らせる（#65）。
  */
 export function findDuplicateIds(tb: Textbook): string[] {
   const seen = new Set<string>()
   const dup = new Set<string>()
-  const see = (id: string) => { if (seen.has(id)) dup.add(id); else seen.add(id) }
+  const see = (id: string) => {
+    if (seen.has(id)) dup.add(id)
+    else seen.add(id)
+  }
   see(tb.id)
   for (const c of tb.chapters) {
     see(c.id)
@@ -108,7 +111,10 @@ export function renumberDuplicateIds(tb: Textbook): { tb: Textbook; count: numbe
   const seen = new Set<string>()
   let count = 0
   const fix = <T extends { id: string }>(x: T): T => {
-    if (seen.has(x.id)) { count++; return { ...x, id: uid() } }
+    if (seen.has(x.id)) {
+      count++
+      return { ...x, id: uid() }
+    }
     seen.add(x.id)
     return x
   }
@@ -125,15 +131,9 @@ export function renumberDuplicateIds(tb: Textbook): { tb: Textbook; count: numbe
   return { tb: out, count }
 }
 
-export const TextbookStrictZ = TextbookZ.superRefine((tb, ctx) => {
-  const dup = findDuplicateIds(tb)
-  if (dup.length) ctx.addIssue({ code: 'custom', path: ['id'], message: `id が重複しています: ${dup.slice(0, 5).join(', ')}${dup.length > 5 ? ' …' : ''}` })
-})
-
 export type Image = z.infer<typeof ImageZ>
 export type Block = z.infer<typeof BlockZ>
 export type Clues = z.infer<typeof CluesZ>
-export type Task = z.infer<typeof TaskZ>
 export type Lesson = z.infer<typeof LessonZ>
 export type Chapter = z.infer<typeof ChapterZ>
 export type CourseInput = z.infer<typeof InputZ>
@@ -157,9 +157,27 @@ export function newBlock(by: Block['by'], md: string, extra: Partial<Block> = {}
 
 export function newLesson(title: string, extra: Partial<Lesson> = {}): Lesson {
   return {
-    id: uid(), title, minutes: 45, isTask: false, done: false, review: false, summary: '',
-    tasks: [], clues: { queries: [], links: [], how: [] }, blocks: [], materials: [], ...extra,
+    id: uid(),
+    title,
+    minutes: 45,
+    isTask: false,
+    done: false,
+    review: false,
+    summary: '',
+    tasks: [],
+    clues: { queries: [], links: [], how: [] },
+    blocks: [],
+    materials: [],
+    ...extra,
   }
+}
+
+/**
+ * 節の資料をまっさらにする（#104）。本文（AIの下書きも自分のノートも）・手を動かす・参考情報・渡した資料の名前を消し、
+ * 完了と再確認の印も外す。id・題名・時間・課題の節か・狙いは残す。章構成と節の位置は変わらない
+ */
+export function clearLesson(l: Lesson): Lesson {
+  return { ...l, blocks: [], tasks: [], clues: { queries: [], links: [], how: [] }, materials: [], done: false, review: false }
 }
 
 export function newChapter(title: string, lessons: Lesson[] = []): Chapter {
@@ -169,7 +187,14 @@ export function newChapter(title: string, lessons: Lesson[] = []): Chapter {
 export function newTextbook(title: string, extra: Partial<Textbook> = {}): Textbook {
   const t = nowIso()
   return {
-    schemaVersion: 1, id: uid(), title, goal: '', input: { prompt: '', can: '', time: '', env: '' },
-    createdAt: t, updatedAt: t, chapters: [], ...extra,
+    schemaVersion: 1,
+    id: uid(),
+    title,
+    goal: '',
+    input: { prompt: '', can: '', time: '', env: '' },
+    createdAt: t,
+    updatedAt: t,
+    chapters: [],
+    ...extra,
   }
 }

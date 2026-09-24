@@ -26,9 +26,7 @@ const CSP = [
 const cspMeta = (): Plugin => ({
   name: 'csp-meta',
   apply: 'build',
-  transformIndexHtml: () => [
-    { tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: CSP }, injectTo: 'head-prepend' },
-  ],
+  transformIndexHtml: () => [{ tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: CSP }, injectTo: 'head-prepend' }],
 })
 
 // GitHub Pages はリポジトリ名の下で配信されるので base を合わせる

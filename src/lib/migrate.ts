@@ -1,4 +1,5 @@
 import { TextbookZ, findDuplicateIds, nowIso, renumberDuplicateIds, type Textbook } from '../types'
+import { MSG } from './messages'
 
 /** 今の保存形式の版。`TextbookZ` の `schemaVersion` と同じ値にする（規約: CLAUDE.md「保存形式の規約」） */
 export const CURRENT_VERSION = 1
@@ -12,9 +13,7 @@ export type Migration = (raw: Raw) => Raw
  */
 export const migrations: Record<number, Migration> = {}
 
-export type MigrateResult =
-  | { ok: true; tb: Textbook; from: number; steps: string[] }
-  | { ok: false; reason: string; from: number | null }
+export type MigrateResult = { ok: true; tb: Textbook; from: number; steps: string[] } | { ok: false; reason: string; from: number | null }
 
 const isObj = (x: unknown): x is Raw => !!x && typeof x === 'object' && !Array.isArray(x)
 const validIso = (x: unknown): x is string => typeof x === 'string' && !Number.isNaN(Date.parse(x))
@@ -28,19 +27,19 @@ const validIso = (x: unknown): x is string => typeof x === 'string' && !Number.i
 export function migrate(raw: unknown, opts: { table?: Record<number, Migration>; current?: number } = {}): MigrateResult {
   const table = opts.table ?? migrations
   const current = opts.current ?? CURRENT_VERSION
-  if (!isObj(raw)) return { ok: false, reason: '教科書のJSONではありません。', from: null }
+  if (!isObj(raw)) return { ok: false, reason: MSG.notTextbook, from: null }
   const v = raw.schemaVersion
   if (typeof v !== 'number' || !Number.isInteger(v)) {
-    return { ok: false, reason: 'schemaVersion（形式の版）がありません。このアプリが書き出したファイルではない可能性があります。', from: null }
+    return { ok: false, reason: MSG.noVersion, from: null }
   }
   if (v > current) {
-    return { ok: false, reason: `このアプリより新しい形式のファイルです（schemaVersion: ${v}）。アプリを更新してから読み込んでください。`, from: v }
+    return { ok: false, reason: MSG.newer(v), from: v }
   }
   const steps: string[] = []
   let obj: Raw = raw
   for (let i = v; i < current; i++) {
     const fn = table[i]
-    if (!fn) return { ok: false, reason: `版 ${i} から ${i + 1} への移行が用意されていません。アプリを更新してから読み込んでください。`, from: v }
+    if (!fn) return { ok: false, reason: MSG.noMigration(i), from: v }
     obj = { ...fn(obj), schemaVersion: i + 1 }
     steps.push(`版 ${i} から ${i + 1} に移行しました`)
   }
@@ -58,7 +57,7 @@ export function migrate(raw: unknown, opts: { table?: Record<number, Migration>;
   const r = TextbookZ.safeParse(obj)
   if (!r.success) {
     const i = r.error.issues[0]
-    return { ok: false, reason: `形式が正しくありません（${i.path.join('.') || 'root'}: ${i.message}）。`, from: v }
+    return { ok: false, reason: MSG.badShape(i.path.join('.') || 'root', i.message), from: v }
   }
   let tb = r.data
   // id の重複は後ろから振り直す（#36 の救済を読込と端末内で同じにする）

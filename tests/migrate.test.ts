@@ -44,10 +44,22 @@ describe('migrate（#65）', () => {
   })
   it('2段の移行も順に当たる（テスト用に今の版を 2 にする）', () => {
     const calls: number[] = []
-    const r = migrate({ ...v1(), schemaVersion: 0 }, {
-      current: 2,
-      table: { 0: (o) => { calls.push(0); return o }, 1: (o) => { calls.push(1); return o } },
-    })
+    const r = migrate(
+      { ...v1(), schemaVersion: 0 },
+      {
+        current: 2,
+        table: {
+          0: (o) => {
+            calls.push(0)
+            return o
+          },
+          1: (o) => {
+            calls.push(1)
+            return o
+          },
+        },
+      },
+    )
     // 版 2 の形は TextbookZ（版 1）に合わないので検証で落ちるが、移行は順に呼ばれている
     expect(calls).toEqual([0, 1])
     expect(r.ok).toBe(false)
@@ -63,7 +75,11 @@ describe('migrate（#65）', () => {
       expect(r.tb.chapters[0].lessons.map((l) => l.title)).toEqual(['a', 'b'])
       expect(Number.isNaN(Date.parse(r.tb.createdAt))).toBe(false)
       expect(r.tb.updatedAt).toBe(r.tb.createdAt)
-      expect(r.steps).toEqual(['作成日時が無かったので補いました', '更新日時が無かったので作成日時で補いました', '重複していた id を 1 件振り直しました'])
+      expect(r.steps).toEqual([
+        '作成日時が無かったので補いました',
+        '更新日時が無かったので作成日時で補いました',
+        '重複していた id を 1 件振り直しました',
+      ])
     }
   })
   it('形式が壊れていれば場所つきで断る', () => {
