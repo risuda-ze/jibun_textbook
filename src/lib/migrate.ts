@@ -1,4 +1,4 @@
-import { TextbookZ, findDuplicateIds, nowIso, renumberDuplicateIds, type Textbook } from '../types'
+import { TextbookZ, nowIso, renumberDuplicateIds, type Textbook } from '../types'
 import { MSG } from './messages'
 
 /** 今の保存形式の版。`TextbookZ` の `schemaVersion` と同じ値にする（規約: CLAUDE.md「保存形式の規約」） */
@@ -59,12 +59,8 @@ export function migrate(raw: unknown, opts: { table?: Record<number, Migration>;
     const i = r.error.issues[0]
     return { ok: false, reason: MSG.badShape(i.path.join('.') || 'root', i.message), from: v }
   }
-  let tb = r.data
   // id の重複は後ろから振り直す（#36 の救済を読込と端末内で同じにする）
-  if (findDuplicateIds(tb).length) {
-    const fixed = renumberDuplicateIds(tb)
-    tb = fixed.tb
-    steps.push(`重複していた id を ${fixed.count} 件振り直しました`)
-  }
-  return { ok: true, tb, from: v, steps }
+  const fixed = renumberDuplicateIds(r.data)
+  if (fixed.count) steps.push(`重複していた id を ${fixed.count} 件振り直しました`)
+  return { ok: true, tb: fixed.tb, from: v, steps }
 }

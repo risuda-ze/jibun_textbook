@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { CURRENT_VERSION, migrate } from '../src/lib/migrate'
-import { TextbookZ, findDuplicateIds, newBlock, newChapter, newLesson, newTextbook } from '../src/types'
+import { TextbookZ, newBlock, newChapter, newLesson, newTextbook, renumberDuplicateIds } from '../src/types'
 
 const v1 = () => JSON.parse(readFileSync('tests/fixtures/textbook_v1.json', 'utf8')) as Record<string, unknown>
 
@@ -71,7 +71,7 @@ describe('migrate（#65）', () => {
     const r = migrate(raw)
     expect(r.ok).toBe(true)
     if (r.ok) {
-      expect(findDuplicateIds(r.tb)).toEqual([])
+      expect(renumberDuplicateIds(r.tb).count).toBe(0)
       expect(r.tb.chapters[0].lessons.map((l) => l.title)).toEqual(['a', 'b'])
       expect(Number.isNaN(Date.parse(r.tb.createdAt))).toBe(false)
       expect(r.tb.updatedAt).toBe(r.tb.createdAt)
