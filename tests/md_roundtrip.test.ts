@@ -66,6 +66,8 @@ describe('崩れる・落ちる（意図したものと、直す対象）', () =
   })
   it('危険な HTML は落ちる', () => {
     expect(mdToHtml('<img src=x onerror="alert(1)"><script>alert(1)</script>')).not.toMatch(/onerror|<script/)
+    // 本文に直書きした target は落とし、同一タブで開く（#88）
+    expect(mdToHtml('<a href="https://example.com" target="_blank">x</a>')).not.toMatch(/target=/)
   })
 })
 

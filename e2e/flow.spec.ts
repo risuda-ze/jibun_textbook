@@ -25,17 +25,6 @@ test('スマホ幅は章ごとの一覧、PC幅はタイムライン', async ({ 
   }
 })
 
-test('完了条件2: 資料を生成すると本文と参考情報が入る', async ({ page }) => {
-  await demoBook(page)
-  await page.getByRole('button', { name: L.generateLesson }).click()
-  await expect(page.locator('.doc [data-by="ai"]')).toHaveCount(3)
-  await expect(page.locator('.doc table')).toBeVisible()
-  const clues = page.getByLabel('参考情報')
-  await expect(clues.locator('a.qchip').first()).toHaveAttribute('href', /google\.com\/search\?q=/)
-  await expect(clues.getByText('本文の例を自分の環境で再現する')).toBeVisible()
-  await expect(page.locator('.rail').getByText('例を自分の環境で試す')).toBeVisible()
-})
-
 test('完了条件4: 完了と再確認の印がロードマップと本棚に出る', async ({ page }) => {
   await blankBook(page)
   await page.getByRole('button', { name: L.startWriting }).click()

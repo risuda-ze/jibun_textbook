@@ -3,7 +3,7 @@ import { clear } from 'idb-keyval'
 import { generateInto, mergeDraft } from '../src/ui/generate'
 import { getStateForTest, init, putBook } from '../src/store'
 import { DEFAULT_AI } from '../src/ai/types'
-import { clearLesson, newBlock, newChapter, newLesson, newTextbook } from '../src/types'
+import { clearLesson, newBlock, newChapter, newLesson, newTextbook, type Textbook } from '../src/types'
 
 const draft = () => ({
   blocks: ['### 本文', '', '  ', '### 要点'],
@@ -61,12 +61,14 @@ describe('generateInto（デモ応答で通す）', () => {
     await init()
   })
   const book = () => newTextbook('t', { chapters: [newChapter('c', [newLesson('最初の節')])] })
-  const tick = () => new Promise((r) => setTimeout(r, 0))
+  const seed = async (tb: Textbook) => {
+    putBook(tb)
+    await new Promise((r) => setTimeout(r, 0))
+  }
 
   it('成功すると本文・手を動かす・参考情報が節に入り、知らせが出る', async () => {
     const tb = book()
-    putBook(tb)
-    await tick()
+    await seed(tb)
     const id = tb.chapters[0].lessons[0].id
     const steps: number[] = []
     const ok = await generateInto(tb, id, { ...DEFAULT_AI, kind: 'demo' }, (s) => steps.push(s))
@@ -88,8 +90,7 @@ describe('generateInto（デモ応答で通す）', () => {
       materials: ['old.md'],
     })
     const tb = newTextbook('t', { chapters: [newChapter('c', [clearLesson(old)])] })
-    putBook(tb)
-    await tick()
+    await seed(tb)
     const ok = await generateInto(tb, old.id, { ...DEFAULT_AI, kind: 'demo' }, () => {})
     expect(ok).toBe(true)
     const l = getStateForTest().books[0].chapters[0].lessons[0]
@@ -103,8 +104,7 @@ describe('generateInto（デモ応答で通す）', () => {
   })
   it('失敗しても教科書は変えず、理由を知らせる（未対応の接続先）', async () => {
     const tb = book()
-    putBook(tb)
-    await tick()
+    await seed(tb)
     const id = tb.chapters[0].lessons[0].id
     const ok = await generateInto(tb, id, { ...DEFAULT_AI, kind: 'compat' }, () => {})
     expect(ok).toBe(false)
@@ -113,8 +113,7 @@ describe('generateInto（デモ応答で通す）', () => {
   })
   it('中止すると教科書は変えず、短く知らせる', async () => {
     const tb = book()
-    putBook(tb)
-    await tick()
+    await seed(tb)
     const id = tb.chapters[0].lessons[0].id
     const c = new AbortController()
     const p = generateInto(tb, id, { ...DEFAULT_AI, kind: 'demo' }, () => {}, c.signal)

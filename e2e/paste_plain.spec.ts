@@ -1,12 +1,9 @@
-import { L } from '../src/ui/labels'
 import { expect, test } from '@playwright/test'
-import { demoBook } from './helpers'
+import { lessonWithDraft } from './helpers'
 
 // #88: 見たまま編集への貼り付けは文字だけ。HTML の装飾は入らず、カレットは貼った文の直後に来る
 test('見たまま編集: HTML を貼り付けても文字だけが入る', async ({ page }) => {
-  await demoBook(page)
-  await page.getByRole('button', { name: L.generateLesson }).click()
-  await expect(page.locator('.doc [data-by="ai"]')).toHaveCount(3)
+  await lessonWithDraft(page)
   const body = page.locator('.doc [data-by="ai"]').first().locator('.blk-body')
   await body.click()
   await page.keyboard.press('End')

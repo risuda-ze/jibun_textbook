@@ -46,6 +46,13 @@ export async function demoBook(page: Page, opts: { demoDelay?: number } = {}) {
   }
 }
 
+/** デモ応答で1冊作り、最初の節の資料を生成してレッスンに立つ（ai ブロック3件） */
+export async function lessonWithDraft(page: Page) {
+  await demoBook(page)
+  await page.getByRole('button', { name: L.generateLesson }).click()
+  await expect(page.locator('.doc [data-by="ai"]')).toHaveCount(3)
+}
+
 export async function writeNote(page: Page, text: string) {
   await page.locator('#note').fill(text)
   await page.getByRole('button', { name: L.write }).click()

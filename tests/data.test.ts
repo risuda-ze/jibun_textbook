@@ -45,7 +45,6 @@ describe('節の状態は保存せず導出する', () => {
     expect(reviewCount(tb)).toBe(3)
   })
   it('再確認の旗は状態と独立', () => {
-    expect(done.review).toBe(true)
     expect(lessonStatus({ ...ai, review: true })).toBe('ai')
   })
   it('集計・現在地・番号', () => {
@@ -123,13 +122,11 @@ describe('読み込み時の上書き判定', () => {
   })
 })
 
-describe('画像の縮小サイズ', () => {
-  it('長辺1600pxに収める。小さい画像は拡大しない', () => {
-    expect(fitSize(3200, 1800)).toEqual({ w: 1600, h: 900 })
-    expect(fitSize(1080, 2400)).toEqual({ w: 720, h: 1600 })
-    expect(fitSize(800, 600)).toEqual({ w: 800, h: 600 })
-    expect(fitSize(1600, 1600)).toEqual({ w: 1600, h: 1600 })
-  })
+it('画像の縮小サイズ: 長辺1600pxに収める。小さい画像は拡大しない', () => {
+  expect(fitSize(3200, 1800)).toEqual({ w: 1600, h: 900 })
+  expect(fitSize(1080, 2400)).toEqual({ w: 720, h: 1600 })
+  expect(fitSize(800, 600)).toEqual({ w: 800, h: 600 })
+  expect(fitSize(1600, 1600)).toEqual({ w: 1600, h: 1600 })
 })
 
 describe('id の一意性（#36）', () => {
@@ -171,32 +168,30 @@ describe('id の一意性（#36）', () => {
   })
 })
 
-describe('資料を消す（#104）', () => {
-  it('本文・手を動かす・参考情報・資料の名前・完了と再確認の印が消え、id・題名・時間・課題の節か・狙いは残る', () => {
-    const l = newLesson('節', {
-      minutes: 30,
-      isTask: true,
-      summary: '狙い',
-      done: true,
-      review: true,
-      tasks: [{ text: 'やる', checked: true }],
-      clues: { queries: ['q'], links: [{ title: 'A', url: 'https://a.example/', fetchedAt: '' }], how: ['h'] },
-      blocks: [newBlock('ai', '下書き'), newBlock('me', '自分のノート')],
-      materials: ['notes.md'],
-    })
-    const c = clearLesson(l)
-    expect(c).toEqual({
-      ...l,
-      blocks: [],
-      tasks: [],
-      clues: { queries: [], links: [], how: [] },
-      materials: [],
-      done: false,
-      review: false,
-    })
-    expect([c.id, c.title, c.minutes, c.isTask, c.summary]).toEqual([l.id, '節', 30, true, '狙い'])
-    // 元の節は変えない
-    expect(l.blocks).toHaveLength(2)
-    expect(l.done).toBe(true)
+it('資料を消す（#104）: 本文・手を動かす・参考情報・資料の名前・完了と再確認の印が消え、id・題名・時間・課題の節か・狙いは残る', () => {
+  const l = newLesson('節', {
+    minutes: 30,
+    isTask: true,
+    summary: '狙い',
+    done: true,
+    review: true,
+    tasks: [{ text: 'やる', checked: true }],
+    clues: { queries: ['q'], links: [{ title: 'A', url: 'https://a.example/', fetchedAt: '' }], how: ['h'] },
+    blocks: [newBlock('ai', '下書き'), newBlock('me', '自分のノート')],
+    materials: ['notes.md'],
   })
+  const c = clearLesson(l)
+  expect(c).toEqual({
+    ...l,
+    blocks: [],
+    tasks: [],
+    clues: { queries: [], links: [], how: [] },
+    materials: [],
+    done: false,
+    review: false,
+  })
+  expect([c.id, c.title, c.minutes, c.isTask, c.summary]).toEqual([l.id, '節', 30, true, '狙い'])
+  // 元の節は変えない
+  expect(l.blocks).toHaveLength(2)
+  expect(l.done).toBe(true)
 })

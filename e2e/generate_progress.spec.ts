@@ -14,9 +14,14 @@ test('資料を生成の間はボタンが進行中の色になり、今して�
   await expect(making.getByRole('status')).toContainText(/中…・\d+秒$/)
   // 脇には出ない（進行中の文はボタンの中の1つだけ）
   await expect(page.locator('.working')).toHaveCount(1)
-  // 終わるとレッスン画面に移り、本文が入る
+  // 終わるとレッスン画面に移り、本文と参考情報が入る（完了条件2）
   await expect(page.locator('.doc [data-by="ai"]')).toHaveCount(3)
   await expect(busyButton(page)).toHaveCount(0)
+  await expect(page.locator('.doc table')).toBeVisible()
+  const clues = page.getByLabel('参考情報')
+  await expect(clues.locator('a.qchip').first()).toHaveAttribute('href', /google\.com\/search\?q=/)
+  await expect(clues.getByText('本文の例を自分の環境で再現する')).toBeVisible()
+  await expect(page.locator('.rail').getByText('例を自分の環境で試す')).toBeVisible()
 
   // レッスン: まだ資料が無い次の節で「資料を生成」
   await page.getByRole('button', { name: /次へ/ }).click()
