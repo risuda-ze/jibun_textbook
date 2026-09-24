@@ -1,9 +1,13 @@
+import { L } from './labels'
 import type { Lesson, Textbook } from '../types'
 import { STATUS_LABEL, lessonStatus, statusCounts, type Status } from '../lib/status'
 import { MODELS, type AiKind } from '../ai/types'
 import { WEB_SEARCH_USD_PER_1000 } from '../ai/anthropic'
-import { setAi, toast, useApp } from '../store'
-import { useEffect, useRef, useState } from 'react'
+import { markExported, setAi, toast, useApp } from '../store'
+import { SIZE_WARN_BYTES, byteSize, exportJson, fileName, formatSize } from '../lib/io'
+import { downloadText } from '../lib/download'
+import type { AiError, Progress, Usage } from '../ai/types'
+import { useEffect, useRef, useState, type InputHTMLAttributes } from 'react'
 import { Button, Card, Pill, Segmented } from './kit'
 
 export function StatusChip({ lesson }: { lesson: Lesson }) {
@@ -25,14 +29,23 @@ export function Meter({ tb }: { tb: Textbook }) {
   return (
     <div>
       <div className="meter" role="img" aria-label={label}>
-        {ORDER.map((k) => <i key={k} style={{ flex: c[k], background: METER_COLOR[k] }} />)}
+        {ORDER.map((k) => (
+          <i key={k} style={{ flex: c[k], background: METER_COLOR[k] }} />
+        ))}
       </div>
-      <div className="sub mono" style={{ fontSize: 12 }}>{label}</div>
+      <div className="sub mono" style={{ fontSize: 12 }}>
+        {label}
+      </div>
     </div>
   )
 }
 
-const KINDS: [AiKind, string][] = [['anthropic', 'Anthropic API'], ['compat', 'OpenAI互換API'], ['local', 'ローカル'], ['demo', 'デモ応答']]
+const KINDS: [AiKind, string][] = [
+  ['anthropic', 'Anthropic API'],
+  ['compat', 'OpenAI互換API'],
+  ['local', 'ローカル'],
+  ['demo', 'デモ応答'],
+]
 
 /** 使うAI。設定画面に埋めず、使う場所で直接切り替える。 */
 export function AiBar() {
@@ -49,25 +62,54 @@ export function AiBar() {
         {ai.kind === 'anthropic' && (
           <div className="row">
             <Pill tone={ai.apiKey ? 'done' : 'warn'}>APIキー {ai.apiKey ? '設定済み' : '未設定'}</Pill>
-            <Button v="outline" sm onClick={() => setEditKey((v) => !v)}>{ai.apiKey ? '変える' : '入れる'}</Button>
+            <Button v="outline" sm onClick={() => setEditKey((v) => !v)}>
+              {ai.apiKey ? '変える' : '入れる'}
+            </Button>
           </div>
         )}
       </div>
       {ai.kind === 'anthropic' && editKey && (
         <div className="row">
-          <input type="password" id="ai_key" autoComplete="off" placeholder="sk-ant-…" value={key} onChange={(e) => setKey(e.target.value)} style={{ flex: '1 1 260px' }} aria-label="APIキー" />
-          <Button v="soft" onClick={() => { setAi({ apiKey: key.trim() }); setKey(''); setEditKey(false); toast(key.trim() ? 'キーをこの端末に保存しました' : 'キーを消しました') }}>保存</Button>
+          <input
+            type="password"
+            id="ai_key"
+            autoComplete="off"
+            placeholder="sk-ant-…"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            style={{ flex: '1 1 260px' }}
+            aria-label="APIキー"
+          />
+          <Button
+            v="soft"
+            onClick={() => {
+              const k = key.trim()
+              setKey('')
+              setEditKey(false)
+              void setAi({ apiKey: k }).then((ok) => {
+                if (ok) toast(k ? 'キーをこの端末に保存しました' : 'キーを消しました')
+              })
+            }}
+          >
+            保存
+          </Button>
           <span className="sub">この端末の中にだけ保存します。書き出すJSONには入りません。</span>
         </div>
       )}
       {ai.kind === 'anthropic' && (
         <div className="opts">
-          <label className="f" htmlFor="ai_model">モデル
+          <label className="f" htmlFor="ai_model">
+            モデル
             <select id="ai_model" value={ai.model} onChange={(e) => setAi({ model: e.target.value })}>
-              {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              {MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
             </select>
           </label>
-          <label className="f" htmlFor="ai_search">Web調査のやり方
+          <label className="f" htmlFor="ai_search">
+            Web調査のやり方
             <select id="ai_search" value={ai.search} onChange={(e) => setAi({ search: e.target.value as 'builtin' | 'none' })}>
               <option value="builtin">モデル内蔵のWeb検索（検索1000回あたり${WEB_SEARCH_USD_PER_1000}）</option>
               <option value="none">検索なし（モデルの知識だけで書く）</option>
@@ -75,7 +117,11 @@ export function AiBar() {
           </label>
         </div>
       )}
-      {(ai.kind === 'compat' || ai.kind === 'local') && <p className="sub">この接続先はまだ使えません。次の段階で対応します。{ai.kind === 'local' && 'ローカルのモデルはPCでだけ使える予定です。'}</p>}
+      {(ai.kind === 'compat' || ai.kind === 'local') && (
+        <p className="sub">
+          この接続先はまだ使えません。次の段階で対応します。{ai.kind === 'local' && 'ローカルのモデルはPCでだけ使える予定です。'}
+        </p>
+      )}
       {ai.kind === 'demo' && <p className="sub">APIキーなしで動線を試すための見本を返します。調査はしません。</p>}
     </Card>
   )
@@ -97,10 +143,25 @@ export function useElapsed(running: boolean, startedAt: number | null, endedAt: 
 export const stepPercent = (step: number, total: number): number => Math.round((Math.max(0, Math.min(step, total)) / total) * 100)
 
 /** 進行中の一言。今していること（検索語など）と経過秒数。ボタンの脇に置く */
-export function Working({ running, detail, startedAt, endedAt }: { running: boolean; detail: string; startedAt: number | null; endedAt: number | null }) {
+export function Working({
+  running,
+  detail,
+  startedAt,
+  endedAt,
+}: {
+  running: boolean
+  detail: string
+  startedAt: number | null
+  endedAt: number | null
+}) {
   const sec = useElapsed(running, startedAt, endedAt)
   if (!running) return null
-  return <span className="sub working" role="status">{detail || '実行中…'}{sec !== null && <span className="mono">・{sec}秒</span>}</span>
+  return (
+    <span className="sub working" role="status">
+      {detail || '実行中…'}
+      {sec !== null && <span className="mono">・{sec}秒</span>}
+    </span>
+  )
 }
 
 export function Steps({ labels, step, detail }: { labels: string[]; step: number; detail: string }) {
@@ -109,7 +170,10 @@ export function Steps({ labels, step, detail }: { labels: string[]; step: number
       {labels.map((l, i) => (
         <li key={l} className={step > i ? 'done' : step === i ? 'run' : ''}>
           <span className="dot" />
-          <span>{l}<small>{step > i ? '済み' : step === i ? detail || '実行中…' : '待機'}</small></span>
+          <span>
+            {l}
+            <small>{step > i ? '済み' : step === i ? detail || '実行中…' : '待機'}</small>
+          </span>
         </li>
       ))}
     </ol>
@@ -124,7 +188,147 @@ export function useAbort(): { start: () => AbortSignal; stop: () => void } {
   const ref = useRef<AbortController | null>(null)
   useEffect(() => () => ref.current?.abort(), [])
   return {
-    start: () => { ref.current?.abort(); const c = new AbortController(); ref.current = c; return c.signal },
+    start: () => {
+      ref.current?.abort()
+      const c = new AbortController()
+      ref.current = c
+      return c.signal
+    },
     stop: () => ref.current?.abort(),
   }
+}
+
+/**
+ * 題名などの入力欄（#80）。文字は手元で持ち、300ms 打鍵が止まるか欄を離れたときだけ確定する。
+ * 1文字ごとに教科書全体をクローンして IndexedDB に書かないため
+ */
+export function TitleInput({
+  value,
+  onCommit,
+  ...rest
+}: { value: string; onCommit: (v: string) => void } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'onBlur'>) {
+  const [v, setV] = useState(value)
+  const dirty = useRef(false)
+  const latest = useRef(value)
+  const commitRef = useRef(onCommit)
+  commitRef.current = onCommit
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  // 外から値が変わったら（別の節を選んだなど）、打ちかけでなければ追随する
+  useEffect(() => {
+    if (!dirty.current) {
+      setV(value)
+      latest.current = value
+    }
+  }, [value])
+  const commit = () => {
+    clearTimeout(timer.current)
+    if (!dirty.current) return
+    dirty.current = false
+    commitRef.current(latest.current)
+  }
+  // 画面を離れるときも打ちかけを確定する
+  useEffect(
+    () => () => {
+      if (dirty.current) commitRef.current(latest.current)
+    },
+    [],
+  )
+  return (
+    <input
+      {...rest}
+      value={v}
+      onChange={(e) => {
+        setV(e.target.value)
+        latest.current = e.target.value
+        dirty.current = true
+        clearTimeout(timer.current)
+        timer.current = setTimeout(commit, 300)
+      }}
+      onBlur={commit}
+    />
+  )
+}
+
+/** 教科書を JSON で書き出す（#82 で Shelf から移動。本棚・ロードマップ・通読・Help で共用） */
+export function downloadBook(tb: Textbook): void {
+  const json = exportJson(tb)
+  const size = byteSize(json)
+  downloadText(fileName(tb), json)
+  markExported(tb.id)
+  toast(
+    size > SIZE_WARN_BYTES
+      ? `書き出しました（${formatSize(size)}）。8MBを超えているので、添付上限に注意してください。`
+      : `書き出しました（${formatSize(size)}）`,
+  )
+}
+
+/** 使った量（検索回数・トークン）の1行。無ければ出さない */
+export function UsageLine({ usage }: { usage: Usage | null }) {
+  if (!usage || (!usage.inputTokens && !usage.searches)) return null
+  return (
+    <p className="usage">
+      検索 {usage.searches}回 / 入力 {usage.inputTokens.toLocaleString()} / 出力 {usage.outputTokens.toLocaleString()} トークン
+    </p>
+  )
+}
+
+/** 進行中の表示（今していること・経過秒数）と「やめる」（#14）。進行中のボタンの脇に置く */
+export function RunControls({
+  detail,
+  startedAt,
+  endedAt,
+  onStop,
+}: {
+  detail: string
+  startedAt: number | null
+  endedAt: number | null
+  onStop: () => void
+}) {
+  return (
+    <>
+      <Working running detail={detail} startedAt={startedAt} endedAt={endedAt} />
+      <Button v="outline" sm onClick={onStop}>
+        {L.stop}
+      </Button>
+    </>
+  )
+}
+
+/**
+ * AI の作業を1回走らせる（#82）。busy・段階・今していること・経過時間・エラー・中止をまとめて持つ。
+ * つくる（設計）と、ロードマップの「設計を直す」で使う。自分でやめたときはエラーにせず短く知らせる（#14）
+ */
+export function useAiRun() {
+  const [busy, setBusy] = useState(false)
+  const [step, setStep] = useState(-1)
+  const [detail, setDetail] = useState('')
+  const [startedAt, setStartedAt] = useState<number | null>(null)
+  const [endedAt, setEndedAt] = useState<number | null>(null)
+  const [error, setError] = useState('')
+  const abort = useAbort()
+  async function run<T>(fn: (progress: Progress, signal: AbortSignal) => Promise<T>, doneStep?: number): Promise<T | null> {
+    setBusy(true)
+    setError('')
+    setStep(0)
+    setDetail('')
+    setStartedAt(Date.now())
+    setEndedAt(null)
+    try {
+      const r = await fn((s, d) => {
+        setStep(s)
+        setDetail(d)
+      }, abort.start())
+      if (doneStep !== undefined) setStep(doneStep)
+      return r
+    } catch (e) {
+      if ((e as AiError).code === 'aborted') toast('生成をやめました')
+      else setError((e as Error).message)
+      setStep(-1)
+      return null
+    } finally {
+      setEndedAt(Date.now())
+      setBusy(false)
+    }
+  }
+  return { busy, step, detail, startedAt, endedAt, error, setError, run, stop: abort.stop }
 }

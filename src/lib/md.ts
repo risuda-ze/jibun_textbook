@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify'
 import TurndownService from 'turndown'
 // @ts-expect-error 型定義が無い
 import { gfm } from 'turndown-plugin-gfm'
+import { isHttpUrl } from './safe'
 
 /** 保存はMarkdown、編集は見たまま。表示時に md→HTML、編集確定時に HTML→md。 */
 
@@ -46,5 +47,13 @@ td.addRule('divAsParagraph', {
 })
 
 export function htmlToMd(html: string): string {
-  return td.turndown(DOMPurify.sanitize(html)).replace(/\n{3,}/g, '\n\n').trim()
+  return (
+    td
+      .turndown(DOMPurify.sanitize(html))
+      .replace(/\n{3,}/g, '\n\n')
+      // 見たまま編集で文字として打った [文](URL) は turndown が \[文\](URL) にエスケープする（#76）。
+      // URL が http(s) のものだけリンクの記法に戻す。太字やコードは意図しない変換になりうるので戻さない
+      .replace(/\\\[([^[\]\n]+)\\\]\((\S+?)\)/g, (m, text, url) => (isHttpUrl(url) ? `[${text}](${url})` : m))
+      .trim()
+  )
 }

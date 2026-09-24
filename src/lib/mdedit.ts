@@ -15,8 +15,11 @@ const PREFIX: Record<'bullet' | 'number' | 'heading', string> = { bullet: '- ', 
 
 /** 選択範囲 [start, end) に kind の記法を当てる。戻り値の start/end は当てた後に選択しておく範囲 */
 export function applyMarkdown(md: string, start: number, end: number, kind: MdKind): MdEdit {
-  const s = Math.max(0, Math.min(start, end)), e = Math.max(start, end)
-  const before = md.slice(0, s), sel = md.slice(s, e), after = md.slice(e)
+  const s = Math.max(0, Math.min(start, end)),
+    e = Math.max(start, end)
+  const before = md.slice(0, s),
+    sel = md.slice(s, e),
+    after = md.slice(e)
 
   if (kind === 'bold' || kind === 'code') {
     const { open, close, placeholder } = WRAP[kind]

@@ -22,6 +22,7 @@ jobs:
   check:
     name: 型・単体・ビルド
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -29,13 +30,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # 整形と lint（Biome）。整形ずれか lint のエラーがあれば失敗する（#86）
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      # build は vite build だけ（型チェックは上で済ませているので二重に走らせない）
       - run: npm run build
 
   audit:
     name: 依存の脆弱性（high 以上で失敗）
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -49,6 +54,7 @@ jobs:
   e2e:
     name: 通し（Playwright）
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -56,7 +62,16 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # ブラウザは package-lock.json（Playwright の版）をキーにキャッシュする。当たれば install は数秒で終わる（#86）
+      - uses: actions/cache@v5
+        id: pw
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - if: steps.pw.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.pw.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
       # デモ応答だけを使い、外部には一切つながない。API キーは不要
       - run: npm run e2e
       - uses: actions/upload-artifact@v7

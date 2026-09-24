@@ -15,12 +15,20 @@ function fake(streams: (Msg | Error)[], parses: (Record<string, unknown> | Error
   const calls = { stream: [] as Record<string, unknown>[], parse: [] as Record<string, unknown>[], opts: [] as unknown[] }
   const client: MessagesLike = {
     stream(params, options) {
-      calls.stream.push(structuredClone(params)); calls.opts.push(options)
+      calls.stream.push(structuredClone(params))
+      calls.opts.push(options)
       const next = streams.shift()
-      return { finalMessage: async () => { if (!next) throw new Error('no more'); if (next instanceof Error) throw next; return next as never } }
+      return {
+        finalMessage: async () => {
+          if (!next) throw new Error('no more')
+          if (next instanceof Error) throw next
+          return next as never
+        },
+      }
     },
     async parse(params, options) {
-      calls.parse.push(params); calls.opts.push(options)
+      calls.parse.push(params)
+      calls.opts.push(options)
       const next = parses.shift()
       if (!next) throw new Error('no more')
       if (next instanceof Error) throw next
@@ -36,13 +44,22 @@ describe('調査（1段目）', () => {
   it('pause_turn は assistant の内容をそのまま送り返して続行する', async () => {
     const paused: Msg = {
       stop_reason: 'pause_turn',
-      content: [{ type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'rust ownership' } },
-        { type: 'web_search_tool_result', tool_use_id: 's1', content: [{ type: 'web_search_result', url: 'https://doc.rust-lang.org/book/', title: 'The Book', encrypted_content: 'ENC' }] }],
+      content: [
+        { type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'rust ownership' } },
+        {
+          type: 'web_search_tool_result',
+          tool_use_id: 's1',
+          content: [{ type: 'web_search_result', url: 'https://doc.rust-lang.org/book/', title: 'The Book', encrypted_content: 'ENC' }],
+        },
+      ],
       usage: { input_tokens: 100, output_tokens: 10, server_tool_use: { web_search_requests: 1 } },
     }
     const done: Msg = {
       stop_reason: 'end_turn',
-      content: [text('所有権は'), text('値ごとに1つ。', [{ type: 'web_search_result_location', url: 'https://example.com/a', title: 'A', cited_text: 'x' }])],
+      content: [
+        text('所有権は'),
+        text('値ごとに1つ。', [{ type: 'web_search_result_location', url: 'https://example.com/a', title: 'A', cited_text: 'x' }]),
+      ],
       usage: { input_tokens: 200, output_tokens: 20 },
     }
     const { client, calls } = fake([paused, done])
@@ -71,10 +88,19 @@ describe('調査（1段目）', () => {
   })
 
   it('検索エラーはHTTP 200で返る。例外にせず記録して続ける', async () => {
-    const { client } = fake([{
-      stop_reason: 'end_turn',
-      content: [{ type: 'web_search_tool_result', tool_use_id: 's1', content: { type: 'web_search_tool_result_error', error_code: 'max_uses_exceeded' } }, text('分かった範囲で書く')],
-    }])
+    const { client } = fake([
+      {
+        stop_reason: 'end_turn',
+        content: [
+          {
+            type: 'web_search_tool_result',
+            tool_use_id: 's1',
+            content: { type: 'web_search_tool_result_error', error_code: 'max_uses_exceeded' },
+          },
+          text('分かった範囲で書く'),
+        ],
+      },
+    ])
     const r = await new AnthropicProvider(settings, client).research('s', 'p', 1, zeroUsage())
     expect(r.searchErrors).toEqual(['max_uses_exceeded'])
     expect(r.sources).toEqual([])
@@ -84,8 +110,10 @@ describe('調査（1段目）', () => {
   it('pause_turn が続いても打ち切る', async () => {
     const p: Msg = { stop_reason: 'pause_turn', content: [text('…')] }
     const { client, calls } = fake(Array.from({ length: 20 }, () => ({ ...p })))
-    await new AnthropicProvider(settings, client).research('s', 'p', 1, zeroUsage())
+    const r = await new AnthropicProvider(settings, client).research('s', 'p', 1, zeroUsage())
     expect(calls.stream.length).toBeLessThanOrEqual(6)
+    // 打ち切ったことは「途中で切れた」として返す（#81）
+    expect(r.truncated).toBe(true)
   })
 
   it('refusal は分かる言葉のエラーにする', async () => {
@@ -119,20 +147,49 @@ describe('構造化（2段目）', () => {
   })
   it('parsed_output が null なら parse エラー', async () => {
     const { client } = fake([], [{ parsed_output: null, stop_reason: 'end_turn' }])
-    await expect(new AnthropicProvider(settings, client).askQuestions({ prompt: 'x', can: '', time: '', env: '' })).rejects.toMatchObject({ code: 'parse' })
+    await expect(new AnthropicProvider(settings, client).askQuestions({ prompt: 'x', can: '', time: '', env: '' })).rejects.toMatchObject({
+      code: 'parse',
+    })
   })
 })
 
 describe('節の生成', () => {
-  const tb = newTextbook('Rust入門', { goal: 'CLIを書く', chapters: [newChapter('所有権', [newLesson('ムーブ', { summary: 'ムーブを理解する' })])] })
+  const tb = newTextbook('Rust入門', {
+    goal: 'CLIを書く',
+    chapters: [newChapter('所有権', [newLesson('ムーブ', { summary: 'ムーブを理解する' })])],
+  })
   const lessonId = tb.chapters[0].lessons[0].id
 
   it('一次情報リンクは調査で実際に見つけたページからだけ作る（AIが書いたURLは使わない）', async () => {
     const { client, calls } = fake(
-      [{ stop_reason: 'end_turn', content: [{ type: 'web_search_tool_result', tool_use_id: 's', content: [
-        { type: 'web_search_result', url: 'https://doc.rust-lang.org/book/ch04-01.html', title: 'What Is Ownership?' },
-        { type: 'web_search_result', url: 'https://example.com/blog', title: 'Blog' }] }, text('調査メモ')] }],
-      [{ parsed_output: { blocks: ['### ムーブ\n本文', ''], tasks: ['試す'], queries: ['rust move'], how: ['コンパイルする'], linkIndexes: [0, 7, -1, 0.5] }, stop_reason: 'end_turn' }],
+      [
+        {
+          stop_reason: 'end_turn',
+          content: [
+            {
+              type: 'web_search_tool_result',
+              tool_use_id: 's',
+              content: [
+                { type: 'web_search_result', url: 'https://doc.rust-lang.org/book/ch04-01.html', title: 'What Is Ownership?' },
+                { type: 'web_search_result', url: 'https://example.com/blog', title: 'Blog' },
+              ],
+            },
+            text('調査メモ'),
+          ],
+        },
+      ],
+      [
+        {
+          parsed_output: {
+            blocks: ['### ムーブ\n本文', ''],
+            tasks: ['試す'],
+            queries: ['rust move'],
+            how: ['コンパイルする'],
+            linkIndexes: [0, 7, -1, 0.5],
+          },
+          stop_reason: 'end_turn',
+        },
+      ],
     )
     const steps: number[] = []
     const { draft } = await new AnthropicProvider(settings, client).generateLesson(tb, lessonId, (s) => steps.push(s))
@@ -147,7 +204,10 @@ describe('節の生成', () => {
   })
 
   it('検索なしなら調査を飛ばして構造化だけ呼ぶ', async () => {
-    const { client, calls } = fake([], [{ parsed_output: { blocks: ['a'], tasks: [], queries: [], how: [], linkIndexes: [] }, stop_reason: 'end_turn' }])
+    const { client, calls } = fake(
+      [],
+      [{ parsed_output: { blocks: ['a'], tasks: [], queries: [], how: [], linkIndexes: [] }, stop_reason: 'end_turn' }],
+    )
     await new AnthropicProvider({ ...settings, search: 'none' }, client).generateLesson(tb, lessonId, () => {})
     expect(calls.stream).toHaveLength(0)
     expect(calls.parse).toHaveLength(1)
@@ -158,7 +218,20 @@ describe('設計を直す', () => {
   it('守る節に【守る】を付けてAIに渡し、空文字のidは新規として扱う', async () => {
     const kept = newLesson('完了の節', { done: true })
     const tb = newTextbook('本', { chapters: [newChapter('章', [kept, newLesson('下書き')])] })
-    const { client, calls } = fake([], [{ parsed_output: { lessons: [{ id: kept.id, title: 'x', minutes: 1, isTask: false, summary: '' }, { id: '', title: '新', minutes: 1, isTask: false, summary: '' }] }, stop_reason: 'end_turn' }])
+    const { client, calls } = fake(
+      [],
+      [
+        {
+          parsed_output: {
+            lessons: [
+              { id: kept.id, title: 'x', minutes: 1, isTask: false, summary: '' },
+              { id: '', title: '新', minutes: 1, isTask: false, summary: '' },
+            ],
+          },
+          stop_reason: 'end_turn',
+        },
+      ],
+    )
     const { plan } = await new AnthropicProvider(settings, client).proposeRedesign(tb, 'chapter', kept.id, '短く', () => {})
     const prompt = (calls.parse[0].messages as { content: string }[])[0].content
     expect(prompt).toContain(`(id: ${kept.id})【守る】`)
@@ -181,17 +254,27 @@ describe('生成の中止（#14）', () => {
 
   it('中止済みの signal なら API を呼ばずに aborted で終わる', async () => {
     const { client, calls } = fake([], [])
-    const c = new AbortController(); c.abort()
-    await expect(new AnthropicProvider(settings, client).generateLesson(tb, lessonId, () => {}, { signal: c.signal })).rejects.toMatchObject({ code: 'aborted' })
+    const c = new AbortController()
+    c.abort()
+    await expect(
+      new AnthropicProvider(settings, client).generateLesson(tb, lessonId, () => {}, { signal: c.signal }),
+    ).rejects.toMatchObject({ code: 'aborted' })
     expect(calls.stream).toHaveLength(0)
     expect(calls.parse).toHaveLength(0)
   })
   it('signal を SDK に渡し、SDK の中止エラーは aborted にする。途中まで使った分を返す', async () => {
     const c = new AbortController()
-    const { client, calls } = fake([
-      { stop_reason: 'pause_turn', content: [text('途中')], usage: { input_tokens: 10, output_tokens: 1, server_tool_use: { web_search_requests: 2 } } },
-      new Anthropic.APIUserAbortError({ message: 'aborted' }),
-    ], [])
+    const { client, calls } = fake(
+      [
+        {
+          stop_reason: 'pause_turn',
+          content: [text('途中')],
+          usage: { input_tokens: 10, output_tokens: 1, server_tool_use: { web_search_requests: 2 } },
+        },
+        new Anthropic.APIUserAbortError({ message: 'aborted' }),
+      ],
+      [],
+    )
     const p = new AnthropicProvider(settings, client).generateLesson(tb, lessonId, () => {}, { signal: c.signal })
     await expect(p).rejects.toMatchObject({ code: 'aborted', usage: { searches: 2 } })
     expect((calls.opts[0] as { signal?: AbortSignal }).signal).toBe(c.signal)
@@ -222,16 +305,22 @@ describe('渡された資料（#63）', () => {
     const content = (calls.parse[0].messages as { content: Record<string, unknown>[] }[])[0].content
     expect(content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('渡された資料: notes.md') })
     expect(content[0]).toMatchObject({ text: expect.stringContaining('所有権のメモ') })
-    expect(content[1]).toMatchObject({ type: 'document', title: 'paper.pdf', source: { type: 'base64', media_type: 'application/pdf', data: 'JVBERg==' } })
+    expect(content[1]).toMatchObject({
+      type: 'document',
+      title: 'paper.pdf',
+      source: { type: 'base64', media_type: 'application/pdf', data: 'JVBERg==' },
+    })
     expect((content[2] as { text: string }).text).toContain('この資料だけを根拠に書く')
   })
-  it('資料があっても調査する時は、調査には文字の資料だけ渡し、書く段階で PDF も渡す', async () => {
+  it('資料があっても調査する時は、調査には資料の本文を渡さず（名前だけ）、書く段階で全部渡す', async () => {
     const { client, calls } = fake([{ stop_reason: 'end_turn', content: [text('調査メモ')] }], [out])
     await new AnthropicProvider(settings, client).generateLesson(tb, lessonId, () => {}, { materials: mats, sourceOnly: false })
     expect(calls.stream).toHaveLength(1)
     expect(calls.stream[0].tools).toBeDefined()
-    const research = (calls.stream[0].messages as { content: Record<string, unknown>[] }[])[0].content
-    expect(research.map((b) => b.type)).toEqual(['text', 'text'])
+    const research = (calls.stream[0].messages as { content: unknown }[])[0].content
+    expect(typeof research).toBe('string')
+    expect(research as string).toContain('notes.md')
+    expect(research as string).not.toContain('所有権のメモ')
     const write = (calls.parse[0].messages as { content: Record<string, unknown>[] }[])[0].content
     expect(write.map((b) => b.type)).toEqual(['text', 'document', 'text'])
     expect((write[2] as { text: string }).text).toContain('本文の主な根拠にし、調査で補う')
@@ -240,5 +329,66 @@ describe('渡された資料（#63）', () => {
     const { client, calls } = fake([], [out])
     await new AnthropicProvider({ ...settings, search: 'none' }, client).generateLesson(tb, lessonId, () => {}, { sourceOnly: true })
     expect(typeof (calls.parse[0].messages as { content: unknown }[])[0].content).toBe('string')
+  })
+})
+
+describe('調査の状態を知らせる（#81）', () => {
+  const tb = newTextbook('t', { chapters: [newChapter('c', [newLesson('l')])] })
+  const lessonId = tb.chapters[0].lessons[0].id
+  const out = { parsed_output: { blocks: ['a'], tasks: [], queries: [], how: [], linkIndexes: [] }, stop_reason: 'end_turn' }
+  const searchError = {
+    type: 'web_search_tool_result',
+    tool_use_id: 's',
+    content: { type: 'web_search_tool_result_error', error_code: 'max_uses_exceeded' },
+  }
+
+  it('節の生成: 検索の失敗と切り詰めを draft.research に載せる', async () => {
+    const { client } = fake([{ stop_reason: 'max_tokens', content: [searchError, text('途中')] }], [out])
+    const { draft } = await new AnthropicProvider(settings, client).generateLesson(tb, lessonId, () => {})
+    expect(draft.research).toEqual({ truncated: true, searchErrors: ['max_uses_exceeded'] })
+  })
+  it('設計: 同じ情報を research に載せる。検索なしなら undefined', async () => {
+    const design = {
+      title: 't',
+      goal: 'g',
+      chapters: [{ title: 'c', lessons: [{ title: 'l', minutes: 30, isTask: false, summary: 's' }] }],
+    }
+    const { client } = fake([{ stop_reason: 'end_turn', content: [searchError] }], [{ parsed_output: design, stop_reason: 'end_turn' }])
+    const r = await new AnthropicProvider(settings, client).designCourse({ prompt: 'p', can: '', time: '', env: '' }, [], '', () => {})
+    expect(r.research).toEqual({ truncated: false, searchErrors: ['max_uses_exceeded'] })
+    const { client: c2 } = fake([], [{ parsed_output: design, stop_reason: 'end_turn' }])
+    const r2 = await new AnthropicProvider({ ...settings, search: 'none' }, c2).designCourse(
+      { prompt: 'p', can: '', time: '', env: '' },
+      [],
+      '',
+      () => {},
+    )
+    expect(r2.research).toBeUndefined()
+  })
+})
+
+describe('デモ応答の設計を直す（#83）', () => {
+  const tb = newTextbook('t', { chapters: [newChapter('c', [newLesson('a'), newLesson('b', { done: true })])] })
+  const lessonId = tb.chapters[0].lessons[0].id
+  it('節だけ: 下書きが2つ', async () => {
+    const { plan } = await new DemoProvider().proposeRedesign(tb, 'lesson', lessonId, '', () => {})
+    expect(plan.scope).toBe('lesson')
+    if (plan.scope === 'lesson') expect(plan.blocks).toHaveLength(2)
+  })
+  it('章だけ: 守らない最初の節に注文を付け、id 無しの節を1つ足す。完了の節は変えない', async () => {
+    const { plan } = await new DemoProvider().proposeRedesign(tb, 'chapter', lessonId, '実践を先に', () => {})
+    expect(plan.scope).toBe('chapter')
+    if (plan.scope === 'chapter') {
+      expect(plan.lessons.map((l) => l.title)).toEqual(['a（実践を先に）', 'b', '注文から追加した節（実践を先に）'])
+      expect(plan.lessons.map((l) => l.id)).toEqual([tb.chapters[0].lessons[0].id, tb.chapters[0].lessons[1].id, null])
+    }
+  })
+  it('コース全体: 章を1つ足す', async () => {
+    const { plan } = await new DemoProvider().proposeRedesign(tb, 'course', lessonId, '', () => {})
+    expect(plan.scope).toBe('course')
+    if (plan.scope === 'course') {
+      expect(plan.chapters).toHaveLength(2)
+      expect(plan.chapters[1]).toMatchObject({ id: null, title: '追加の章（見直し）' })
+    }
   })
 })

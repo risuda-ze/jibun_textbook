@@ -1,80 +1,77 @@
-import { clearToast, currentBook, go, useApp, type Screen } from "../store";
-import { Shelf } from "./Shelf";
-import { Create } from "./Create";
-import { Roadmap } from "./Roadmap";
-import { LessonPage } from "./LessonPage";
-import { Book } from "./Book";
-import { Help } from "./Help";
+import { clearToast, currentBook, go, useApp, type Screen } from '../store'
+import { Shelf } from './Shelf'
+import { Create } from './Create'
+import { Roadmap } from './Roadmap'
+import { LessonPage } from './LessonPage'
+import { Book } from './Book'
+import { Help } from './Help'
+import { L } from './labels'
 
 const TABS: [Screen, string, boolean][] = [
-    ["shelf", "本棚", false],
-    ["new", "つくる", false],
-    ["road", "ロードマップ", true],
-    ["lesson", "レッスン", true],
-    ["book", "教科書", true],
-];
+  ['shelf', '本棚', false],
+  ['new', 'つくる', false],
+  ['road', L.roadmap, true],
+  ['lesson', 'レッスン', true],
+  ['book', '教科書', true],
+]
 
 export function App() {
-    const s = useApp();
-    const tb = currentBook(s);
-    if (!s.ready)
-        return (
-            <div className="app">
-                <p className="empty">読み込み中…</p>
-            </div>
-        );
-    const screen: Screen =
-        !tb &&
-        (s.screen === "road" || s.screen === "lesson" || s.screen === "book")
-            ? "shelf"
-            : s.screen;
-    // レッスンと通読では、設定に応じて画面幅の約 90% まで広げる（#53）
-    const wide = s.wide && (screen === "lesson" || screen === "book");
+  const s = useApp()
+  const tb = currentBook(s)
+  if (!s.ready)
     return (
-        <div className={`app${wide ? " wide" : ""}`}>
-            <header className="bar">
-                <div className="brand">じぶん教科書</div>
-                <nav className="tabs" role="tablist">
-                    {TABS.map(([k, label, needsBook]) => (
-                        <button
-                            key={k}
-                            className="tab"
-                            role="tab"
-                            aria-selected={screen === k}
-                            disabled={needsBook && !tb}
-                            onClick={() => go(k)}
-                        >
-                            {label}
-                        </button>
-                    ))}
-                </nav>
-                {tb && (
-                    <div className="mocknote">開いている教科書: {tb.title}</div>
-                )}
-            </header>
-            <main className="stack">
-                {screen === "shelf" && <Shelf />}
-                {screen === "new" && <Create />}
-                {screen === "road" && tb && <Roadmap tb={tb} />}
-                {screen === "lesson" && tb && <LessonPage tb={tb} />}
-                {screen === "book" && tb && <Book tb={tb} />}
-                {screen === "help" && <Help />}
-            </main>
-            {s.toast && (
-                <div className="toast" role="status">
-                    <span>{s.toast.msg}</span>
-                    {s.toast.undo && (
-                        <button
-                            onClick={() => {
-                                s.toast?.undo?.();
-                                clearToast();
-                            }}
-                        >
-                            元に戻す
-                        </button>
-                    )}
-                </div>
-            )}
+      <div className="app">
+        <p className="empty">読み込み中…</p>
+      </div>
+    )
+  const screen: Screen = !tb && (s.screen === 'road' || s.screen === 'lesson' || s.screen === 'book') ? 'shelf' : s.screen
+  // レッスンと通読では、設定に応じて画面幅の約 90% まで広げる（#53）
+  const wide = s.wide && (screen === 'lesson' || screen === 'book')
+  return (
+    <div className={`app${wide ? ' wide' : ''}`}>
+      <header className="bar">
+        <div className="brand">じぶん教科書</div>
+        <nav className="tabs" role="tablist">
+          {TABS.map(([k, label, needsBook]) => (
+            <button
+              type="button"
+              key={k}
+              className="tab"
+              role="tab"
+              aria-selected={screen === k}
+              disabled={needsBook && !tb}
+              onClick={() => go(k)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+        {tb && <div className="mocknote">開いている教科書: {tb.title}</div>}
+      </header>
+      <main className="stack">
+        {screen === 'shelf' && <Shelf />}
+        {screen === 'new' && <Create />}
+        {screen === 'road' && tb && <Roadmap tb={tb} />}
+        {screen === 'lesson' && tb && <LessonPage tb={tb} />}
+        {screen === 'book' && tb && <Book tb={tb} />}
+        {screen === 'help' && <Help />}
+      </main>
+      {s.toast && (
+        <div className="toast" role="status">
+          <span>{s.toast.msg}</span>
+          {s.toast.undo && (
+            <button
+              type="button"
+              onClick={() => {
+                s.toast?.undo?.()
+                clearToast()
+              }}
+            >
+              元に戻す
+            </button>
+          )}
         </div>
-    );
+      )}
+    </div>
+  )
 }
