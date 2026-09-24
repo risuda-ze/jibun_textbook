@@ -25,10 +25,10 @@ test('別の節を選び直しても生成は続く', async ({ page }) => {
   await page.getByRole('button', { name: L.generateLesson }).click()
   await expect(page.getByRole('button', { name: L.stop })).toBeVisible()
   // 章構成の一覧から別の節を選ぶ（進行中でない節では生成ボタンは押せない）
-  await page.locator('.chapterpane .lessonlist button').nth(1).click()
+  await page.locator('.lessonlist button').locator('visible=true').nth(1).click()
   await expect(page.getByRole('button', { name: L.generateLesson })).toBeDisabled()
   // 元の節に戻ると進行中の表示が続いている
-  await page.locator('.chapterpane .lessonlist button').nth(0).click()
+  await page.locator('.lessonlist button').locator('visible=true').nth(0).click()
   await expect(page.getByRole('button', { name: L.generating })).toBeVisible()
   await expect(page.getByRole('button', { name: L.generating })).toHaveCount(0, { timeout: 15_000 })
 })
