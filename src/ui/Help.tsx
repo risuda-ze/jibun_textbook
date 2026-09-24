@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { migrate } from '../lib/migrate'
 import { formatSize, readTextbookFile, type ParseResult } from '../lib/io'
 import { AI_KEY, KEY, MATERIAL_KEY } from '../lib/messages'
-import { PDF_LIMIT_BYTES, TEXT_LIMIT_BYTES } from '../lib/material'
+import { PDF_LIMIT_BYTES, TEXT_LIMIT_BYTES, TOTAL_LIMIT_BYTES } from '../lib/material'
 import { clearRepairTarget, go, useApp } from '../store'
 import { downloadBook } from './common'
 import { OlderCard, importTextbook, type Older } from './import'
@@ -69,8 +69,8 @@ export const TROUBLES: { when: string; next: string }[] = [
     next: '括弧の中が Anthropic の状態番号、その後ろが理由です。教科書は変わりません。時間を置いて試し、続くなら理由の文を添えて「不具合を知らせる」から知らせてください。',
   },
   {
-    when: `資料を渡すときに「${MATERIAL_KEY.badKind}」「${MATERIAL_KEY.tooBig}」「〈ファイル名〉${MATERIAL_KEY.unreadable}」と出る`,
-    next: `渡せるのは .txt / .md / .pdf で、上限は文字が ${formatSize(TEXT_LIMIT_BYTES)}、PDF が ${formatSize(PDF_LIMIT_BYTES)} です。種類と大きさを確かめてください。読めない場合はファイルが壊れているか、開いたままの可能性があります。`,
+    when: `資料を渡すときに「${MATERIAL_KEY.badKind}」「${MATERIAL_KEY.tooBig}」「${MATERIAL_KEY.tooBigTotal}」「〈ファイル名〉${MATERIAL_KEY.unreadable}」と出る`,
+    next: `渡せるのは .txt / .md / .pdf で、上限は文字が ${formatSize(TEXT_LIMIT_BYTES)}、PDF が ${formatSize(PDF_LIMIT_BYTES)}、合計が ${formatSize(TOTAL_LIMIT_BYTES)} です。種類と大きさを確かめてください。読めない場合はファイルが壊れているか、開いたままの可能性があります。`,
   },
 ]
 

@@ -59,6 +59,7 @@ export const AI_MSG = {
 export const MATERIAL_KEY = {
   badKind: '渡せない種類のファイルです',
   tooBig: '大きすぎて渡せません',
+  tooBigTotal: '合計が大きすぎて渡せません',
   unreadable: 'を読めませんでした',
 } as const
 
@@ -66,5 +67,7 @@ export const MATERIAL_MSG = {
   badKind: (name: string) => `「${name}」は${MATERIAL_KEY.badKind}。渡せるのは .txt / .md / .pdf です。`,
   /** 「〈名前〉は」の後に付ける。ファイルと貼り付けで主語が違う */
   tooBig: (what: 'PDF' | '文字', size: string, limit: string) => `${MATERIAL_KEY.tooBig}（${size}。${what}の上限は ${limit}）。`,
+  /** 複数の資料の合計（#69）。「〈名前〉を足すと」「資料の」の後に付ける */
+  tooBigTotal: (size: string, limit: string) => `${MATERIAL_KEY.tooBigTotal}（${size}。上限は ${limit}）。`,
   unreadable: (name: string, detail: string) => `「${name}」${MATERIAL_KEY.unreadable}。${detail}`,
 } as const

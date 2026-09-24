@@ -1,27 +1,37 @@
 import { L } from './labels'
 import { useRef, useState, type ReactNode } from 'react'
 import type { Material } from '../ai/types'
-import { PDF_LIMIT_BYTES, TEXT_LIMIT_BYTES, pastedMaterial, pastedSize, readMaterial } from '../lib/material'
+import {
+  PDF_LIMIT_BYTES,
+  TEXT_LIMIT_BYTES,
+  TOTAL_LIMIT_BYTES,
+  checkTotal,
+  pastedMaterial,
+  pastedSize,
+  readMaterial,
+  totalSize,
+} from '../lib/material'
 import { formatSize } from '../lib/io'
 import { Button, Card } from './kit'
 
-/** 「資料を渡す」欄の入力（#63）。ファイル1つ・貼り付け・この資料だけから作る */
-export type MaterialInput = { file: Material | null; pasted: string; sourceOnly: boolean }
-export const emptyMaterialInput = (): MaterialInput => ({ file: null, pasted: '', sourceOnly: false })
+/** 「資料を渡す」欄の入力（#63 #69）。ファイル（複数）・貼り付け・この資料だけから作る */
+export type MaterialInput = { files: Material[]; pasted: string; sourceOnly: boolean }
+export const emptyMaterialInput = (): MaterialInput => ({ files: [], pasted: '', sourceOnly: false })
 
-/** AI 層に渡す形にする。ファイルと貼り付けは別々の資料として並べる */
+/** AI 層に渡す形にする。ファイルそれぞれと貼り付けを別々の資料として並べる */
 export function toMaterials(m: MaterialInput): Material[] {
-  const out: Material[] = []
-  if (m.file) out.push(m.file)
+  const out: Material[] = [...m.files]
   const p = pastedMaterial(m.pasted)
   if (p?.ok) out.push(p.material)
   return out
 }
 
-/** 渡せない状態なら理由。生成の前に見る（#79） */
+/** 渡せない状態なら理由。生成の前に見る（#79）。貼り付けの上限 → 合計の上限（#69）の順 */
 export function materialError(m: MaterialInput): string | null {
   const p = pastedMaterial(m.pasted)
-  return p && !p.ok ? p.reason : null
+  if (p && !p.ok) return p.reason
+  const over = checkTotal(totalSize(toMaterials(m)))
+  return over ? `資料の${over}` : null
 }
 
 /**
@@ -42,15 +52,33 @@ export function MaterialPanel({
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
   const file = useRef<HTMLInputElement>(null)
-  const count = toMaterials(value).length
+  const mats = toMaterials(value)
+  const count = mats.length
+  const total = totalSize(mats)
   const pastedErr = materialError(value)
 
-  async function onFile(f: File | undefined) {
-    if (!f) return
+  /** 選んだファイルを順に読んで足す。同じ名前は置き換える。合計が上限を超えるものは読む前に断る（#69） */
+  async function onFiles(list: FileList | null) {
+    if (!list?.length) return
     setError('')
-    const r = await readMaterial(f)
-    if (!r.ok) return setError(r.reason)
-    onChange({ ...value, file: r.material })
+    const errs: string[] = []
+    let files = value.files
+    for (const f of Array.from(list)) {
+      const rest = files.filter((x) => x.name !== f.name)
+      const over = checkTotal(totalSize(rest) + pastedSize(value.pasted) + f.size)
+      if (over) {
+        errs.push(`「${f.name}」を足すと${over}`)
+        continue
+      }
+      const r = await readMaterial(f)
+      if (!r.ok) {
+        errs.push(r.reason)
+        continue
+      }
+      files = [...rest, r.material]
+    }
+    if (files !== value.files) onChange({ ...value, files })
+    setError(errs.join(' '))
   }
 
   return (
@@ -60,7 +88,7 @@ export function MaterialPanel({
           {L.material}
           {count ? `（${count}）` : ''}
         </Button>
-        {!open && value.file && <span className="sub mono">{value.file.name}</span>}
+        {!open && value.files.length > 0 && <span className="sub mono">{value.files.map((f) => f.name).join('、')}</span>}
         {!open && count > 0 && value.sourceOnly && <span className="sub">この資料だけから作る</span>}
         {children}
       </div>
@@ -77,28 +105,38 @@ export function MaterialPanel({
               ref={file}
               type="file"
               id="materialfile"
+              multiple
               accept=".txt,.md,.markdown,.pdf,text/plain,text/markdown,application/pdf"
               hidden
               onChange={(e) => {
-                void onFile(e.target.files?.[0])
+                void onFiles(e.target.files)
                 e.target.value = ''
               }}
             />
-            {value.file ? (
-              <>
-                <span className="sub mono">
-                  {value.file.name}（{formatSize(value.file.size)}）
-                </span>
-                <Button v="outline" sm disabled={disabled} onClick={() => onChange({ ...value, file: null })}>
-                  外す
-                </Button>
-              </>
-            ) : (
-              <span className="sub">
-                .txt / .md（{formatSize(TEXT_LIMIT_BYTES)} まで）か .pdf（{formatSize(PDF_LIMIT_BYTES)} まで）を1つ
-              </span>
-            )}
+            <span className="sub">
+              .txt / .md（{formatSize(TEXT_LIMIT_BYTES)} まで）か .pdf（{formatSize(PDF_LIMIT_BYTES)} まで）。複数選べます
+            </span>
           </div>
+          {value.files.length > 0 && (
+            <ul className="stack" style={{ gap: 4, margin: 0, paddingLeft: 0, listStyle: 'none' }} aria-label="選んだファイル">
+              {value.files.map((f) => (
+                <li key={f.name} className="row">
+                  <span className="sub mono">
+                    {f.name}（{formatSize(f.size)}）
+                  </span>
+                  <Button
+                    v="outline"
+                    sm
+                    disabled={disabled}
+                    aria-label={`${f.name} を外す`}
+                    onClick={() => onChange({ ...value, files: value.files.filter((x) => x.name !== f.name) })}
+                  >
+                    外す
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
           {error && (
             <p className="err" role="alert">
               {error}
@@ -117,7 +155,8 @@ export function MaterialPanel({
             />
           </label>
           <p className={pastedErr ? 'err' : 'sub'} role={pastedErr ? 'alert' : undefined}>
-            {pastedErr ?? `${formatSize(pastedSize(value.pasted))} / 上限 ${formatSize(TEXT_LIMIT_BYTES)}`}
+            {pastedErr ??
+              `${formatSize(pastedSize(value.pasted))} / 上限 ${formatSize(TEXT_LIMIT_BYTES)}。資料の合計 ${formatSize(total)} / 上限 ${formatSize(TOTAL_LIMIT_BYTES)}`}
           </p>
           <label className="row sub" htmlFor="sourceonly">
             <input
