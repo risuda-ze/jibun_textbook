@@ -3,7 +3,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { AnthropicProvider, type MessagesLike } from '../src/ai/anthropic'
 import { DemoProvider } from '../src/ai/demo'
 import { getProvider } from '../src/ai'
-import { AiError, DEFAULT_AI, zeroUsage, type AiSettings } from '../src/ai/types'
+import { DEFAULT_AI, zeroUsage, type AiSettings } from '../src/ai/types'
+import { AI_MSG } from '../src/lib/messages'
 import { newChapter, newLesson, newTextbook } from '../src/types'
 
 const settings: AiSettings = { ...DEFAULT_AI, apiKey: 'test' }
@@ -260,8 +261,8 @@ describe('設計を直す', () => {
 
 describe('接続先の切り替え', () => {
   it('キー未設定・未対応の接続先は分かる言葉で断る', () => {
-    expect(() => getProvider({ ...DEFAULT_AI, apiKey: '' })).toThrowError(AiError)
-    expect(() => getProvider({ ...DEFAULT_AI, kind: 'local' })).toThrowError(/まだ使用できません/)
+    expect(() => getProvider({ ...DEFAULT_AI, apiKey: '' })).toThrowError(AI_MSG.nokey)
+    expect(() => getProvider({ ...DEFAULT_AI, kind: 'local' })).toThrowError(AI_MSG.unsupported)
     expect(getProvider({ ...DEFAULT_AI, kind: 'demo' })).toBeTruthy()
   })
 })

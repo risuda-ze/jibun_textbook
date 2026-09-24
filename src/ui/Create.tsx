@@ -1,7 +1,7 @@
 import { L } from './labels'
 import { useState } from 'react'
 import { researchNote } from './generate'
-import { getProvider, type CourseDesign, type QA, type Usage } from '../ai'
+import { PROGRESS, getProvider, type CourseDesign, type QA, type Usage } from '../ai'
 import { openBook, putBook, toast, useApp } from '../store'
 import { newChapter, newLesson, newTextbook, type CourseInput } from '../types'
 import { AiBar, Steps, StopButton, UsageLine, stepPercent, useAiRun } from './common'
@@ -122,7 +122,7 @@ export function Create() {
               onClick={ask}
               disabled={busyAny}
               progress={asking ? 0 : d.busy && !redoing ? stepPercent(d.step, STEP_LABELS.length) : null}
-              busy={asking ? { label: '質問を作成中…', seconds: null } : d.busy && !redoing ? d.working : null}
+              busy={asking ? { label: PROGRESS.asking, seconds: null } : d.busy && !redoing ? d.working : null}
             >
               {design ? 'もう一度調べ直す' : L.design}
             </Button>

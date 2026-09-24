@@ -190,3 +190,10 @@ zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても
 - `Working` と `RunControls` は削除し、「やめる」だけの `StopButton` にした。`L.generating`（生成中…）は使う所が無くなったので削除。e2e は名前ではなく `button[aria-busy="true"]`（`e2e/helpers.ts` の `busyButton`）で進行中のボタンを探す
 - 表に無い文言: つくるの確認質問を考えている間は「質問を作成中…」（秒数なし）。デモ応答の「この資料だけから作る」は「資料から作成中…」で実 API と同じ
 - `role="status"` の中の文は Chrome がボタンの名前に数えない（e2e の snapshot で `button [disabled]:` と名無しになった）。読み上げで名無しにならないよう、同じ文を `aria-label` にも入れる
+
+## 2026-09-24 の判断（#102・システムメッセージの一元化の範囲）
+
+- 集めたのは **AI のエラー文**（`AI_KEY` / `AI_MSG`）と**資料の断り文**（`MATERIAL_KEY` / `MATERIAL_MSG`）。どちらも `src/lib/messages.ts`。Help の対処表に `code` ごとの行と「資料を渡すときに…」の行を足し、`tests/messages.test.ts` が JSON・AI・資料の全 KEY を Help に照合する
+- `AI_KEY` は Help に行がある語だけ（nokey / auth / permission / rate / network / refusal / api）。行の無い文（parse・unsupported・noLesson・aborted）は `AI_MSG` にだけ置く。`AiError` の `code` は変えない（`auth` に auth と permission の2文がある）
+- **トースト（30件）は集めない**。操作の結果の文で、1か所ずつ文脈に依存するため
+- 進行中の文（「Web調査中…」など）は Help と無関係なので `messages.ts` ではなく `src/ai/types.ts` の `PROGRESS` に置く。デモ応答と実 API、`Button` の既定「実行中…」が同じ定数を読む。文言は変えていない

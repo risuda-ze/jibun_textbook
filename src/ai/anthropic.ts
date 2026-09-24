@@ -3,8 +3,10 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod'
 import type { CourseInput, Textbook } from '../types'
 import { findLesson, isProtectedLesson, lessonNo } from '../lib/status'
+import { AI_MSG } from '../lib/messages'
 import {
   AiError,
+  PROGRESS,
   abortError,
   throwIfAborted,
   zeroUsage,
@@ -79,18 +81,13 @@ function toAiError(e: unknown): AiError {
   if (e instanceof AiError) return e
   // 自分でやめた（#14）。APIUserAbortError は APIError の子なので先に見る
   if (e instanceof Anthropic.APIUserAbortError || (e instanceof Error && e.name === 'AbortError')) return abortError()
-  if (e instanceof Anthropic.AuthenticationError)
-    return new AiError('auth', 'APIキーが正しく認証されませんでした。キーを入れ直してください。')
-  if (e instanceof Anthropic.PermissionDeniedError)
-    return new AiError('auth', 'このキーでは使用できない機能またはモデルです。モデルを変更するか、Web調査を「検索なし」にしてください。')
-  if (e instanceof Anthropic.RateLimitError)
-    return new AiError('rate', '利用上限に達しました。しばらく待ってから、もう一度お試しください。')
-  if (e instanceof Anthropic.APIConnectionError)
-    return new AiError('network', 'ネットワークに接続できませんでした。接続を確認してから、もう一度お試しください。')
-  if (e instanceof Anthropic.APIError) return new AiError('api', `APIエラーが発生しました（${e.status ?? '?'}）: ${e.message}`)
+  if (e instanceof Anthropic.AuthenticationError) return new AiError('auth', AI_MSG.auth)
+  if (e instanceof Anthropic.PermissionDeniedError) return new AiError('auth', AI_MSG.permission)
+  if (e instanceof Anthropic.RateLimitError) return new AiError('rate', AI_MSG.rate)
+  if (e instanceof Anthropic.APIConnectionError) return new AiError('network', AI_MSG.network)
+  if (e instanceof Anthropic.APIError) return new AiError('api', AI_MSG.api(e.status ?? '?', e.message))
   // fetch の失敗は TypeError で来る。それ以外の TypeError はコードの不具合なので、接続の案内にせず中身を出す（#88）
-  if (e instanceof TypeError && /fetch|network|Load failed/i.test(e.message))
-    return new AiError('network', 'ネットワークに接続できませんでした。接続を確認してから、もう一度お試しください。')
+  if (e instanceof TypeError && /fetch|network|Load failed/i.test(e.message)) return new AiError('network', AI_MSG.network)
   return new AiError('api', e instanceof Error ? e.message : String(e))
 }
 
@@ -100,7 +97,7 @@ export class AnthropicProvider implements AiProvider {
     private settings: AiSettings,
     client?: MessagesLike,
   ) {
-    if (!client && !settings.apiKey) throw new AiError('nokey', 'APIキーが未設定です。「使うAI」でキーを入力してください。')
+    if (!client && !settings.apiKey) throw new AiError('nokey', AI_MSG.nokey)
     this.messages = client ?? makeClient(settings.apiKey)
   }
 
@@ -157,8 +154,7 @@ export class AnthropicProvider implements AiProvider {
             if (q) onDetail?.(`検索: ${q}`)
           }
         }
-        if (msg.stop_reason === 'refusal')
-          throw new AiError('refusal', 'この内容についてはモデルが応答を控えました。言い回しを変えるか、モデルを切り替えてください。')
+        if (msg.stop_reason === 'refusal') throw new AiError('refusal', AI_MSG.refusal)
         if (msg.stop_reason === 'max_tokens') out.truncated = true
         if (msg.stop_reason !== 'pause_turn') break
         messages.push({ role: 'assistant', content: msg.content })
@@ -188,9 +184,8 @@ export class AnthropicProvider implements AiProvider {
         { signal },
       )
       this.add(usage, res.usage)
-      if (res.stop_reason === 'refusal')
-        throw new AiError('refusal', 'この内容についてはモデルが応答を控えました。言い回しを変えるか、モデルを切り替えてください。')
-      if (res.parsed_output == null) throw new AiError('parse', 'AIの返答を読み取れませんでした。もう一度お試しください。')
+      if (res.stop_reason === 'refusal') throw new AiError('refusal', AI_MSG.refusal)
+      if (res.parsed_output == null) throw new AiError('parse', AI_MSG.parse)
       return res.parsed_output as z.infer<T>
     } catch (e) {
       const err = toAiError(e)
@@ -212,11 +207,11 @@ export class AnthropicProvider implements AiProvider {
   async designCourse(input: CourseInput, qa: QA[], note: string, onProgress: Progress, opts: AiOpts = {}) {
     const usage = zeroUsage()
     const who = describeInput(input) + describeQa(qa) + (note ? `\n\n設計への注文: ${note}` : '')
-    onProgress(0, '分解中…')
+    onProgress(0, PROGRESS.splitting)
     let found = ''
     let research: ResearchInfo | undefined
     if (this.settings.search === 'builtin') {
-      onProgress(1, 'Web調査中…')
+      onProgress(1, PROGRESS.searching)
       const r = await this.research(
         SYS,
         `${who}\n\nこの人のためのコースを設計する材料を集める。日本語と英語の両方で調べ、公式ドキュメントなどの一次情報を優先する。` +
@@ -229,7 +224,7 @@ export class AnthropicProvider implements AiProvider {
       found = `\n\n## 調査で分かったこと\n${r.text}`
       research = { truncated: r.truncated, searchErrors: r.searchErrors }
     }
-    onProgress(2, '設計中…')
+    onProgress(2, PROGRESS.designing)
     const design = await this.structure(
       SYS,
       `${who}${found}\n\n上をもとにコースを設計する。\n- 章は4〜9、各章の節は2〜5\n- 節の題は、その節でできるようになることが分かる具体的な言葉にする\n` +
@@ -238,13 +233,13 @@ export class AnthropicProvider implements AiProvider {
       usage,
       opts.signal,
     )
-    onProgress(3, '設計ができた')
+    onProgress(3, PROGRESS.designed)
     return { design: design as CourseDesign, usage, research }
   }
 
   async generateLesson(tb: Textbook, lessonId: string, onProgress: Progress, opts: AiOpts = {}) {
     const f = findLesson(tb, lessonId)
-    if (!f) throw new AiError('api', '節が見つかりませんでした。')
+    if (!f) throw new AiError('api', AI_MSG.noLesson)
     const usage = zeroUsage()
     const ctx = `${describeInput(tb.input)}\n\nコース: ${tb.title}（${tb.goal}）\n\n${outline(tb)}\n\n今回書く節: ${lessonNo(tb, lessonId)} ${f.lesson.title}\n狙い: ${f.lesson.summary || '（未設定）'}`
     let sources: Source[] = []
@@ -258,7 +253,7 @@ export class AnthropicProvider implements AiProvider {
       ? `\n\n渡された資料: ${mats.map((m) => m.name).join('、')}。${sourceOnly ? 'この資料だけを根拠に書く。資料に無いことは書かず、足りない所は「資料に無い」と書く' : '本文の主な根拠にし、調査で補う'}`
       : ''
     if (this.settings.search === 'builtin' && !sourceOnly) {
-      onProgress(0, 'Web調査中…')
+      onProgress(0, PROGRESS.searching)
       // 調査には資料の本文を渡さない（名前だけ）。資料は書く段階でだけ読ませ、入力トークンを二重に使わない（#79）
       const researchNote = mats.length
         ? `\n\n手元に資料がある（${mats.map((m) => m.name).join('、')}。本文は書く段階で読む）。資料を補う事実や最新の情報を集める。`
@@ -277,7 +272,7 @@ export class AnthropicProvider implements AiProvider {
       research = { truncated: r.truncated, searchErrors: r.searchErrors }
       found = `\n\n## 調査で分かったこと\n${r.text}\n\n## 見つけたページ\n${sources.map((s, i) => `[${i}] ${s.title} ${s.url}`).join('\n')}`
     }
-    onProgress(1, sourceOnly ? '資料から作成中…' : '資料を作成中…')
+    onProgress(1, sourceOnly ? PROGRESS.writingFromMaterial : PROGRESS.writing)
     const d = await this.structure(
       SYS,
       withMaterials(
@@ -297,15 +292,15 @@ export class AnthropicProvider implements AiProvider {
       .slice(0, 6)
       .map((i) => ({ ...sources[i], fetchedAt }))
     const draft: LessonDraft = { blocks: d.blocks, tasks: d.tasks, clues: { queries: d.queries, how: d.how, links }, truncated, research }
-    onProgress(2, '資料ができた')
+    onProgress(2, PROGRESS.written)
     return { draft, usage }
   }
 
   async proposeRedesign(tb: Textbook, scope: RedesignScope, lessonId: string, order: string, onProgress: Progress, opts: AiOpts = {}) {
     const f = findLesson(tb, lessonId)
-    if (!f) throw new AiError('api', '節が見つかりませんでした。')
+    if (!f) throw new AiError('api', AI_MSG.noLesson)
     const usage = zeroUsage()
-    onProgress(0, '案を作成中…')
+    onProgress(0, PROGRESS.proposing)
     const base = `${describeInput(tb.input)}\n\nコース: ${tb.title}（${tb.goal}）\n\n${outline(tb, true)}\n\n注文: ${order || '（特になし。より良くする）'}`
     let plan: RedesignPlan
     if (scope === 'lesson') {
