@@ -50,8 +50,11 @@ test('ノート: 本文を選択して引用すると、そのブロックの直
   await lessonWithDraft(page)
   await page.evaluate(() => {
     const el = document.querySelectorAll('.doc [data-by="ai"] .blk-body')[1]
-    const r = document.createRange(); r.selectNodeContents(el)
-    const s = getSelection()!; s.removeAllRanges(); s.addRange(r)
+    const r = document.createRange()
+    r.selectNodeContents(el)
+    const s = getSelection()!
+    s.removeAllRanges()
+    s.addRange(r)
     document.dispatchEvent(new Event('selectionchange'))
   })
   const qbtn = page.getByRole('button', { name: '引用してノートを書く' })
@@ -61,7 +64,9 @@ test('ノート: 本文を選択して引用すると、そのブロックの直
   await writeNote(page, '引用へのコメント')
   const quoted = page.locator('.doc [data-by="me"]').filter({ hasText: '引用へのコメント' })
   await expect(quoted.locator('blockquote')).toContainText('まず小さく試す')
-  const order = await page.locator('.doc [data-block]').evaluateAll((els) => els.map((e) => e.getAttribute('data-by') + ':' + (e.textContent ?? '')))
+  const order = await page
+    .locator('.doc [data-block]')
+    .evaluateAll((els) => els.map((e) => e.getAttribute('data-by') + ':' + (e.textContent ?? '')))
   const at = order.findIndex((x) => x.includes('引用へのコメント'))
   expect(order[at - 1]).toContain('ai:')
   expect(order[at - 1]).toContain('要点')

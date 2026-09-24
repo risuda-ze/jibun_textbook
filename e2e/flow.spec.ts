@@ -138,7 +138,8 @@ test('完了条件7: JSONの書き出しと読み込み。キーは入らない�
   // 消して、読み込み直す（別の端末で読む想定）
   await page.getByRole('button', { name: '消去', exact: true }).click()
   await expect(page.getByText('まだ教科書がありません。')).toBeVisible()
-  const upload = (name: string, body: string) => page.locator('#importfile').setInputFiles({ name, mimeType: 'application/json', buffer: Buffer.from(body) })
+  const upload = (name: string, body: string) =>
+    page.locator('#importfile').setInputFiles({ name, mimeType: 'application/json', buffer: Buffer.from(body) })
   await upload('a.json', json)
   await expect(page.getByRole('heading', { name: '新しい教科書' })).toBeVisible()
 
@@ -213,15 +214,47 @@ test('ノートの下書きは差し込み位置や節の切り替えで消え�
 })
 
 test('不正な URL と画像は無害化される（読み込んだ JSON 由来）', async ({ page }) => {
-  await page.goto("./")
+  await page.goto('./')
   const now = new Date().toISOString()
   const tb = {
-    schemaVersion: 1, id: 'bad-urls', title: '不正なURLの教科書', createdAt: now, updatedAt: now,
-    chapters: [{ id: 'c1', title: '第1章', lessons: [{ id: 'l1', title: '節1', clues: { queries: [], how: [],
-      links: [{ title: '悪いリンク', url: 'javascript:alert(1)' }, { title: '良いリンク', url: 'https://example.com/' }] },
-      blocks: [{ id: 'b1', by: 'me', md: '本文', source: 'javascript:alert(2)', images: [{ id: 'i1', dataUrl: 'data:text/html,<b>x</b>', alt: '' }] }] }] }],
+    schemaVersion: 1,
+    id: 'bad-urls',
+    title: '不正なURLの教科書',
+    createdAt: now,
+    updatedAt: now,
+    chapters: [
+      {
+        id: 'c1',
+        title: '第1章',
+        lessons: [
+          {
+            id: 'l1',
+            title: '節1',
+            clues: {
+              queries: [],
+              how: [],
+              links: [
+                { title: '悪いリンク', url: 'javascript:alert(1)' },
+                { title: '良いリンク', url: 'https://example.com/' },
+              ],
+            },
+            blocks: [
+              {
+                id: 'b1',
+                by: 'me',
+                md: '本文',
+                source: 'javascript:alert(2)',
+                images: [{ id: 'i1', dataUrl: 'data:text/html,<b>x</b>', alt: '' }],
+              },
+            ],
+          },
+        ],
+      },
+    ],
   }
-  await page.locator('#importfile').setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tb)) })
+  await page
+    .locator('#importfile')
+    .setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tb)) })
   await page.getByRole('button', { name: '開く' }).click()
   await page.getByRole('button', { name: 'レッスンを開く' }).click()
   const clues = page.getByLabel('参考情報')
@@ -236,10 +269,15 @@ test('不正な URL と画像は無害化される（読み込んだ JSON 由来
 
 test('CSP 違反が出ない（本番ビルドの meta CSP）', async ({ page }) => {
   const violations: string[] = []
-  page.on('console', (m) => { if (/Content Security Policy|CSP/i.test(m.text())) violations.push(m.text()) })
+  page.on('console', (m) => {
+    if (/Content Security Policy|CSP/i.test(m.text())) violations.push(m.text())
+  })
   page.on('pageerror', (e) => violations.push('pageerror: ' + e.message))
   await demoBook(page)
-  await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveAttribute('content', /connect-src 'self' https:\/\/api\.anthropic\.com/)
+  await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveAttribute(
+    'content',
+    /connect-src 'self' https:\/\/api\.anthropic\.com/,
+  )
   await page.getByRole('button', { name: L.generateLesson }).click()
   await page.locator('.doc [data-by="ai"]').first().waitFor()
   // 画像（data URL）と手描きの図（canvas → data URL）

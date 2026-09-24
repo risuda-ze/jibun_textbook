@@ -27,9 +27,25 @@ describe('URL の無害化（#35）', () => {
 
   it('スキーマは弾かない（古い JSON を読めなくしない）。描画側で無害化する', () => {
     const tb = {
-      schemaVersion: 1, id: 't', title: 'x', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
-      chapters: [{ id: 'c', title: 'c', lessons: [{ id: 'l', title: 'l', clues: { links: [{ title: '悪いリンク', url: 'javascript:alert(1)' }] },
-        blocks: [{ id: 'b', by: 'me', md: 'x', images: [{ id: 'i', dataUrl: 'data:text/html,<b>x</b>' }] }] }] }],
+      schemaVersion: 1,
+      id: 't',
+      title: 'x',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      chapters: [
+        {
+          id: 'c',
+          title: 'c',
+          lessons: [
+            {
+              id: 'l',
+              title: 'l',
+              clues: { links: [{ title: '悪いリンク', url: 'javascript:alert(1)' }] },
+              blocks: [{ id: 'b', by: 'me', md: 'x', images: [{ id: 'i', dataUrl: 'data:text/html,<b>x</b>' }] }],
+            },
+          ],
+        },
+      ],
     }
     const r = TextbookZ.safeParse(tb)
     expect(r.success).toBe(true)

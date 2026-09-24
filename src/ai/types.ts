@@ -44,7 +44,13 @@ export type CourseDesign = {
 /** Web 調査の状態（#81）。途中で切れた（max_tokens か pause_turn の上限）、検索が失敗した回数と理由 */
 export type ResearchInfo = { truncated: boolean; searchErrors: string[] }
 
-export type LessonDraft = { blocks: string[]; tasks: string[]; clues: Clues; /** Web 調査が途中で切れた（#17） */ truncated?: boolean; /** 調査の状態（#81） */ research?: ResearchInfo }
+export type LessonDraft = {
+  blocks: string[]
+  tasks: string[]
+  clues: Clues /** Web 調査が途中で切れた（#17） */
+  truncated?: boolean /** 調査の状態（#81） */
+  research?: ResearchInfo
+}
 
 export type RedesignScope = 'lesson' | 'chapter' | 'course'
 export type RedesignPlan =
@@ -54,9 +60,22 @@ export type RedesignPlan =
 
 export interface AiProvider {
   askQuestions(input: CourseInput, opts?: AiOpts): Promise<string[]>
-  designCourse(input: CourseInput, qa: QA[], note: string, onProgress: Progress, opts?: AiOpts): Promise<{ design: CourseDesign; usage: Usage; research?: ResearchInfo }>
+  designCourse(
+    input: CourseInput,
+    qa: QA[],
+    note: string,
+    onProgress: Progress,
+    opts?: AiOpts,
+  ): Promise<{ design: CourseDesign; usage: Usage; research?: ResearchInfo }>
   generateLesson(tb: Textbook, lessonId: string, onProgress: Progress, opts?: AiOpts): Promise<{ draft: LessonDraft; usage: Usage }>
-  proposeRedesign(tb: Textbook, scope: RedesignScope, lessonId: string, order: string, onProgress: Progress, opts?: AiOpts): Promise<{ plan: RedesignPlan; usage: Usage }>
+  proposeRedesign(
+    tb: Textbook,
+    scope: RedesignScope,
+    lessonId: string,
+    order: string,
+    onProgress: Progress,
+    opts?: AiOpts,
+  ): Promise<{ plan: RedesignPlan; usage: Usage }>
 }
 
 export type AiErrorCode = 'nokey' | 'auth' | 'rate' | 'network' | 'refusal' | 'parse' | 'unsupported' | 'api' | 'aborted'
