@@ -172,6 +172,14 @@ export function newLesson(title: string, extra: Partial<Lesson> = {}): Lesson {
   }
 }
 
+/**
+ * 節の資料をまっさらにする（#104）。本文（AIの下書きも自分のノートも）・手を動かす・参考情報・渡した資料の名前を消し、
+ * 完了と再確認の印も外す。id・題名・時間・課題の節か・狙いは残す。章構成と節の位置は変わらない
+ */
+export function clearLesson(l: Lesson): Lesson {
+  return { ...l, blocks: [], tasks: [], clues: { queries: [], links: [], how: [] }, materials: [], done: false, review: false }
+}
+
 export function newChapter(title: string, lessons: Lesson[] = []): Chapter {
   return { id: uid(), title, lessons }
 }
