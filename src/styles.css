@@ -285,6 +285,13 @@ main.stack {
   font-size: 13px;
   padding-block: 3px;
 }
+/* 記号だけのボタン（∧ ∨ ×）。名前は aria-label に持つ（#123） */
+.btn.icon {
+  min-width: 28px;
+  padding-inline: 6px;
+  font-size: var(--text-body);
+  line-height: 1.25;
+}
 .btn:disabled {
   opacity: 0.45;
   cursor: default;
@@ -852,7 +859,12 @@ label.f {
 .detail {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-  gap: var(--s32);
+  gap: var(--s16) var(--s32);
+}
+/* 詳細カードの見出し行（#123）。両方の列にまたがり、左に章の番号と上下、右端に「足す」 */
+.detail .detailhead {
+  grid-column: 1 / -1;
+  justify-content: space-between;
 }
 .lessonlist {
   list-style: none;
@@ -865,7 +877,7 @@ label.f {
 .lessonlist li:first-child {
   border-top: 0;
 }
-.lessonlist button {
+.lessonlist li > button {
   width: 100%;
   background: none;
   border: 0;
@@ -879,15 +891,19 @@ label.f {
   color: var(--ink);
   transition: background var(--ease);
 }
-.lessonlist button:hover,
-.lessonlist button[aria-current="true"] {
+.lessonlist li > button:hover,
+.lessonlist li > button[aria-current="true"] {
   background: var(--wash);
 }
-/* 節・章の並べ替え（#11）。select は行の中に収める。スマホ幅では指で押せる高さに */
+/* 節・章の並べ替え（#11 #123）。select は行の中に収める。スマホ幅では指で押せる高さに */
 .movectl select {
   width: auto;
   padding-block: 3px;
   font-size: 13px;
+}
+/* 選んだ節の行に開くメニュー（#123）。番号の列ぶん下げて題名に揃える */
+.lessonlist .lessonmenu {
+  padding: 0 var(--s8) var(--s8) 44px;
 }
 .diff {
   list-style: none;

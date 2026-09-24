@@ -14,7 +14,7 @@ test('資料を消す → 元に戻す → ロードマップからも消して�
   // レッスン画面の右レールで消す
   await page.getByRole('button', { name: L.clearLesson }).click()
   await expect(page.locator('.doc [data-by="ai"]')).toHaveCount(0)
-  await expect(page.getByText('この節はまだ資料がありません')).toBeVisible()
+  await expect(page.getByRole('group', { name: L.generateGroup })).toBeVisible()
   await expect(page.getByRole('button', { name: L.generate })).toBeVisible()
   await expect(page.getByRole('button', { name: L.clearLesson })).toHaveCount(0)
 

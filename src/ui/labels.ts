@@ -14,6 +14,6 @@ export const L = {
   roadmap: 'ロードマップ',
   propose: '変更案を出してもらう',
   material: '資料を渡す',
-  generateGroup: 'AIに作らせる',
+  generateGroup: 'まだ資料がありません。AI生成または自分で書き始めてください。',
   clearLesson: '資料を消す',
 } as const

@@ -240,18 +240,16 @@ export function LessonPage({ tb }: { tb: Textbook }) {
         <div className="stack">
           {l.blocks.length === 0 && (
             <Card stack>
-              <p>この節はまだ資料がありません。AIに下書きを作らせるか、下の欄から自分で書き始めてください。</p>
-              <GenerateControls
-                g={g}
-                lessonId={l.id}
-                label={L.generate}
-                note={
-                  <span className="sub">
-                    使うAI: {ai.kind === 'anthropic' ? ai.model : 'デモ応答'}
-                    （「つくる」画面で切り替え）
-                  </span>
-                }
-              />
+              {/* ロードマップと同じ3択の枠（#91 #123）。「自分で書き始める」は下のノート欄へ */}
+              <GenerateControls g={g} lessonId={l.id} label={L.generate}>
+                <Button v="ghost" onClick={() => document.getElementById('note')?.focus()}>
+                  {L.startWriting}
+                </Button>
+              </GenerateControls>
+              <span className="sub">
+                使うAI: {ai.kind === 'anthropic' ? ai.model : 'デモ応答'}
+                （「つくる」画面で切り替え）
+              </span>
             </Card>
           )}
           <div className="row">
