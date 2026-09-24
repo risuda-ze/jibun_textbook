@@ -7,6 +7,8 @@ import { migrate } from './lib/migrate'
 
 export type Screen = 'shelf' | 'new' | 'road' | 'lesson' | 'book' | 'help'
 export type Toast = { id: number; msg: string; undo?: () => void }
+/** 資料の生成の進行中の状態（段階・今していること・開始と終了の時刻） */
+export type GenState = { step: number; detail: string; startedAt: number; endedAt: number | null }
 
 export type State = {
   ready: boolean
@@ -23,6 +25,8 @@ export type State = {
   drafts: Record<string, NoteDraft>
   /** 起動時に読めなかった教科書の生データ（#17）。本棚から書き出すか消せる */
   broken: { key: string; raw: unknown }[]
+  /** 進行中の資料の生成（節 id → 状態）。画面ではなく store が持つので、タブを切り替えても生成は続く（#87） */
+  running: Record<string, GenState>
   /** Help の「読み込めない場合、まずはこちら」に渡す生データ（本棚の「読めない教科書」から）（#65） */
   repairTarget: { name: string; raw: unknown } | null
   toast: Toast | null
@@ -39,6 +43,7 @@ let state: State = {
   wide: false,
   drafts: {},
   broken: [],
+  running: {},
   repairTarget: null,
   toast: null,
 }
@@ -189,6 +194,12 @@ export function openRepair(name: string, raw: unknown): void {
   window.scrollTo(0, 0)
 }
 export const clearRepairTarget = (): void => setState({ repairTarget: null })
+
+/** 生成の進行中の状態を置き換える。null で外す（#87） */
+export function setRunning(lessonId: string, g: GenState | null): void {
+  const { [lessonId]: _drop, ...rest } = state.running
+  setState({ running: g ? { ...rest, [lessonId]: g } : rest })
+}
 
 /** 読めなかった教科書の生データを消す（#17） */
 export function dropBroken(key: string): void {
