@@ -43,3 +43,38 @@ test('見たまま編集: **強調** と `コード` を打って確定すると
   await expect(first.locator('.blk-body code', { hasText: 'Alt' })).toHaveCount(1)
   await expect(first.locator('.blk-body')).not.toContainText('**')
 })
+
+// Enter は行、空行は段落（入力欄と同じ規則 #148）。1行ずつ Enter で打った表が確定後に表になり、Enter 2回で段落が分かれる
+test('見たまま編集: Enter で1行ずつ打った表が確定後に表になる', async ({ page }) => {
+  await lessonWithDraft(page)
+
+  const first = page.locator('.doc [data-by="ai"]').first()
+  await first.locator('.blk-body').click()
+  await page.keyboard.press('End')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('|a|b|')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('|-|-|')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('|1|2|')
+  await page.locator('h1').click()
+
+  await expect(first.locator('.blk-body table')).toHaveCount(1)
+  await expect(first.locator('.blk-body th', { hasText: 'a' })).toHaveCount(1)
+})
+
+test('見たまま編集: Enter を2回打つと段落が分かれる', async ({ page }) => {
+  await lessonWithDraft(page)
+
+  const first = page.locator('.doc [data-by="ai"]').first()
+  const before = await first.locator('.blk-body p').count()
+  await first.locator('.blk-body').click()
+  await page.keyboard.press('End')
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('新しい段落')
+  await page.locator('h1').click()
+
+  await expect(first.locator('.blk-body p')).toHaveCount(before + 1)
+  await expect(first.locator('.blk-body p', { hasText: '新しい段落' })).toHaveCount(1)
+})
