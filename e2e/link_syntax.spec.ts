@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { lessonWithDraft } from './helpers'
 
-// 見たまま編集中に文字で打ったリンクの記法 [文](URL) が、確定後にリンクになる（#76）
+// 見たまま編集中に文字で打った記法は Markdown として扱う（#76 #145 → #147）。リンク・太字・コード・見出しで確かめる
 test('見たまま編集: [文](https://…) と打って確定するとリンクになる', async ({ page }) => {
   await lessonWithDraft(page)
 
@@ -16,17 +16,17 @@ test('見たまま編集: [文](https://…) と打って確定するとリン�
   await expect(first.locator('.blk-body')).not.toContainText('[ツール]')
 })
 
-test('見たまま編集: URL でないものはリンクにしない', async ({ page }) => {
+test('見たまま編集: 段落の先頭に # を打つと見出しになる（入力欄と同じ規則）', async ({ page }) => {
   await lessonWithDraft(page)
 
   const first = page.locator('.doc [data-by="ai"]').first()
   await first.locator('.blk-body').click()
   await page.keyboard.press('End')
-  await page.keyboard.type(' [メモ](後で)')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('# 自分の見出し')
   await page.locator('h1').click()
 
-  await expect(first.locator('.blk-body')).toContainText('[メモ](後で)')
-  await expect(first.locator('.blk-body a')).toHaveCount(0)
+  await expect(first.locator('.blk-body h1', { hasText: '自分の見出し' })).toHaveCount(1)
 })
 
 // 文字で打った **強調** と `コード` も確定後に整形される（#145）
