@@ -2,14 +2,14 @@ import { L } from '../src/ui/labels'
 import { expect, test } from '@playwright/test'
 import { blankBook } from './helpers'
 
-/** 「手を動かす」に1件足す */
+/** 「手を動かす」に1件追加する */
 async function addTask(page: import('@playwright/test').Page, text: string) {
   await page.locator('#newtask').fill(text)
   await page.getByRole('button', { name: L.addTask, exact: true }).click()
   await expect(page.getByRole('checkbox', { name: text })).toBeVisible()
 }
 
-test('手を動かす: 足す → 消す → 元に戻す。消してもチェックが隣にずれない（#143）', async ({ page }) => {
+test('手を動かす: 追加 → 消す → 元に戻す。消してもチェックが隣にずれない（#143）', async ({ page }) => {
   await blankBook(page)
   await page.getByRole('button', { name: L.startWriting }).click()
   await addTask(page, '環境を入れる')

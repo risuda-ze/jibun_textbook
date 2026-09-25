@@ -16,5 +16,5 @@ export const L = {
   material: '資料を渡す',
   generateGroup: 'まだ資料がありません。AI生成または自分で書き始めてください。',
   clearLesson: '資料を消す',
-  addTask: '足す',
+  addTask: '追加',
 } as const

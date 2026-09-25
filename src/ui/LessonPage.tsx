@@ -406,7 +406,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
                 id="newtask"
                 value={task}
                 onChange={(e) => setTask(e.target.value)}
-                placeholder="やることを足す"
+                placeholder="やることを追加"
                 style={{ flex: '1 1 120px' }}
               />
               <Button
