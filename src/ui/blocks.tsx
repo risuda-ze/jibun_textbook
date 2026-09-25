@@ -1,21 +1,46 @@
 import { L } from './labels'
 import { useEffect, useRef, useState } from 'react'
-import { htmlToMd, mdToHtml, toggleTask } from '../lib/md'
+import { htmlToMd, imgChip, mdToHtml, refIds, removeRef, toggleTask } from '../lib/md'
 import { shrinkImage } from '../lib/image'
 import { isHttpUrl, isImageDataUrl } from '../lib/safe'
 import { applyMarkdown, type MdKind } from '../lib/mdedit'
 import { toast } from '../store'
-import type { Block, NoteDraft } from '../types'
+import { type Block, type Image, type NoteDraft, uid } from '../types'
 import { Button } from './kit'
 
-/** 見たまま編集。表示は md→HTML、フォーカスが外れた時に変更があれば HTML→md で確定する。 */
-function Editable({ md, onCommit }: { md: string; onCommit: (md: string) => void }) {
+/**
+ * el の中のカレット（選択範囲）に node を差し込み、カレットをその直後に置く。選択が el の外なら何もしない（false）。
+ * execCommand('insertText') は非推奨なので Range で差し込む（#88）。貼り付けと「文中に置く」（#125）が使う
+ */
+function insertAtCaret(el: HTMLElement, node: Node): boolean {
+  const sel = getSelection()
+  if (!sel?.rangeCount || !el.contains(sel.getRangeAt(0).startContainer)) return false
+  const range = sel.getRangeAt(0)
+  range.deleteContents()
+  const last = node.lastChild ?? node
+  range.insertNode(node)
+  range.setStartAfter(last)
+  range.collapse(true)
+  sel.removeAllRanges()
+  sel.addRange(range)
+  return true
+}
+
+/** 画像の id の短い表示（#125）。先頭8文字、全文は title */
+const ShortId = ({ id }: { id: string }) => (
+  <span className="mono sub" title={id}>
+    {id.slice(0, 8)}…
+  </span>
+)
+
+/** 見たまま編集。表示は md→HTML、フォーカスが外れた時に変更があれば HTML→md で確定する。本文の画像の参照はチップにする（#125） */
+function Editable({ md, images, onCommit }: { md: string; images: Image[]; onCommit: (md: string) => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const before = useRef('')
   useEffect(() => {
     const el = ref.current
-    if (el && document.activeElement !== el) el.innerHTML = mdToHtml(md)
-  }, [md])
+    if (el && document.activeElement !== el) el.innerHTML = mdToHtml(md, images, 'edit')
+  }, [md, images])
   return (
     <div
       ref={ref}
@@ -33,22 +58,14 @@ function Editable({ md, onCommit }: { md: string; onCommit: (md: string) => void
         if (files.some((f) => f.type.startsWith('image/')))
           return toast('本文には画像を貼れません。ノートの「画像を入れる」を使ってください')
         const text = e.clipboardData.getData('text/plain')
-        const sel = getSelection()
-        if (!text || !sel?.rangeCount || !e.currentTarget.contains(sel.getRangeAt(0).startContainer)) return
-        // execCommand('insertText') は非推奨なので Range で差し込む（#88）。改行は <br>（marked の breaks と往復が合う）。カレットは差し込んだ文の直後
-        const range = sel.getRangeAt(0)
-        range.deleteContents()
+        if (!text) return
+        // 改行は <br>（marked の breaks と往復が合う）
         const frag = document.createDocumentFragment()
         text.split(/\r?\n/).forEach((line, i) => {
           if (i) frag.appendChild(document.createElement('br'))
           frag.appendChild(document.createTextNode(line))
         })
-        const last = frag.lastChild as Node
-        range.insertNode(frag)
-        range.setStartAfter(last)
-        range.collapse(true)
-        sel.removeAllRanges()
-        sel.addRange(range)
+        insertAtCaret(e.currentTarget, frag)
       }}
       onKeyDown={(e) => {
         // Enter は行（<br>）、空行での Enter は段落の区切り。入力欄と同じ規則（#148）。contenteditable の既定の Enter は段落（<p>/<div>）を
@@ -101,44 +118,19 @@ type RowProps = {
   onCheck?: (md: string) => void
   onDelete?: () => void
   onRemoveImage?: (imageId: string) => void
-  /** 保存済みの画像の説明（alt）を書き換えたとき（#13） */
-  onAlt?: (imageId: string, alt: string) => void
 }
 
-/** 画像の説明の入力欄（#13）。入力欄と保存後の両方で使う。Enter で blur（確定は親の onBlur） */
-function AltInput({
-  value,
-  onChange,
-  onBlur,
-  autoFocus,
-}: {
-  value: string
-  onChange: (alt: string) => void
-  onBlur?: () => void
-  autoFocus?: boolean
-}) {
-  return (
-    <input
-      type="text"
-      className="alt"
-      value={value}
-      placeholder="この画像の説明（任意）"
-      aria-label="画像の説明"
-      // biome-ignore lint/a11y/noAutofocus: クリックで開いた欄なので、そのまま打てるのが自然
-      autoFocus={autoFocus}
-      onChange={(e) => onChange(e.target.value)}
-      onBlur={onBlur}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') e.currentTarget.blur()
-      }}
-    />
-  )
-}
-
-export function BlockRow({ block: b, read, onCommit, onCheck, onDelete, onRemoveImage, onAlt }: RowProps) {
+export function BlockRow({ block: b, read, onCommit, onCheck, onDelete, onRemoveImage }: RowProps) {
   const [cls, mk, tt] = MARK(b)
-  // 説明を書いている画像の id と打っている文。クリックで開き、blur で確定して閉じる（#13）
-  const [altOf, setAltOf] = useState<{ id: string; text: string } | null>(null)
+  // 本文で参照している画像は本文の中に出るので、下には出さない（#125）。参照していない画像は今までどおり下に出る
+  const refd = refIds(b.md)
+  // 保存済みの画像を文中に置く（#125）。本文を見たまま編集中（フォーカスあり）ならカレットにチップを差し込み（確定は blur）、
+  // そうでなければ本文の末尾に記法を足して保存する。ボタンの mousedown は既定を止め、本文のフォーカスを奪わない
+  const place = (e: React.MouseEvent<HTMLButtonElement>, id: string) => {
+    const body = e.currentTarget.closest('.ln')?.querySelector<HTMLElement>('.blk-body')
+    if (body && document.activeElement === body && insertAtCaret(body, document.createRange().createContextualFragment(imgChip(id)))) return
+    onCommit?.(`${b.md.trimEnd()}\n\n![](img:${id})`.trim())
+  }
   // 本文のチェックボックスのクリックを拾い、Markdown 側を反転して保存する。DOM の切り替えは保存後の再描画に任せる
   const onBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const t = e.target
@@ -167,42 +159,41 @@ export function BlockRow({ block: b, read, onCommit, onCheck, onDelete, onRemove
         )}
         {b.quote && <blockquote>{b.quote}</blockquote>}
         {read ? (
-          <div className="blk-body" dangerouslySetInnerHTML={{ __html: mdToHtml(b.md) }} />
+          <div className="blk-body" dangerouslySetInnerHTML={{ __html: mdToHtml(b.md, b.images) }} />
         ) : (
-          <Editable md={b.md} onCommit={(m) => onCommit?.(m)} />
+          <Editable md={b.md} images={b.images} onCommit={(m) => onCommit?.(m)} />
         )}
-        {b.images.map((im) => (
-          <figure className="imgwrap" key={im.id}>
-            {/* JSON 由来の画像は data:image/ だけを表示する（#35） */}
-            {!isImageDataUrl(im.dataUrl) ? (
-              <span className="sub">表示できない画像です</span>
-            ) : read ? (
-              <img src={im.dataUrl} alt={im.alt || '自分で入れた画像'} />
-            ) : (
-              <button type="button" className="imgbtn" title="クリックで説明を書く" onClick={() => setAltOf({ id: im.id, text: im.alt })}>
-                <img src={im.dataUrl} alt={im.alt || '自分で入れた画像'} />
-              </button>
-            )}
-            {!read && altOf?.id === im.id ? (
-              <AltInput
-                value={altOf.text}
-                autoFocus
-                onChange={(text) => setAltOf({ id: im.id, text })}
-                onBlur={() => {
-                  if (altOf.text !== im.alt) onAlt?.(im.id, altOf.text)
-                  setAltOf(null)
-                }}
-              />
-            ) : (
-              im.alt && <figcaption className="sub">{im.alt}</figcaption>
-            )}
-            {!read && (
-              <button type="button" className="rm" onClick={() => onRemoveImage?.(im.id)} aria-label="この画像を外す">
-                ×
-              </button>
-            )}
-          </figure>
-        ))}
+        {b.images
+          .filter((im) => !refd.has(im.id))
+          .map((im) => (
+            <figure className="imgwrap" key={im.id}>
+              {/* JSON 由来の画像は data:image/ だけを表示する（#35） */}
+              {isImageDataUrl(im.dataUrl) ? (
+                <img src={im.dataUrl} alt="自分で入れた画像" />
+              ) : (
+                <span className="sub">表示できない画像です</span>
+              )}
+              {!read && (
+                <>
+                  <button type="button" className="rm" onClick={() => onRemoveImage?.(im.id)} aria-label="この画像を外す">
+                    ×
+                  </button>
+                  <div className="row">
+                    <ShortId id={im.id} />
+                    <Button
+                      v="ghost"
+                      sm
+                      aria-label={`画像 ${im.id.slice(0, 8)} を文中に置く`}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => place(e, im.id)}
+                    >
+                      文中に置く
+                    </Button>
+                  </div>
+                </>
+              )}
+            </figure>
+          ))}
         {b.source && (
           <div className="src">
             出典:{' '}
@@ -323,7 +314,7 @@ export function Composer({ draft, onChange, onSubmit }: { draft: NoteDraft; onCh
       if (!f.type.startsWith('image/')) continue
       try {
         const url = await shrinkImage(f)
-        set({ images: [...latest.current.images, { dataUrl: url, alt: '' }] })
+        set({ images: [...latest.current.images, { id: uid(), dataUrl: url, alt: '' }] })
       } catch {
         toast('画像を読み込めませんでした。')
       }
@@ -355,6 +346,17 @@ export function Composer({ draft, onChange, onSubmit }: { draft: NoteDraft; onCh
     pendingSel.current = { start: r.start, end: r.end }
     set({ md: r.md })
   }
+  // 画像の参照記法をカレット位置に入れる（#125）。カレットは記法の直後
+  function insertRef(id: string) {
+    const el = note.current
+    if (!el) return
+    const m = latest.current.md,
+      ref = `![](img:${id})`,
+      at = el.selectionStart + ref.length
+    pendingSel.current = { start: at, end: at }
+    set({ md: m.slice(0, el.selectionStart) + ref + m.slice(el.selectionEnd) })
+  }
+  const refd = refIds(md)
   const MD_BUTTONS: [MdKind, string, string][] = [
     ['bold', '太字', '**太字**'],
     ['bullet', '箇条書き', '- 項目'],
@@ -402,20 +404,31 @@ export function Composer({ draft, onChange, onSubmit }: { draft: NoteDraft; onCh
       {images.length > 0 && (
         <div className="atts">
           {images.map((im, i) => (
-            <figure key={i}>
-              <img src={im.dataUrl} alt={im.alt || `入れる画像 ${i + 1}`} />
+            <figure key={im.id}>
+              <img src={im.dataUrl} alt={`入れる画像 ${i + 1}`} />
               <button
                 type="button"
                 className="rm"
-                onClick={() => set({ images: images.filter((_, j) => j !== i) })}
+                // 外すときは本文の参照も消す（#125）
+                onClick={() => set({ images: images.filter((x) => x.id !== im.id), md: removeRef(md, im.id) })}
                 aria-label="この画像を外す"
               >
                 ×
               </button>
-              <AltInput
-                value={im.alt}
-                onChange={(alt) => set({ images: latest.current.images.map((x, j) => (j === i ? { ...x, alt } : x)) })}
-              />
+              <div className="row">
+                <ShortId id={im.id} />
+                {/* 1つの画像は本文で1回だけ参照できる。2回目は無効 */}
+                <Button
+                  v="ghost"
+                  sm
+                  disabled={refd.has(im.id)}
+                  aria-label={`画像 ${im.id.slice(0, 8)} を文中に置く`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => insertRef(im.id)}
+                >
+                  文中に置く
+                </Button>
+              </div>
             </figure>
           ))}
         </div>
@@ -425,7 +438,7 @@ export function Composer({ draft, onChange, onSubmit }: { draft: NoteDraft; onCh
           onClose={() => setPad(false)}
           onSave={async (u) => {
             const s = await shrinkImage(u).catch(() => u)
-            set({ images: [...latest.current.images, { dataUrl: s, alt: '' }] })
+            set({ images: [...latest.current.images, { id: uid(), dataUrl: s, alt: '' }] })
             setPad(false)
           }}
         />

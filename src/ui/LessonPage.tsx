@@ -1,11 +1,12 @@
 import { L } from './labels'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { allLessons, findLesson, lessonNo, minePercent } from '../lib/status'
-import { go, openLesson, setDraft as storeDraft, setWide, toast, updateLesson, useApp } from '../store'
-import { emptyDraft, newBlock, uid, type Block, type Lesson, type NoteDraft, type Textbook } from '../types'
+import { go, openLesson, putBook, setDraft as storeDraft, setWide, snapshot, toast, updateLesson, useApp } from '../store'
+import { emptyDraft, newBlock, type Block, type Lesson, type NoteDraft, type Textbook } from '../types'
 import { BlockRow, Composer } from './blocks'
 import { StatusChip, clearLessonWithUndo, patchBlock, withUndo } from './common'
 import { isHttpUrl } from '../lib/safe'
+import { removeRef } from '../lib/md'
 import { GenerateControls, useGenerate } from './GenerateControls'
 import { Button, Card } from './kit'
 
@@ -182,7 +183,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
       const b = newBlock('me', n.md.trim(), {
         source: n.source.trim(),
         quote: n.quote,
-        images: n.images.map((im) => ({ id: uid(), ...im })),
+        images: n.images,
       })
       d.blocks.splice(insAt ?? d.blocks.length, 0, b)
     })
@@ -289,14 +290,10 @@ export function LessonPage({ tb }: { tb: Textbook }) {
                       withUndo(tb.id, '画像を外しました', () =>
                         patch((x) => {
                           x.images = x.images.filter((im) => im.id !== imgId)
+                          // 本文の参照も消す（#125）。参照が残ると「（消した画像）」になる
+                          x.md = removeRef(x.md, imgId)
                         }),
                       )
-                    }
-                    onAlt={(imgId, alt) =>
-                      patch((x) => {
-                        const im = x.images.find((y) => y.id === imgId)
-                        if (im) im.alt = alt
-                      })
                     }
                   />
                 </Fragment>
