@@ -36,3 +36,22 @@ test('資料を生成の間はボタンが進行中の色になり、今して�
   await expect(busyButton(page)).toHaveCount(0)
   await expect(page.getByRole('button', { name: L.generate })).toHaveCount(0)
 })
+
+// #141: 生成中は「資料を渡す」が押せず、開いていた欄は閉じる。閉じた要約（件数・ファイル名）は生成中も見える
+test('生成中は「資料を渡す」が非活性で開いていた欄は閉じ、要約は残る。終わるとまた押せる', async ({ page }) => {
+  await demoBook(page, { demoDelay: 2000 })
+  await page.getByRole('button', { name: L.material }).click()
+  await page.locator('#materialfile').setInputFiles({ name: 'notes.md', mimeType: 'text/markdown', buffer: Buffer.from('# メモ') })
+  await expect(page.getByLabel('渡す資料')).toContainText('notes.md')
+  await page.getByRole('button', { name: L.generateLesson }).click()
+  const toggle = page.getByRole('button', { name: L.material })
+  await expect(toggle).toBeDisabled()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(toggle).toHaveText(`${L.material}（1）`)
+  await expect(page.getByLabel('渡す資料')).toHaveCount(0)
+  await expect(page.locator('.matrow').getByText('notes.md')).toBeVisible()
+  // 終わるとレッスンに移る。次の節（資料なし）ではまた押せる
+  await expect(page.locator('.doc [data-by="ai"]')).toHaveCount(3, { timeout: 15_000 })
+  await page.getByRole('button', { name: /次へ/ }).click()
+  await expect(page.getByRole('button', { name: L.material })).toBeEnabled()
+})

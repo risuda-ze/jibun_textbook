@@ -49,7 +49,9 @@ export function MaterialPanel({
   disabled?: boolean
   children?: ReactNode
 }) {
-  const [open, setOpen] = useState(false)
+  const [wantOpen, setOpen] = useState(false)
+  // 生成中は閉じる。開いている ＝ 操作できる、なので中では disabled を見ない（#141）
+  const open = wantOpen && !disabled
   const [error, setError] = useState('')
   const file = useRef<HTMLInputElement>(null)
   const mats = toMaterials(value)
@@ -84,7 +86,7 @@ export function MaterialPanel({
   return (
     <div className="stack" style={{ gap: 8 }}>
       <div className="row matrow">
-        <Button v="ghost" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <Button v="ghost" aria-expanded={open} disabled={disabled} onClick={() => setOpen((v) => !v)}>
           {L.material}
           {count ? `（${count}）` : ''}
         </Button>
@@ -98,7 +100,7 @@ export function MaterialPanel({
             自分が持っている資料を元に本文を書かせます。渡した資料の本文は AI に送るだけで、教科書の JSON には名前だけ残ります。
           </p>
           <div className="row">
-            <Button v="soft" sm disabled={disabled} onClick={() => file.current?.click()}>
+            <Button v="soft" sm onClick={() => file.current?.click()}>
               ファイルを選ぶ
             </Button>
             <input
@@ -127,7 +129,6 @@ export function MaterialPanel({
                   <Button
                     v="outline"
                     sm
-                    disabled={disabled}
                     aria-label={`${f.name} を外す`}
                     onClick={() => onChange({ ...value, files: value.files.filter((x) => x.name !== f.name) })}
                   >
@@ -148,7 +149,6 @@ export function MaterialPanel({
               id="materialtext"
               rows={4}
               value={value.pasted}
-              disabled={disabled}
               onChange={(e) => onChange({ ...value, pasted: e.target.value })}
               placeholder="ここに貼り付けます"
               aria-invalid={!!pastedErr}
@@ -163,7 +163,7 @@ export function MaterialPanel({
               type="checkbox"
               id="sourceonly"
               checked={value.sourceOnly}
-              disabled={disabled || count === 0}
+              disabled={count === 0}
               onChange={(e) => onChange({ ...value, sourceOnly: e.target.checked })}
             />
             この資料だけから作る（Web 調査をしません）

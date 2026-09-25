@@ -19,6 +19,8 @@ test('レッスン: ファイルを渡して「この資料だけから作る」
   await expect(page.getByLabel('渡す資料')).toContainText('notes.md')
   await page.locator('#sourceonly').check()
   await page.getByRole('button', { name: L.generate }).click()
+  // 生成が始まると欄は閉じる（#141）。閉じた要約は出たまま
+  await expect(page.getByLabel('渡す資料')).toHaveCount(0)
   await expect(page.locator('.doc [data-by="ai"]').first()).toContainText('渡された資料: notes.md')
   await expect(page.getByText('元にした資料: notes.md')).toBeVisible()
   // JSON には資料の本文は入らない（名前だけ）
