@@ -49,6 +49,20 @@ td.addRule('divAsParagraph', {
   filter: 'div',
   replacement: (content) => '\n\n' + content + '\n\n',
 })
+// 表の外の <br> は改行1つにする（#148）。既定の「行末空白2つ＋改行」でも描画は同じだが、Markdown の元文として行末の空白を残さない。
+// 見たまま編集の Enter は <br>（行）なので、2つ続く <br>（空行）は段落の区切り \n\n にする
+// （turndown は続く改行を1つにまとめるため、2つ目の <br> で \n\n を返す）。表のセルの中は brInTableCell（#48）に任せる。
+// ブロック末尾の <br>（Enter で置く見えない <br> や、ブラウザがブロックを分けた残り）は描画に出ないので消す。
+// li の末尾に改行が残ると空白だけの行になり、tight list が loose になる
+td.addRule('lineBreak', {
+  filter: (node) => node.nodeName === 'BR' && !node.closest('td, th'),
+  replacement: (_content, node) => {
+    let next = node.nextSibling
+    while (next?.nodeName === 'BR') next = next.nextSibling
+    if (!next) return ''
+    return node.previousSibling?.nodeName === 'BR' ? '\n\n' : '\n'
+  },
+})
 
 export function htmlToMd(html: string): string {
   return td

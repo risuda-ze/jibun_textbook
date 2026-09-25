@@ -50,6 +50,33 @@ function Editable({ md, onCommit }: { md: string; onCommit: (md: string) => void
         sel.removeAllRanges()
         sel.addRange(range)
       }}
+      onKeyDown={(e) => {
+        // Enter は行（<br>）、空行での Enter は段落の区切り。入力欄と同じ規則（#148）。contenteditable の既定の Enter は段落（<p>/<div>）を
+        // 作るため、1行ずつ打った表や箇条書きが確定後に Markdown として成立しなかった。Shift+Enter は既定のまま（<br>）。
+        // IME 変換中の Enter は変換の確定なので触らない
+        if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
+        const sel = getSelection()
+        if (!sel?.rangeCount) return
+        const range = sel.getRangeAt(0)
+        const { startContainer: n, startOffset: o } = range
+        const el = n instanceof Element ? n : n.parentElement
+        // コードブロックの中は既定に任せる（fenced の往復は textContent なので <br> を入れると改行が消える）
+        if (!el || !e.currentTarget.contains(el) || el.closest('pre')) return
+        // 直前が <br>（空行か行頭）なら段落の区切り。ブラウザ既定でブロックを分ける（li なら次の項目になる）
+        const prev = n.nodeType === Node.TEXT_NODE ? (o === 0 ? n.previousSibling : null) : n.childNodes[o - 1]
+        if (prev?.nodeName === 'BR') return
+        e.preventDefault()
+        range.deleteContents()
+        const br = document.createElement('br')
+        range.insertNode(br)
+        br.parentNode?.normalize()
+        // ブロック末尾の <br> は行として見えないので、もう1つ置いてカレットをその手前に置く
+        if (!br.nextSibling) br.after(document.createElement('br'))
+        range.setStartAfter(br)
+        range.collapse(true)
+        sel.removeAllRanges()
+        sel.addRange(range)
+      }}
       onFocus={(e) => {
         before.current = e.currentTarget.innerHTML
       }}
