@@ -2,12 +2,11 @@ name: CI
 
 # Pull Request と develop / production への push で、型・単体・ビルド・依存の脆弱性・通しを確かめる。
 # push は develop と production だけに絞る。PR を開いているブランチで push と pull_request の両方が発火し、同じコミットで2回走るのを防ぐ。
-# 配信はここでは行わない（deploy.yml が v* タグと手動でだけ配信する）。
+# 配信はここでは行わない（release.yml が production への push で version からタグを打って配信する）。
 
 on:
   push:
     branches: [develop, production]
-    tags-ignore: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -46,8 +45,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci --ignore-scripts
+      # npm audit は lockfile だけ読むので npm ci は要らない
       # high 以上が1件でもあれば失敗させる。moderate 以下は Dependabot の更新 PR に任せる
       - run: npm audit --audit-level=high
 
@@ -68,10 +66,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - if: steps.pw.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-      - if: steps.pw.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+      # 同じ版のブラウザが既にあればダウンロードは飛ばされる（OS の依存は毎回入れる）
+      - run: npx playwright install --with-deps chromium
       # デモ応答だけを使い、外部には一切つながない。API キーは不要
       - run: npm run e2e
       - uses: actions/upload-artifact@v7

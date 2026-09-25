@@ -16,8 +16,6 @@ const CSP = [
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob:",
   "connect-src 'self' https://api.anthropic.com",
-  "worker-src 'self'",
-  "manifest-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'none'",
@@ -37,7 +35,6 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg'],
       manifest: {
         name: 'じぶん教科書',
         short_name: 'じぶん教科書',
@@ -45,7 +42,6 @@ export default defineConfig({
         lang: 'ja',
         theme_color: '#f6f5f4',
         background_color: '#f6f5f4',
-        display: 'standalone',
         start_url: '.',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
@@ -56,7 +52,6 @@ export default defineConfig({
       workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2}'] },
     }),
   ],
-  server: { port: 5173 },
   test: {
     environment: 'jsdom',
     include: ['tests/**/*.test.ts'],
