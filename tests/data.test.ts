@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { TextbookZ, clearLesson, newBlock, newChapter, newLesson, newTextbook, renumberDuplicateIds, type Textbook } from '../src/types'
+import {
+  TextbookZ,
+  clearLesson,
+  emptyDraft,
+  newBlock,
+  newChapter,
+  newLesson,
+  newTextbook,
+  renumberDuplicateIds,
+  type Textbook,
+} from '../src/types'
 import { currentLesson, lessonNo, lessonStatus, minePercent, reviewCount, statusCounts } from '../src/lib/status'
 import { asCopy, decideImport, exportJson, parseImport } from '../src/lib/io'
 import { fitSize } from '../src/lib/image'
@@ -67,6 +77,20 @@ describe('JSONの書き出しと読み込み', () => {
     const r = parseImport(json)
     expect(r.ok).toBe(true)
     if (r.ok) expect(r.tb.chapters[0].lessons[2].blocks[1].images[0].alt).toBe('エラー画面のスクショ')
+  })
+  it('下書きの画像の id はそのまま保存したブロックに残り、本文の参照が指せる（#125）', () => {
+    const d = emptyDraft()
+    d.images.push({ id: 'im1', dataUrl: 'data:image/png;base64,AA==', alt: '' })
+    d.md = '前\n\n![](img:im1)'
+    const tb = book()
+    tb.chapters[0].lessons[2].blocks.push(newBlock('me', d.md, { images: d.images }))
+    const r = parseImport(exportJson(tb))
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      const b = r.tb.chapters[0].lessons[2].blocks.at(-1)!
+      expect(b.images[0].id).toBe('im1')
+      expect(b.md).toContain('![](img:im1)')
+    }
   })
   it('書き出しJSONに教科書以外の項目（APIキー等）は入らない', () => {
     const dirty = { ...book(), apiKey: 'sk-ant-SECRET', ai: { apiKey: 'sk-ant-SECRET' } } as unknown as Textbook

@@ -1016,24 +1016,21 @@ label.f {
   margin: 0;
   max-width: 100%;
 }
-/* 画像の説明（#13）。表示は figcaption、書くときは input */
-.imgwrap figcaption {
-  margin: -4px 0 var(--s8);
-}
-.imgwrap input.alt {
-  margin-bottom: var(--s8);
-}
-.imgwrap .imgbtn {
-  display: block;
-  padding: 0;
-  border: 0;
-  background: none;
-}
-.atts input.alt {
-  width: 180px;
-  margin-top: var(--s4);
-  padding: var(--s4) var(--s8);
+/* 本文の中の画像のチップ（見たまま編集・#125）。読み取りでは <img> になる */
+.imgref {
+  display: inline-block;
+  padding: 0 var(--s8);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pills);
+  font-family: var(--font-mono);
   font-size: var(--text-body-sm);
+  line-height: 1.6;
+  color: var(--ink-3);
+  background: var(--canvas);
+  user-select: none;
+}
+.imgref.missing {
+  border-style: dashed;
 }
 .imgwrap .rm,
 .atts .rm {

@@ -118,8 +118,8 @@ export type Chapter = z.infer<typeof ChapterZ>
 export type CourseInput = z.infer<typeof InputZ>
 export type Textbook = z.infer<typeof TextbookZ>
 
-/** ノート入力欄の下書き。画面をまたいで保持するが、端末には保存しない（#12） */
-export type NoteDraft = { md: string; images: Pick<Image, 'dataUrl' | 'alt'>[]; source: string; quote: string }
+/** ノート入力欄の下書き。画面をまたいで保持するが、端末には保存しない（#12）。画像の id は入れた時に振る（本文の参照記法が書き込む前に指せるように #125） */
+export type NoteDraft = { md: string; images: Image[]; source: string; quote: string }
 export const emptyDraft = (): NoteDraft => ({ md: '', images: [], source: '', quote: '' })
 export const isDraftEmpty = (d: NoteDraft): boolean => !d.md.trim() && !d.images.length && !d.source.trim() && !d.quote
 

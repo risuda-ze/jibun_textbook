@@ -60,6 +60,15 @@ describe('文字列は変わるが意味は同じ（equiv・stable）', () => {
   }
 })
 
+describe('本文の中の画像の参照記法（#125）', () => {
+  const images = [{ id: 'abcdefgh-1234', dataUrl: 'data:image/png;base64,AA==', alt: '' }]
+  const backEdit = (md: string) => htmlToMd(mdToHtml(md, images, 'edit'))
+  it('編集のチップは往復で一字一句 ![](img:ID) に戻る（文の途中でも・無い ID でも）', () => {
+    for (const md of ['前\n\n![](img:abcdefgh-1234)\n\n後', '文の途中に![](img:abcdefgh-1234)置く', '![](img:nothing)'])
+      expect(backEdit(md)).toBe(md)
+  })
+})
+
 describe('見たまま編集の Enter は行（<br>）、空行は段落（#148）', () => {
   it('1行ずつ <br> で打った表は Markdown の表になる', () => {
     const md = htmlToMd('<p>本文。<br>|a|b|<br>|-|-|<br>|1|2|</p>')

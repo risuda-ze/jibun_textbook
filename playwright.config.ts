@@ -18,7 +18,7 @@ export default defineConfig({
     {
       name: 'phone',
       use: { ...devices['Pixel 7'] },
-      testMatch: /(flow|reorder|wide|busy_button|generate_group|note_edit|image_alt)\.spec\.ts$/,
+      testMatch: /(flow|reorder|wide|busy_button|generate_group|note_edit|inline_image)\.spec\.ts$/,
     },
   ],
 })
