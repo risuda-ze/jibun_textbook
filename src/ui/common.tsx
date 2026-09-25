@@ -1,8 +1,7 @@
 import { L } from './labels'
 import { clearLesson, type Lesson, type Textbook } from '../types'
 import { STATUS_LABEL, lessonStatus, statusCounts, type Status } from '../lib/status'
-import { MODELS, type AiKind } from '../ai/types'
-import { WEB_SEARCH_USD_PER_1000 } from '../ai'
+import { MODELS, WEB_SEARCH_USD_PER_1000, type AiKind } from '../ai/types'
 import { markExported, putBook, setAi, snapshot, toast, updateLesson, useApp } from '../store'
 import { SIZE_WARN_BYTES, byteSize, exportJson, fileName, formatSize } from '../lib/io'
 import { downloadText } from '../lib/download'
@@ -50,8 +49,6 @@ export function Meter({ tb }: { tb: Textbook }) {
 
 const KINDS: [AiKind, string][] = [
   ['anthropic', 'Anthropic API'],
-  ['compat', 'OpenAI互換API'],
-  ['local', 'ローカル'],
   ['demo', 'デモ応答'],
 ]
 
@@ -124,11 +121,6 @@ export function AiBar() {
             </select>
           </label>
         </div>
-      )}
-      {(ai.kind === 'compat' || ai.kind === 'local') && (
-        <p className="sub">
-          この接続先はまだ使えません。次の段階で対応します。{ai.kind === 'local' && 'ローカルのモデルはPCでだけ使える予定です。'}
-        </p>
       )}
       {ai.kind === 'demo' && <p className="sub">APIキーなしで動線を試すための見本を返します。調査はしません。</p>}
     </Card>

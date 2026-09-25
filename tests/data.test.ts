@@ -1,15 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  TextbookZ,
-  clearLesson,
-  findDuplicateIds,
-  newBlock,
-  newChapter,
-  newLesson,
-  newTextbook,
-  renumberDuplicateIds,
-  type Textbook,
-} from '../src/types'
+import { TextbookZ, clearLesson, newBlock, newChapter, newLesson, newTextbook, renumberDuplicateIds, type Textbook } from '../src/types'
 import { currentLesson, lessonNo, lessonStatus, minePercent, reviewCount, statusCounts } from '../src/lib/status'
 import { asCopy, decideImport, exportJson, parseImport } from '../src/lib/io'
 import { fitSize } from '../src/lib/image'
@@ -137,15 +127,11 @@ describe('id の一意性（#36）', () => {
     tb.chapters[0].lessons[2].blocks[1].id = tb.chapters[0].lessons[2].blocks[0].id
     return tb
   }
-  it('重複を見つける', () => {
-    expect(findDuplicateIds(book())).toEqual([])
-    expect(findDuplicateIds(dupBook())).toHaveLength(2)
-  })
   it('読み込みは振り直して直し、直した所を返す（#65 で修復に変更）', () => {
     const r = parseImport(JSON.stringify(dupBook()))
     expect(r.ok).toBe(true)
     if (r.ok) {
-      expect(findDuplicateIds(r.tb)).toEqual([])
+      expect(renumberDuplicateIds(r.tb).count).toBe(0)
       expect(r.steps).toEqual(['重複していた id を 2 件振り直しました'])
     }
   })
@@ -153,7 +139,7 @@ describe('id の一意性（#36）', () => {
     const src = dupBook()
     const { tb, count } = renumberDuplicateIds(src)
     expect(count).toBe(2)
-    expect(findDuplicateIds(tb)).toEqual([])
+    expect(renumberDuplicateIds(tb).count).toBe(0)
     expect(tb.chapters[0].lessons[0].id).toBe(src.chapters[0].lessons[0].id)
     expect(tb.chapters[0].lessons[1].id).not.toBe(src.chapters[0].lessons[1].id)
     expect(tb.chapters[0].lessons.map((l) => l.title)).toEqual(src.chapters[0].lessons.map((l) => l.title))
@@ -194,4 +180,56 @@ it('資料を消す（#104）: 本文・手を動かす・参考情報・資料�
   // 元の節は変えない
   expect(l.blocks).toHaveLength(2)
   expect(l.done).toBe(true)
+})
+
+describe('工場関数の既定値はスキーマから来る（#126）', () => {
+  it('newBlock / newLesson / newTextbook の形（キーの順も）は #126 の前の直書きと同じ', () => {
+    const b = newBlock('ai', '本文')
+    expect(b).toEqual({ id: b.id, by: 'ai', md: '本文', edited: false, source: '', quote: '', images: [] })
+    expect(Object.keys(b)).toEqual(['id', 'by', 'md', 'edited', 'source', 'quote', 'images'])
+    const l = newLesson('節')
+    expect(l).toEqual({
+      id: l.id,
+      title: '節',
+      minutes: 45,
+      isTask: false,
+      done: false,
+      review: false,
+      summary: '',
+      tasks: [],
+      clues: { queries: [], links: [], how: [] },
+      blocks: [],
+      materials: [],
+    })
+    expect(Object.keys(l)).toEqual([
+      'id',
+      'title',
+      'minutes',
+      'isTask',
+      'done',
+      'review',
+      'summary',
+      'tasks',
+      'clues',
+      'blocks',
+      'materials',
+    ])
+    const t = newTextbook('本')
+    expect(t).toEqual({
+      schemaVersion: 1,
+      id: t.id,
+      title: '本',
+      goal: '',
+      input: { prompt: '', can: '', time: '', env: '' },
+      createdAt: t.createdAt,
+      updatedAt: t.createdAt,
+      chapters: [],
+    })
+    expect(Object.keys(t)).toEqual(['schemaVersion', 'id', 'title', 'goal', 'input', 'createdAt', 'updatedAt', 'chapters'])
+    // extra は上書きされ、JSON に出る形は変わらない
+    const x = newLesson('節', { minutes: 30, blocks: [b] })
+    expect(x.minutes).toBe(30)
+    expect(x.blocks[0]).toBe(b)
+    expect(JSON.parse(exportJson(newTextbook('本', { chapters: [newChapter('章', [x])] }))).chapters[0].lessons[0]).toEqual(x)
+  })
 })

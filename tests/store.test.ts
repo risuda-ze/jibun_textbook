@@ -26,6 +26,7 @@ vi.mock('idb-keyval', async (orig) => {
 import { clear, get, set } from 'idb-keyval'
 import { getStateForTest, init, putBook, removeBook, setAi, setDraft, updateBook } from '../src/store'
 import { emptyDraft } from '../src/types'
+import { DEFAULT_AI } from '../src/ai/types'
 import { newChapter, newLesson, newTextbook } from '../src/types'
 
 const tick = () => new Promise((r) => setTimeout(r, 0))
@@ -56,6 +57,11 @@ describe('store（#80）', () => {
     await set('settings', 1) // 壊れた設定（get は成功するが形が違う）
     await init()
     expect(getStateForTest().books).toHaveLength(1)
+    expect(getStateForTest().ai.kind).toBe('anthropic')
+  })
+  it('init: 消した接続先（compat / local）が設定に残っていれば Anthropic にする（#127）', async () => {
+    await set('settings', { ai: { ...DEFAULT_AI, kind: 'compat' } })
+    await init()
     expect(getStateForTest().ai.kind).toBe('anthropic')
   })
   it('putBook: 書き込みに失敗したら、その教科書だけ元に戻す', async () => {

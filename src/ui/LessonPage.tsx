@@ -247,7 +247,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
                 label={L.generate}
                 note={
                   <span className="sub">
-                    使うAI: {ai.kind === 'anthropic' ? ai.model : ai.kind === 'demo' ? 'デモ応答' : '未対応の接続先'}
+                    使うAI: {ai.kind === 'anthropic' ? ai.model : 'デモ応答'}
                     （「つくる」画面で切り替え）
                   </span>
                 }

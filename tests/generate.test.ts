@@ -102,14 +102,14 @@ describe('generateInto（デモ応答で通す）', () => {
     expect(l.materials).not.toContain('old.md')
     expect(l.done).toBe(false)
   })
-  it('失敗しても教科書は変えず、理由を知らせる（未対応の接続先）', async () => {
+  it('失敗しても教科書は変えず、理由を知らせる（キー未設定）', async () => {
     const tb = book()
     await seed(tb)
     const id = tb.chapters[0].lessons[0].id
-    const ok = await generateInto(tb, id, { ...DEFAULT_AI, kind: 'compat' }, () => {})
+    const ok = await generateInto(tb, id, { ...DEFAULT_AI, apiKey: '' }, () => {})
     expect(ok).toBe(false)
     expect(getStateForTest().books[0].chapters[0].lessons[0].blocks).toEqual([])
-    expect(getStateForTest().toast?.msg).toContain('まだ使用できません')
+    expect(getStateForTest().toast?.msg).toContain('APIキーが未設定です')
   })
   it('中止すると教科書は変えず、短く知らせる', async () => {
     const tb = book()

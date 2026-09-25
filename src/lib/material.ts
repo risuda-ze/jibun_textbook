@@ -1,4 +1,6 @@
 import type { Material, MaterialKind } from '../ai/types'
+import { readAsDataUrl } from './image'
+import { byteSize } from './io'
 import { MATERIAL_MSG } from './messages'
 
 /** 渡せる資料の上限（#63）。txt/md はプロンプトに入るので小さく、PDF は API の document 入力に渡す */
@@ -36,15 +38,6 @@ export function checkTotal(size: number): string | null {
 
 export type ReadResult = { ok: true; material: Material } | { ok: false; reason: string }
 
-const readAs = (file: File, how: 'text' | 'dataUrl'): Promise<string> =>
-  new Promise((res, rej) => {
-    const r = new FileReader()
-    r.onload = () => res(String(r.result ?? ''))
-    r.onerror = () => rej(new Error('ファイルを読めませんでした。'))
-    if (how === 'text') r.readAsText(file)
-    else r.readAsDataURL(file)
-  })
-
 /** ファイルを1つ読んで資料にする。txt/md は文字、PDF は base64（data URL の先頭を外す） */
 export async function readMaterial(file: File): Promise<ReadResult> {
   const kind = classify(file.name, file.type)
@@ -52,12 +45,12 @@ export async function readMaterial(file: File): Promise<ReadResult> {
   const over = checkSize(kind, file.size)
   if (over) return { ok: false, reason: `「${file.name}」は${over}` }
   try {
-    if (kind === 'text') return { ok: true, material: { kind, name: file.name, size: file.size, text: await readAs(file, 'text') } }
-    const dataUrl = await readAs(file, 'dataUrl')
+    if (kind === 'text') return { ok: true, material: { kind, name: file.name, size: file.size, text: await file.text() } }
+    const dataUrl = await readAsDataUrl(file)
     const data = dataUrl.slice(dataUrl.indexOf(',') + 1)
     return { ok: true, material: { kind, name: file.name, size: file.size, data } }
-  } catch (e) {
-    return { ok: false, reason: MATERIAL_MSG.unreadable(file.name, (e as Error).message) }
+  } catch {
+    return { ok: false, reason: MATERIAL_MSG.unreadable(file.name, 'ファイルを読めませんでした。') }
   }
 }
 
@@ -65,11 +58,11 @@ export async function readMaterial(file: File): Promise<ReadResult> {
 export function pastedMaterial(text: string): ReadResult | null {
   const t = text.trim()
   if (!t) return null
-  const size = new Blob([t]).size
+  const size = byteSize(t)
   const over = checkSize('text', size)
   if (over) return { ok: false, reason: `貼り付けた文は${over}` }
   return { ok: true, material: { kind: 'text', name: PASTED_NAME, size, text: t } }
 }
 
 /** 貼り付けた文の今の大きさ（バイト）。欄の下に上限と並べて出す */
-export const pastedSize = (text: string): number => new Blob([text.trim()]).size
+export const pastedSize = (text: string): number => byteSize(text.trim())

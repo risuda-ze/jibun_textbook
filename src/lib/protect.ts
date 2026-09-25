@@ -1,5 +1,5 @@
 import { newBlock, newChapter, newLesson, type Block, type Chapter, type Lesson, type Textbook } from '../types'
-import { isMine, isProtectedLesson } from './status'
+import { allLessons, isMine, isProtectedLesson } from './status'
 
 /**
  * 「設計を直す」でAIが返す変更案を、自分の教科書を壊さずに反映する。
@@ -60,7 +60,7 @@ export function applyChapterPlan(chapter: Chapter, plan: PlanLesson[], pool?: Ma
 /** コース全体を変更案に合わせる。 */
 export function applyCoursePlan(tb: Textbook, plan: PlanChapter[]): Textbook {
   const byId = new Map(tb.chapters.map((c) => [c.id, c]))
-  const pool = new Map(tb.chapters.flatMap((c) => c.lessons).map((l) => [l.id, l]))
+  const pool = new Map(allLessons(tb).map((l) => [l.id, l]))
   const usedCh = new Set<string>()
   const out: Chapter[] = []
   for (const pc of plan) {
@@ -82,12 +82,7 @@ export function applyCoursePlan(tb: Textbook, plan: PlanChapter[]): Textbook {
   })
   // 同じ節が2か所に入らないようにする（先勝ち）
   const seen = new Set<string>()
-  const keepFirst = (id: string): boolean => {
-    if (seen.has(id)) return false
-    seen.add(id)
-    return true
-  }
-  const dedup = out.map((c) => ({ ...c, lessons: c.lessons.filter((l) => keepFirst(l.id)) }))
+  const dedup = out.map((c) => ({ ...c, lessons: c.lessons.filter((l) => !seen.has(l.id) && seen.add(l.id)) }))
   return { ...tb, chapters: dedup }
 }
 
@@ -100,8 +95,8 @@ export const DIFF_LABEL: Record<DiffKind, string> = { keep: '残す', same: 'そ
 export function diffTextbooks(before: Textbook, after: Textbook, onlyChapterId?: string): DiffRow[] {
   const rows: DiffRow[] = []
   const bCh = new Map(before.chapters.map((c) => [c.id, c]))
-  const bLs = new Map(before.chapters.flatMap((c) => c.lessons).map((l) => [l.id, l]))
-  const aLs = new Set(after.chapters.flatMap((c) => c.lessons).map((l) => l.id))
+  const bLs = new Map(allLessons(before).map((l) => [l.id, l]))
+  const aLs = new Set(allLessons(after).map((l) => l.id))
   for (const c of after.chapters) {
     if (onlyChapterId && c.id !== onlyChapterId) continue
     const bc = bCh.get(c.id)

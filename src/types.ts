@@ -2,13 +2,13 @@ import { z } from 'zod'
 
 /** 教科書1冊 = JSON 1ファイル。ここが保存形式の正。APIキーやAI設定は含めない。 */
 
-export const ImageZ = z.object({
+const ImageZ = z.object({
   id: z.string(),
   dataUrl: z.string(),
   alt: z.string().default(''),
 })
 
-export const BlockZ = z.object({
+const BlockZ = z.object({
   id: z.string(),
   /** 書き手。ai = AIの下書き / me = 自分のノート */
   by: z.enum(['ai', 'me']),
@@ -23,21 +23,21 @@ export const BlockZ = z.object({
   images: z.array(ImageZ).default([]),
 })
 
-export const LinkZ = z.object({
+const LinkZ = z.object({
   title: z.string(),
   url: z.string(),
   fetchedAt: z.string().default(''),
 })
 
-export const CluesZ = z.object({
+const CluesZ = z.object({
   queries: z.array(z.string()).default([]),
   links: z.array(LinkZ).default([]),
   how: z.array(z.string()).default([]),
 })
 
-export const TaskZ = z.object({ text: z.string(), checked: z.boolean().default(false) })
+const TaskZ = z.object({ text: z.string(), checked: z.boolean().default(false) })
 
-export const LessonZ = z.object({
+const LessonZ = z.object({
   id: z.string(),
   title: z.string(),
   minutes: z.number().default(45),
@@ -55,13 +55,13 @@ export const LessonZ = z.object({
   materials: z.array(z.string()).default([]),
 })
 
-export const ChapterZ = z.object({
+const ChapterZ = z.object({
   id: z.string(),
   title: z.string(),
   lessons: z.array(LessonZ).default([]),
 })
 
-export const InputZ = z.object({
+const InputZ = z.object({
   prompt: z.string().default(''),
   can: z.string().default(''),
   time: z.string().default(''),
@@ -83,30 +83,9 @@ export const TextbookZ = z.object({
  * id の一意性（#36）。章・節・ブロック・画像の id は教科書全体で重ならないこと。
  * 重なると findLesson / updateLesson が最初の1つしか扱えず、片方の編集が反映されない。
  * TextbookZ 自体には付けない（端末内の古いデータを読めなくしないため）。読み込み（parseImport）も
- * 起動時（store.init）も migrate() が renumberDuplicateIds で振り直して救済し、直した所を知らせる（#65）。
+ * 起動時（store.init）も migrate() がこれで振り直して救済し、直した所を知らせる（#65）。
+ * 重複した id を後ろから振り直す。最初の1つは元のまま。戻り値の count は振り直した数（0 なら重複なし）
  */
-export function findDuplicateIds(tb: Textbook): string[] {
-  const seen = new Set<string>()
-  const dup = new Set<string>()
-  const see = (id: string) => {
-    if (seen.has(id)) dup.add(id)
-    else seen.add(id)
-  }
-  see(tb.id)
-  for (const c of tb.chapters) {
-    see(c.id)
-    for (const l of c.lessons) {
-      see(l.id)
-      for (const b of l.blocks) {
-        see(b.id)
-        for (const im of b.images) see(im.id)
-      }
-    }
-  }
-  return [...dup]
-}
-
-/** 重複した id を後ろから振り直す。最初の1つは元のまま。戻り値の count は振り直した数 */
 export function renumberDuplicateIds(tb: Textbook): { tb: Textbook; count: number } {
   const seen = new Set<string>()
   let count = 0
@@ -144,32 +123,17 @@ export type NoteDraft = { md: string; images: Pick<Image, 'dataUrl' | 'alt'>[]; 
 export const emptyDraft = (): NoteDraft => ({ md: '', images: [], source: '', quote: '' })
 export const isDraftEmpty = (d: NoteDraft): boolean => !d.md.trim() && !d.images.length && !d.source.trim() && !d.quote
 
-export const uid = (): string =>
-  typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : 'id-' + Math.random().toString(36).slice(2) + Date.now().toString(36)
+export const uid = (): string => crypto.randomUUID()
 
 export const nowIso = (): string => new Date().toISOString()
 
+/** 工場関数。既定値はスキーマの `.default()` だけが持つ（#126）。extra は検証も複製もせずそのまま載せる */
 export function newBlock(by: Block['by'], md: string, extra: Partial<Block> = {}): Block {
-  return { id: uid(), by, md, edited: false, source: '', quote: '', images: [], ...extra }
+  return { ...BlockZ.parse({ id: uid(), by, md }), ...extra }
 }
 
 export function newLesson(title: string, extra: Partial<Lesson> = {}): Lesson {
-  return {
-    id: uid(),
-    title,
-    minutes: 45,
-    isTask: false,
-    done: false,
-    review: false,
-    summary: '',
-    tasks: [],
-    clues: { queries: [], links: [], how: [] },
-    blocks: [],
-    materials: [],
-    ...extra,
-  }
+  return { ...LessonZ.parse({ id: uid(), title }), ...extra }
 }
 
 /**
@@ -186,15 +150,5 @@ export function newChapter(title: string, lessons: Lesson[] = []): Chapter {
 
 export function newTextbook(title: string, extra: Partial<Textbook> = {}): Textbook {
   const t = nowIso()
-  return {
-    schemaVersion: 1,
-    id: uid(),
-    title,
-    goal: '',
-    input: { prompt: '', can: '', time: '', env: '' },
-    createdAt: t,
-    updatedAt: t,
-    chapters: [],
-    ...extra,
-  }
+  return { ...TextbookZ.parse({ schemaVersion: 1, id: uid(), title, createdAt: t, updatedAt: t }), ...extra }
 }

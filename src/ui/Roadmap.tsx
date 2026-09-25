@@ -1,6 +1,7 @@
 import { L } from './labels'
 import { useMemo, useState } from 'react'
-import { getProvider, type RedesignPlan, type RedesignScope, type Usage } from '../ai'
+import { getProvider } from '../ai'
+import type { RedesignPlan, RedesignScope, Usage } from '../ai/types'
 import {
   applyChapterPlan,
   applyCoursePlan,
