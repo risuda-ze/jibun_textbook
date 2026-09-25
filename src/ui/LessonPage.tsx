@@ -1,10 +1,10 @@
 import { L } from './labels'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { allLessons, findLesson, lessonNo, minePercent } from '../lib/status'
-import { go, openLesson, putBook, setDraft as storeDraft, setWide, snapshot, toast, updateLesson, useApp } from '../store'
-import { emptyDraft, newBlock, uid, type Lesson, type NoteDraft, type Textbook } from '../types'
+import { go, openLesson, setDraft as storeDraft, setWide, toast, updateLesson, useApp } from '../store'
+import { emptyDraft, newBlock, uid, type Block, type Lesson, type NoteDraft, type Textbook } from '../types'
 import { BlockRow, Composer } from './blocks'
-import { StatusChip, clearLessonWithUndo } from './common'
+import { StatusChip, clearLessonWithUndo, patchBlock, withUndo } from './common'
 import { isHttpUrl } from '../lib/safe'
 import { GenerateControls, useGenerate } from './GenerateControls'
 import { Button, Card } from './kit'
@@ -123,6 +123,7 @@ function Clues({ tb, lesson }: { tb: Textbook; lesson: Lesson }) {
   )
 }
 
+/** 節が変わると App が key で作り直すので、差し込み位置などの state は初期値に戻る（#128） */
 export function LessonPage({ tb }: { tb: Textbook }) {
   const { lessonId, ai, drafts, wide } = useApp()
   const f = (lessonId && findLesson(tb, lessonId)) || null
@@ -131,11 +132,6 @@ export function LessonPage({ tb }: { tb: Textbook }) {
   const [task, setTask] = useState('')
   const qbtn = useRef<HTMLButtonElement>(null)
   const pending = useRef<{ text: string; blockId: string } | null>(null)
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: 節が変わったときに差し込み位置を戻す（lessonId は「いつ走るか」の指定）
-  useEffect(() => {
-    setInsAt(null)
-  }, [lessonId])
 
   // 本文を選択すると「引用してノートを書く」を出す
   useEffect(() => {
@@ -176,11 +172,6 @@ export function LessonPage({ tb }: { tb: Textbook }) {
   const ls = allLessons(tb)
   const next = ls[ls.indexOf(l) + 1]
   const pct = minePercent(l)
-  const withUndo = (msg: string, fn: () => void) => {
-    const before = snapshot(tb.id)
-    fn()
-    toast(msg, before ? () => putBook(before) : undefined)
-  }
   // ノートの下書きは store に節ごとに持つ。差し込み位置の変更・節の切り替え・画面の移動で消えない（#12）
   const draft = drafts[l.id] ?? emptyDraft()
   const setDraft = (d: NoteDraft) => storeDraft(l.id, d)
@@ -240,18 +231,16 @@ export function LessonPage({ tb }: { tb: Textbook }) {
         <div className="stack">
           {l.blocks.length === 0 && (
             <Card stack>
-              <p>この節はまだ資料がありません。AIに下書きを作らせるか、下の欄から自分で書き始めてください。</p>
-              <GenerateControls
-                g={g}
-                lessonId={l.id}
-                label={L.generate}
-                note={
-                  <span className="sub">
-                    使うAI: {ai.kind === 'anthropic' ? ai.model : 'デモ応答'}
-                    （「つくる」画面で切り替え）
-                  </span>
-                }
-              />
+              {/* ロードマップと同じ3択の枠（#91 #123）。「自分で書き始める」は下のノート欄へ */}
+              <GenerateControls g={g} lessonId={l.id} label={L.generate}>
+                <Button v="ghost" onClick={() => document.getElementById('note')?.focus()}>
+                  {L.startWriting}
+                </Button>
+              </GenerateControls>
+              <span className="sub">
+                使うAI: {ai.kind === 'anthropic' ? ai.model : 'デモ応答'}
+                （「つくる」画面で切り替え）
+              </span>
             </Card>
           )}
           <div className="row">
@@ -264,56 +253,55 @@ export function LessonPage({ tb }: { tb: Textbook }) {
             </span>
           </div>
           <div className={`blocks doc ${blame ? '' : 'noblame'}`}>
-            {l.blocks.map((b, i) => (
-              <Fragment key={b.id}>
-                {composerAt === i ? (
-                  composer
-                ) : (
-                  <button type="button" className="ins" onClick={() => setInsAt(i)}>
-                    ＋ ここに書く
-                  </button>
-                )}
-                <BlockRow
-                  block={b}
-                  onCommit={(md) =>
-                    updateLesson(tb.id, l.id, (d) => {
-                      const x = d.blocks.find((y) => y.id === b.id)
-                      if (x) {
+            {l.blocks.map((b, i) => {
+              // この要素を書き換える（#128）
+              const patch = (fn: (x: Block) => void) => patchBlock(tb.id, l.id, b.id, fn)
+              return (
+                <Fragment key={b.id}>
+                  {composerAt === i ? (
+                    composer
+                  ) : (
+                    <button type="button" className="ins" onClick={() => setInsAt(i)}>
+                      ＋ ここに書く
+                    </button>
+                  )}
+                  <BlockRow
+                    block={b}
+                    onCommit={(md) =>
+                      patch((x) => {
                         x.md = md
                         if (x.by === 'ai') x.edited = true
-                      }
-                    })
-                  }
-                  onCheck={(md) =>
-                    updateLesson(tb.id, l.id, (d) => {
-                      const x = d.blocks.find((y) => y.id === b.id)
-                      if (x) x.md = md
-                    })
-                  }
-                  onDelete={() =>
-                    withUndo(b.by === 'me' ? 'ノートを消しました' : '文を消しました', () =>
-                      updateLesson(tb.id, l.id, (d) => {
-                        d.blocks = d.blocks.filter((y) => y.id !== b.id)
-                      }),
-                    )
-                  }
-                  onRemoveImage={(imgId) =>
-                    withUndo('画像を外しました', () =>
-                      updateLesson(tb.id, l.id, (d) => {
-                        const x = d.blocks.find((y) => y.id === b.id)
-                        if (x) x.images = x.images.filter((im) => im.id !== imgId)
-                      }),
-                    )
-                  }
-                  onAlt={(imgId, alt) =>
-                    updateLesson(tb.id, l.id, (d) => {
-                      const im = d.blocks.find((y) => y.id === b.id)?.images.find((y) => y.id === imgId)
-                      if (im) im.alt = alt
-                    })
-                  }
-                />
-              </Fragment>
-            ))}
+                      })
+                    }
+                    onCheck={(md) =>
+                      patch((x) => {
+                        x.md = md
+                      })
+                    }
+                    onDelete={() =>
+                      withUndo(tb.id, b.by === 'me' ? 'ノートを消しました' : '文を消しました', () =>
+                        updateLesson(tb.id, l.id, (d) => {
+                          d.blocks = d.blocks.filter((y) => y.id !== b.id)
+                        }),
+                      )
+                    }
+                    onRemoveImage={(imgId) =>
+                      withUndo(tb.id, '画像を外しました', () =>
+                        patch((x) => {
+                          x.images = x.images.filter((im) => im.id !== imgId)
+                        }),
+                      )
+                    }
+                    onAlt={(imgId, alt) =>
+                      patch((x) => {
+                        const im = x.images.find((y) => y.id === imgId)
+                        if (im) im.alt = alt
+                      })
+                    }
+                  />
+                </Fragment>
+              )
+            })}
             {composerAt >= l.blocks.length ? (
               composer
             ) : (

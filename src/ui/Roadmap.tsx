@@ -14,7 +14,7 @@ import {
 import { moveChapter, moveLesson, moveLessonToChapter } from '../lib/reorder'
 import { STATUS_LABEL, currentLesson, findLesson, lessonNo, lessonStatus } from '../lib/status'
 import { openLesson, putBook, selectLesson, snapshot, toast, updateBook, updateLesson, useApp } from '../store'
-import { newChapter, newLesson, type Lesson, type Textbook } from '../types'
+import { newChapter, newLesson, type Chapter, type Lesson, type Textbook } from '../types'
 import {
   GoalInput,
   Meter,
@@ -26,6 +26,7 @@ import {
   downloadBook,
   stepPercent,
   useAiRun,
+  withUndo,
 } from './common'
 import { GenerateControls, useGenerate } from './GenerateControls'
 import { Button, Card, Pill, Segmented, type PillTone } from './kit'
@@ -91,14 +92,14 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
 
   function adopt() {
     if (!after) return
-    const before = snapshot(tb.id)
-    putBook(after)
-    if (!findLesson(after, lesson.id)) {
-      const c = currentLesson(after)
-      if (c) selectLesson(c.id)
-    }
-    onClose()
-    toast('変更案を反映しました', before ? () => putBook(before) : undefined)
+    withUndo(tb.id, '変更案を反映しました', () => {
+      putBook(after)
+      if (!findLesson(after, lesson.id)) {
+        const c = currentLesson(after)
+        if (c) selectLesson(c.id)
+      }
+      onClose()
+    })
   }
 
   return (
@@ -177,6 +178,12 @@ function RedoPanel({ tb, lesson, onClose }: { tb: Textbook; lesson: Lesson; onCl
   )
 }
 
+/** 上へ／下への対（#123 でアイコン化）。方向・読み上げの語・見た目の記号。章と節で同じ */
+const DIRS: [-1 | 1, string, string][] = [
+  [-1, '上へ', '∧'],
+  [1, '下へ', '∨'],
+]
+
 export function Roadmap({ tb }: { tb: Textbook }) {
   const { lessonId, ai } = useApp()
   const [redo, setRedo] = useState(false)
@@ -187,7 +194,6 @@ export function Roadmap({ tb }: { tb: Textbook }) {
     (lessonId && findLesson(tb, lessonId)) ||
     (cur && findLesson(tb, cur.id)) ||
     (tb.chapters[0]?.lessons[0] && findLesson(tb, tb.chapters[0].lessons[0].id))
-  const selNo = sel ? lessonNo(tb, sel.lesson.id) : ''
 
   // タイムライン: 章ごとに1トラック。節は所要時間を幅にして、前の章の続きから並べる
   let cursor = 0
@@ -222,15 +228,12 @@ export function Roadmap({ tb }: { tb: Textbook }) {
     const before = snapshot(tb.id)
     // 最後の1節を消すと章ごと消える。そのことをトーストで伝える（#17）。元に戻すで章も戻る
     const last = tb.chapters.some((c) => c.lessons.length === 1 && c.lessons[0].id === id)
-    updateBook(tb.id, (d) => {
-      for (const c of d.chapters) c.lessons = c.lessons.filter((l) => l.id !== id)
-      d.chapters = d.chapters.filter((c) => c.lessons.length)
-    })
-    // 消した節を選んだままにしない（#88）。レッスンタブを押したときに「節が選ばれていません」になるのを防ぐ。元に戻すで選択も戻す
     const after = {
       ...tb,
       chapters: tb.chapters.map((c) => ({ ...c, lessons: c.lessons.filter((l) => l.id !== id) })).filter((c) => c.lessons.length),
     }
+    updateBook(tb.id, (d) => Object.assign(d, after))
+    // 消した節を選んだままにしない（#88）。レッスンタブを押したときに「節が選ばれていません」になるのを防ぐ。元に戻すで選択も戻す
     const next = (currentLesson(after) ?? after.chapters[0]?.lessons[0])?.id
     const moved = (!lessonId || lessonId === id) && !!next
     if (moved) selectLesson(next)
@@ -246,10 +249,77 @@ export function Roadmap({ tb }: { tb: Textbook }) {
   }
   /** 並べ替え（#11）。純粋関数の結果で置き換え、元に戻せるトーストを出す。選択は動かした節のまま */
   function move(fn: (d: Textbook) => Textbook, lessonId: string, msg: string) {
-    const before = snapshot(tb.id)
-    updateBook(tb.id, (d) => Object.assign(d, fn(d)))
-    selectLesson(lessonId)
-    toast(msg, before ? () => putBook(before) : undefined)
+    withUndo(tb.id, msg, () => {
+      updateBook(tb.id, (d) => Object.assign(d, fn(d)))
+      selectLesson(lessonId)
+    })
+  }
+
+  /**
+   * 節の1行（番号・◆題名・状態）。スマホ幅の一覧（.chlist）と章構成（chapterpane）で同じ形（#128）。
+   * 選んだ行の中に「上へ／下へ／別の章へ」のメニューが開く（#123）。常設の操作行は無い
+   */
+  function lessonItem(c: Chapter, ci: number, l: Lesson, li: number) {
+    const no = `${ci + 1}-${li + 1}`
+    const on = l.id === sel?.lesson.id
+    return (
+      <li key={l.id}>
+        <button type="button" aria-current={on} onClick={() => selectLesson(l.id)}>
+          <span className="mono sub">{no}</span>
+          <span>
+            {l.isTask && '◆ '}
+            {l.title}
+          </span>
+          <span className="row" style={{ justifyContent: 'flex-end' }}>
+            <StatusChip lesson={l} />
+          </span>
+        </button>
+        {on && (
+          <div className="row movectl lessonmenu" role="group" aria-label={`${no} の位置`}>
+            {DIRS.map(([dir, word, icon]) => (
+              <Button
+                key={dir}
+                v="ghost"
+                sm
+                className="icon"
+                aria-label={`${no} を${word}`}
+                disabled={dir < 0 ? li === 0 : li === c.lessons.length - 1}
+                onClick={() => move((d) => moveLesson(d, l.id, dir), l.id, `節を${word}動かしました`)}
+              >
+                {icon}
+              </Button>
+            ))}
+            {tb.chapters.length > 1 && (
+              <select
+                aria-label={`${no} を別の章へ`}
+                value=""
+                onChange={(e) => {
+                  const to = tb.chapters.findIndex((x) => x.id === e.target.value)
+                  if (to < 0) return
+                  // 最後の1節を移すと元の章は消える。そのことをトーストで伝える（removeLesson と同じ）
+                  const last = c.lessons.length === 1
+                  move(
+                    (d) => moveLessonToChapter(d, l.id, e.target.value),
+                    l.id,
+                    `節を第${to + 1}章の末尾へ動かしました${last ? '。節が無くなった章も消しました' : ''}`,
+                  )
+                }}
+              >
+                <option value="">別の章へ…</option>
+                {tb.chapters.map(
+                  (x, i) =>
+                    x.id !== c.id && (
+                      <option key={x.id} value={x.id}>
+                        第{i + 1}章 {x.title}
+                      </option>
+                    ),
+                )}
+              </select>
+            )}
+          </div>
+        )}
+      </li>
+    )
   }
 
   return (
@@ -311,7 +381,7 @@ export function Roadmap({ tb }: { tb: Textbook }) {
             <div className="tl-label">3時間ごと</div>
             <div className="tl-lane" style={{ width: W }}>
               {Array.from({ length: units }, (_, i) => (
-                <span key={i} className="tick" style={{ left: i * UNIT * PXMIN }}>
+                <span key={i} className="tick mono" style={{ left: i * UNIT * PXMIN }}>
                   {(i + 1) * 3}h
                 </span>
               ))}
@@ -349,38 +419,14 @@ export function Roadmap({ tb }: { tb: Textbook }) {
         </div>
       </div>
 
-      {/* スマホ幅: 章ごとの一覧 */}
+      {/* スマホ幅: 章ごとの一覧。行を選ぶとその行にメニューが開く（#123）ので、詳細へは飛ばない */}
       <div className="chlist" aria-label="章ごとの一覧">
         {tb.chapters.map((c, ci) => (
           <Card key={c.id}>
             <h3>
               <span className="mono sub">CH{ci + 1}</span> {c.title}
             </h3>
-            <ul className="lessonlist">
-              {c.lessons.map((l, li) => (
-                <li key={l.id}>
-                  <button
-                    type="button"
-                    aria-current={sel?.lesson.id === l.id}
-                    onClick={() => {
-                      selectLesson(l.id)
-                      requestAnimationFrame(() => document.getElementById('detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
-                    }}
-                  >
-                    <span className="mono sub">
-                      {ci + 1}-{li + 1}
-                    </span>
-                    <span>
-                      {l.isTask && '◆ '}
-                      {l.title}
-                    </span>
-                    <span className="row" style={{ justifyContent: 'flex-end' }}>
-                      <StatusChip lesson={l} />
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <ul className="lessonlist">{c.lessons.map((l, li) => lessonItem(c, ci, l, li))}</ul>
           </Card>
         ))}
       </div>
@@ -389,29 +435,35 @@ export function Roadmap({ tb }: { tb: Textbook }) {
 
       {sel ? (
         <Card className="detail" id="detail">
-          {/* 章構成を左（広い）、選択中の節を右に置く（#89）。読み上げ順も同じ */}
-          <div className="chapterpane">
+          {/* 見出し行: 章の番号と上下、右端に「足す」（#123）。画面の下端は読みづらいので、下に操作を置かない */}
+          <div className="row detailhead">
             <div className="row movectl">
               <div className="eyebrow">CH{sel.ci + 1}</div>
-              <Button
-                v="ghost"
-                sm
-                aria-label={`第${sel.ci + 1}章を上へ`}
-                disabled={sel.ci === 0}
-                onClick={() => move((d) => moveChapter(d, sel.chapter.id, -1), sel.lesson.id, '章を上へ動かしました')}
-              >
-                上へ
+              {DIRS.map(([dir, word, icon]) => (
+                <Button
+                  key={dir}
+                  v="ghost"
+                  sm
+                  className="icon"
+                  aria-label={`第${sel.ci + 1}章を${word}`}
+                  disabled={dir < 0 ? sel.ci === 0 : sel.ci === tb.chapters.length - 1}
+                  onClick={() => move((d) => moveChapter(d, sel.chapter.id, dir), sel.lesson.id, `章を${word}動かしました`)}
+                >
+                  {icon}
+                </Button>
+              ))}
+            </div>
+            <div className="row">
+              <Button v="outline" sm onClick={() => addLesson(sel.chapter.id)}>
+                ＋節を足す
               </Button>
-              <Button
-                v="ghost"
-                sm
-                aria-label={`第${sel.ci + 1}章を下へ`}
-                disabled={sel.ci === tb.chapters.length - 1}
-                onClick={() => move((d) => moveChapter(d, sel.chapter.id, 1), sel.lesson.id, '章を下へ動かしました')}
-              >
-                下へ
+              <Button v="outline" sm onClick={addChapter}>
+                ＋章を足す
               </Button>
             </div>
+          </div>
+          {/* 章構成を左（広い）、選択中の節を右に置く（#89）。読み上げ順も同じ */}
+          <div className="chapterpane">
             <TitleInput
               key={sel.chapter.id}
               className="titleinput"
@@ -423,84 +475,24 @@ export function Roadmap({ tb }: { tb: Textbook }) {
                 })
               }
             />
-            <ul className="lessonlist">
-              {sel.chapter.lessons.map((l, li) => (
-                <li key={l.id}>
-                  <button type="button" aria-current={l.id === sel.lesson.id} onClick={() => selectLesson(l.id)}>
-                    <span className="mono sub">
-                      {sel.ci + 1}-{li + 1}
-                    </span>
-                    <span>
-                      {l.isTask && '◆ '}
-                      {l.title}
-                    </span>
-                    <span className="row" style={{ justifyContent: 'flex-end' }}>
-                      <StatusChip lesson={l} />
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {/* 選択中の節の位置を動かす（#11）。行ごとのボタンにしないのは、スマホ幅ではこの一覧が隠れる（一覧は .chlist）ため */}
-            <div className="row movectl" style={{ marginTop: 8 }} role="group" aria-label={`${selNo} の位置`}>
-              <span className="sub">{selNo} を</span>
-              <Button
-                v="ghost"
-                sm
-                aria-label={`${selNo} を上へ`}
-                disabled={sel.li === 0}
-                onClick={() => move((d) => moveLesson(d, sel.lesson.id, -1), sel.lesson.id, '節を上へ動かしました')}
-              >
-                上へ
-              </Button>
-              <Button
-                v="ghost"
-                sm
-                aria-label={`${selNo} を下へ`}
-                disabled={sel.li === sel.chapter.lessons.length - 1}
-                onClick={() => move((d) => moveLesson(d, sel.lesson.id, 1), sel.lesson.id, '節を下へ動かしました')}
-              >
-                下へ
-              </Button>
-              {tb.chapters.length > 1 && (
-                <select
-                  aria-label={`${selNo} を別の章へ`}
-                  value=""
-                  onChange={(e) => {
-                    const to = tb.chapters.findIndex((c) => c.id === e.target.value)
-                    if (to < 0) return
-                    // 最後の1節を移すと元の章は消える。そのことをトーストで伝える（removeLesson と同じ）
-                    const last = sel.chapter.lessons.length === 1
-                    move(
-                      (d) => moveLessonToChapter(d, sel.lesson.id, e.target.value),
-                      sel.lesson.id,
-                      `節を第${to + 1}章の末尾へ動かしました${last ? '。節が無くなった章も消しました' : ''}`,
-                    )
-                  }}
-                >
-                  <option value="">別の章へ…</option>
-                  {tb.chapters.map(
-                    (c, i) =>
-                      c.id !== sel.chapter.id && (
-                        <option key={c.id} value={c.id}>
-                          第{i + 1}章 {c.title}
-                        </option>
-                      ),
-                  )}
-                </select>
-              )}
-            </div>
-            {/* この章への操作は章構成の右下に。コース全体への「章を足す」はカードの外に置く */}
-            <div className="row" style={{ marginTop: 8, justifyContent: 'flex-end' }}>
-              <Button v="outline" sm onClick={() => addLesson(sel.chapter.id)}>
-                この章に節を足す
-              </Button>
-            </div>
+            <ul className="lessonlist">{sel.chapter.lessons.map((l, li) => lessonItem(sel.chapter, sel.ci, l, li))}</ul>
           </div>
           <div className="stack">
             <div>
-              <div className="eyebrow">
-                選択中 {lessonNo(tb, sel.lesson.id)}・{sel.lesson.minutes}分
+              <div className="row" style={{ justifyContent: 'space-between' }}>
+                <div className="eyebrow">
+                  選択中 {lessonNo(tb, sel.lesson.id)}・{sel.lesson.minutes}分
+                </div>
+                <Button
+                  v="ghost"
+                  sm
+                  className="icon"
+                  aria-label="この節を消す"
+                  title="この節を消す"
+                  onClick={() => removeLesson(sel.lesson.id)}
+                >
+                  ×
+                </Button>
               </div>
               <TitleInput
                 key={sel.lesson.id}
@@ -529,30 +521,28 @@ export function Roadmap({ tb }: { tb: Textbook }) {
                 })
               }
             />
-            {!sel.lesson.blocks.length && <p className="sub">まだ資料がありません。AIに生成させるか、自分で書き始めてください。</p>}
-            <GenerateControls
-              g={g}
-              lessonId={sel.lesson.id}
-              label={L.generateLesson}
-              show={sel.lesson.blocks.length === 0}
-              onDone={() => openLesson(sel.lesson.id)}
-              actions={
-                <Button v={sel.lesson.blocks.length ? 'soft' : 'ghost'} onClick={() => openLesson(sel.lesson.id)}>
-                  {sel.lesson.blocks.length ? 'レッスンを開く' : L.startWriting}
+            {sel.lesson.blocks.length ? (
+              <div className="row" style={{ justifyContent: 'flex-end' }}>
+                <Button v="soft" onClick={() => openLesson(sel.lesson.id)}>
+                  レッスンを開く
                 </Button>
-              }
-            />
-            {/* 消す系は主操作の並びから離して右寄せに（#90） */}
-            <div className="row" style={{ justifyContent: 'flex-end' }}>
-              <Button v="outline" sm onClick={() => removeLesson(sel.lesson.id)}>
-                この節を消す
-              </Button>
-              {sel.lesson.blocks.length > 0 && (
+              </div>
+            ) : (
+              // 未作成の節は3択の枠（#123）: 渡す → 生成、その右に自分で書き始める
+              <GenerateControls g={g} lessonId={sel.lesson.id} label={L.generateLesson} onDone={() => openLesson(sel.lesson.id)}>
+                <Button v="ghost" onClick={() => openLesson(sel.lesson.id)}>
+                  {L.startWriting}
+                </Button>
+              </GenerateControls>
+            )}
+            {/* 消す系は主操作の並びから離して右寄せに（#90）。「この節を消す」は右上の × */}
+            {sel.lesson.blocks.length > 0 && (
+              <div className="row" style={{ justifyContent: 'flex-end' }}>
                 <Button v="outline" sm onClick={() => clearLessonWithUndo(tb, sel.lesson.id)}>
                   {L.clearLesson}
                 </Button>
-              )}
-            </div>
+              </div>
+            )}
             <div>
               <div className="sub" style={{ marginBottom: 4 }}>
                 教科書の育ち具合
@@ -568,13 +558,6 @@ export function Roadmap({ tb }: { tb: Textbook }) {
             章を足す
           </Button>
         </Card>
-      )}
-      {sel && (
-        <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
-          <Button v="outline" sm onClick={addChapter}>
-            章を足す
-          </Button>
-        </div>
       )}
     </>
   )

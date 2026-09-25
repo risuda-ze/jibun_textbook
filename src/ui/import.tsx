@@ -6,7 +6,7 @@ import { Button, Card } from './kit'
 /** 読み込む側が古いときの確認に使う組 */
 export type Older = { incoming: Textbook; existing: Textbook }
 
-export type ImportOutcome = { done: true } | { done: false; older: Older }
+type ImportOutcome = { done: true } | { done: false; older: Older }
 
 /**
  * 読み込んだ教科書を本棚に入れる（#78）。本棚の「JSON読込」と Help の「本棚に追加」で同じ判定を通す。

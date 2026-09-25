@@ -8,11 +8,6 @@ import { materialError, toMaterials, type MaterialInput } from './material'
 /** 生成の段階数（Web調査中… → 資料を作成中… → 資料ができた）。ボタンの塗りは stepPercent(step, GEN_STEPS) */
 export const GEN_STEPS = 2
 
-/** 進行中の状態。画面がボタンの塗りと中の文に使う（#55 #77） */
-export type { GenState }
-
-export const startGen = (): GenState => ({ step: 0, detail: '', hint: '', startedAt: Date.now(), endedAt: null })
-
 /**
  * Web 調査の状態を、完了の知らせに添える文にする（#81）。
  * 検索が全部失敗したときは「モデルの知識だけで書いた」と明かす。途中で切れたら根拠が足りない可能性を伝える
@@ -107,7 +102,8 @@ export async function startGeneration(tb: Textbook, lessonId: string, ai: AiSett
   if (controllers.has(lessonId)) return false
   const c = new AbortController()
   controllers.set(lessonId, c)
-  let g = startGen()
+  // 進行中の状態。画面がボタンの塗りと中の文に使う（#55 #77）
+  let g: GenState = { step: 0, detail: '', hint: '', startedAt: Date.now(), endedAt: null }
   setRunning(lessonId, g)
   try {
     return await generateInto(

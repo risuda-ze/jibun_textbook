@@ -240,7 +240,7 @@ export function Help() {
         }
       />
 
-      <Card as="section" stack aria-labelledby="help-trouble">
+      <Card stack aria-labelledby="help-trouble">
         <h2 id="help-trouble">読み込めない場合、まずはこちら</h2>
         <p className="sub">本棚の「JSON読込」・AI の生成・資料を渡すときに出た文を探して、次に試すことを見てください。</p>
         <dl className="help-list">
@@ -254,7 +254,7 @@ export function Help() {
         <Repair />
       </Card>
 
-      <Card as="section" stack aria-labelledby="help-qa">
+      <Card stack aria-labelledby="help-qa">
         <h2 id="help-qa">Q&A</h2>
         <dl className="help-list">
           {QA.map((x) => (
@@ -266,7 +266,7 @@ export function Help() {
         </dl>
       </Card>
 
-      <Card as="section" stack aria-labelledby="help-contact">
+      <Card stack aria-labelledby="help-contact">
         <h2 id="help-contact">問い合わせ</h2>
         <p className="sub">
           不具合や要望は GitHub の Issue で受け付けます（GitHub のアカウントが必要です）。下のリンクを開くと、書く項目が入った状態で新しい
