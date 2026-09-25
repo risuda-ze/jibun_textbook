@@ -3,7 +3,6 @@ import DOMPurify from 'dompurify'
 import TurndownService from 'turndown'
 // @ts-expect-error 型定義が無い
 import { gfm } from 'turndown-plugin-gfm'
-import { isHttpUrl } from './safe'
 
 /** 保存はMarkdown、編集は見たまま。表示時に md→HTML、編集確定時に HTML→md。 */
 
@@ -35,6 +34,10 @@ export function mdToHtml(md: string): string {
 
 const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', bulletListMarker: '-', emDelimiter: '*' })
 td.use(gfm)
+// 見たまま編集で打った文字は Markdown として扱う（#147）。turndown は既定で文字中の * ` [ # - _ > を \* のように
+// エスケープするため、編集中に打った記法が文字のまま残っていた（#76 #145）。本文は Markdown なので、入力欄と同じ規則に揃える。
+// 代わりに、もともと \* で文字として保っていた記号は、その段落を編集で確定すると Markdown として解釈される
+td.escape = (s: string) => s
 // 表のセルの中の <br> は <br> のまま出す（#48）。既定の「行末空白2つ＋改行」にすると表の行が途中で切れる。
 // GFM の表セルは HTML の <br> を許すので、marked が再び改行として描画する
 td.addRule('brInTableCell', {
@@ -48,13 +51,8 @@ td.addRule('divAsParagraph', {
 })
 
 export function htmlToMd(html: string): string {
-  return (
-    td
-      .turndown(DOMPurify.sanitize(html))
-      .replace(/\n{3,}/g, '\n\n')
-      // 見たまま編集で文字として打った [文](URL) は turndown が \[文\](URL) にエスケープする（#76）。
-      // URL が http(s) のものだけリンクの記法に戻す。太字やコードは意図しない変換になりうるので戻さない
-      .replace(/\\\[([^[\]\n]+)\\\]\((\S+?)\)/g, (m, text, url) => (isHttpUrl(url) ? `[${text}](${url})` : m))
-      .trim()
-  )
+  return td
+    .turndown(DOMPurify.sanitize(html))
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
