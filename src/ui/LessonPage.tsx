@@ -367,17 +367,34 @@ export function LessonPage({ tb }: { tb: Textbook }) {
             <h2>手を動かす</h2>
             <ul>
               {l.tasks.map((t, j) => (
-                <li className="check" key={j}>
-                  <input
-                    type="checkbox"
-                    id={`task${j}`}
-                    checked={t.checked}
-                    onChange={(e) =>
-                      updateLesson(tb.id, l.id, (d) => {
-                        d.tasks[j].checked = e.target.checked
-                      })
-                    }
-                  />
+                // key に文も入れ、消したときにチェック状態が隣の項目へずれないようにする（#143）
+                <li className="check" key={`${j}-${t.text}`}>
+                  <div className="ctl">
+                    <input
+                      type="checkbox"
+                      id={`task${j}`}
+                      checked={t.checked}
+                      onChange={(e) =>
+                        updateLesson(tb.id, l.id, (d) => {
+                          d.tasks[j].checked = e.target.checked
+                        })
+                      }
+                    />
+                    {/* 消すはチェックボックスの下。横に並べると右レールの文の幅を圧迫する（#143） */}
+                    <Button
+                      sm
+                      aria-label={`「${t.text}」を消す`}
+                      onClick={() => {
+                        const before = snapshot(tb.id)
+                        updateLesson(tb.id, l.id, (d) => {
+                          d.tasks.splice(j, 1)
+                        })
+                        toast('やることを消しました', before ? () => putBook(before) : undefined)
+                      }}
+                    >
+                      ×
+                    </Button>
+                  </div>
                   <label htmlFor={`task${j}`}>{t.text}</label>
                 </li>
               ))}
@@ -389,7 +406,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
                 id="newtask"
                 value={task}
                 onChange={(e) => setTask(e.target.value)}
-                placeholder="やることを足す"
+                placeholder="やることを追加"
                 style={{ flex: '1 1 120px' }}
               />
               <Button
@@ -403,7 +420,7 @@ export function LessonPage({ tb }: { tb: Textbook }) {
                   setTask('')
                 }}
               >
-                足す
+                {L.addTask}
               </Button>
             </div>
           </Card>

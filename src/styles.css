@@ -1281,6 +1281,19 @@ pre code {
 .check input {
   margin-top: 5px;
 }
+/* チェックボックスの下に「消す」を縦に積む。左の列は 18px のまま、文の幅は変えない（#143） */
+.check .ctl {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+.check .ctl .btn {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  line-height: 1;
+  color: var(--ink-2);
+}
 .marks {
   display: flex;
   flex-wrap: wrap;
