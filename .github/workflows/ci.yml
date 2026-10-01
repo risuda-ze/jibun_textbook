@@ -61,7 +61,7 @@ jobs:
           cache: npm
       - run: npm ci
       # ブラウザは package-lock.json（Playwright の版）をキーにキャッシュする。当たれば install は数秒で終わる（#86）
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         id: pw
         with:
           path: ~/.cache/ms-playwright
