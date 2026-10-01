@@ -130,7 +130,7 @@ jobs:
           cd ..
           ls -l "jibun_textbook-${TAG}.zip"
       - name: Release を作成（既にあれば zip を差し替え）
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.TAG }}
           name: ${{ env.TAG }}
