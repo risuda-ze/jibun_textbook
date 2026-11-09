@@ -3,8 +3,9 @@ import { clearLesson, type Block, type Lesson, type Textbook } from '../types'
 import { STATUS_LABEL, lessonStatus, statusCounts, type Status } from '../lib/status'
 import { MODELS, PROGRESS, WEB_SEARCH_USD_PER_1000, type AiError, type AiKind, type Progress, type Usage } from '../ai/types'
 import { markExported, putBook, setAi, snapshot, toast, updateLesson, useApp } from '../store'
-import { SIZE_WARN_BYTES, byteSize, exportJson, fileName, formatSize } from '../lib/io'
-import { downloadText } from '../lib/download'
+import { SIZE_WARN_BYTES, byteSize, exportJson, fileName, formatSize, safeName } from '../lib/io'
+import { downloadBlob, downloadText } from '../lib/download'
+import { bookZip } from '../lib/mdexport'
 import { useEffect, useRef, useState, type InputHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 import { Button, Card, Pill, Segmented, type Busy } from './kit'
 
@@ -249,6 +250,13 @@ export function downloadBook(tb: Textbook): void {
       ? `書き出しました（${formatSize(size)}）。8MBを超えているので、添付上限に注意してください。`
       : `書き出しました（${formatSize(size)}）`,
   )
+}
+
+/** Markdown 書き出し（#136）。zip（<名前>.md と img/）。端末間の受け渡しではないので「最後の書き出し日」は動かさない */
+export function downloadMarkdown(tb: Textbook): void {
+  const zip = bookZip(tb)
+  downloadBlob(`${safeName(tb)}.zip`, new Blob([zip as Uint8Array<ArrayBuffer>], { type: 'application/zip' }))
+  toast(`Markdown を書き出しました（${formatSize(zip.byteLength)}）`)
 }
 
 /** 使った量（検索回数・トークン）の1行。無ければ出さない */
