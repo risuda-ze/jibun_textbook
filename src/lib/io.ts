@@ -19,7 +19,9 @@ export function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-export const fileName = (tb: Textbook): string => `${tb.title.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40) || 'textbook'}.textbook.json`
+/** 書き出すファイルの名前の元。OS が嫌う文字を _ にし 40 文字まで。JSON（.textbook.json）と Markdown（.zip / .md）で共用 */
+export const safeName = (tb: Textbook): string => tb.title.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40) || 'textbook'
+export const fileName = (tb: Textbook): string => `${safeName(tb)}.textbook.json`
 
 /** 文字列の JSON を読む。結果は migrate() のもの（steps は直した所、from は読んだ版） */
 export function parseImport(text: string): MigrateResult {

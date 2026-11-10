@@ -21,6 +21,8 @@ export const removeRef = (md: string, id: string): string =>
     .replace(REF, (m, i) => (i === id ? '' : m))
     .replace(/\n{3,}/g, '\n\n')
     .trim()
+/** 参照記法を1つずつ置き換える。Markdown 書き出し（#136）が img/<ID>.<拡張子> の相対パスにする。to は記法1つ分の文字を返す */
+export const replaceRefs = (md: string, to: (id: string) => string): string => md.replace(REF, (_, id: string) => to(id))
 /** 見たまま編集に出すチップ。BlockRow の「文中に置く」もこれをカレットに差し込む */
 export const imgChip = (id: string): string =>
   `<span class="imgref" contenteditable="false" data-id="${esc(id)}">[画像: ${esc(id.slice(0, 8))}]</span>`

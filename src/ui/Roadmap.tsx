@@ -24,6 +24,7 @@ import {
   UsageLine,
   clearLessonWithUndo,
   downloadBook,
+  downloadMarkdown,
   stepPercent,
   useAiRun,
   withUndo,
@@ -352,6 +353,9 @@ export function Roadmap({ tb }: { tb: Textbook }) {
         <div className="row">
           <Button v="ghost" onClick={() => downloadBook(tb)}>
             JSONを書き出す
+          </Button>
+          <Button v="ghost" onClick={() => downloadMarkdown(tb)}>
+            Markdownを書き出す
           </Button>
           <Button v="ghost" onClick={() => setRedo(true)} disabled={!sel}>
             設計を直す

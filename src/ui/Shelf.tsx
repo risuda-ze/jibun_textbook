@@ -6,7 +6,7 @@ import { readTextbookFile } from '../lib/io'
 import { downloadText } from '../lib/download'
 import { OlderCard, importTextbook, type Older } from './import'
 import { allLessons, currentLesson, isMine, lessonNo, reviewCount } from '../lib/status'
-import { Meter, downloadBook } from './common'
+import { Meter, downloadBook, downloadMarkdown } from './common'
 import { Button, Card, PageHead, Pill } from './kit'
 
 const daysSince = (iso?: string): number | null => (iso ? Math.floor((Date.now() - Date.parse(iso)) / 86400000) : null)
@@ -139,10 +139,13 @@ export function Shelf() {
                   {b.goal && <p className="sub">{b.goal}</p>}
                 </div>
                 <Meter tb={b} />
-                {/* 左から「JSON書出」「消去」「開く」。主操作の「開く」を右端に置き、右揃えにする */}
+                {/* 左から「JSON書出」「MD書出」「消去」「開く」。主操作の「開く」を右端に置き、右揃えにする */}
                 <div className="row card-actions">
                   <Button v="outline" sm onClick={() => downloadBook(b)}>
                     JSON書出
+                  </Button>
+                  <Button v="outline" sm onClick={() => downloadMarkdown(b)}>
+                    MD書出
                   </Button>
                   <Button
                     v="danger"
