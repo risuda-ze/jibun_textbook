@@ -5,7 +5,7 @@
   "description": "AI-assisted personal textbook creation app",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",
-    "dompurify": "^3.4.15",
+    "dompurify": "^3.4.17",
     "idb-keyval": "^6.3.0",
     "marked": "^18.0.13",
     "react": "^18.3.1",
