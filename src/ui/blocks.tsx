@@ -309,16 +309,13 @@ export function Composer({ draft, onChange, onSubmit }: { draft: NoteDraft; onCh
     if (quote) note.current?.focus()
   }, [quote])
 
+  // 全部を縮小してから1回の set で足す。1枚ずつ await → set だと latest の更新が次の set に間に合わず、
+  // 前に足した画像を上書きして最後の1枚しか残らない（#153）。読めなかった分は飛ばし、トーストは1回
   async function addFiles(files: Iterable<File>) {
-    for (const f of files) {
-      if (!f.type.startsWith('image/')) continue
-      try {
-        const url = await shrinkImage(f)
-        set({ images: [...latest.current.images, { id: uid(), dataUrl: url, alt: '' }] })
-      } catch {
-        toast('画像を読み込めませんでした。')
-      }
-    }
+    const rs = await Promise.allSettled([...files].filter((f) => f.type.startsWith('image/')).map((f) => shrinkImage(f)))
+    const ok = rs.filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
+    if (ok.length) set({ images: [...latest.current.images, ...ok.map((r) => ({ id: uid(), dataUrl: r.value, alt: '' }))] })
+    if (ok.length < rs.length) toast('画像を読み込めませんでした。')
   }
 
   function submit() {
