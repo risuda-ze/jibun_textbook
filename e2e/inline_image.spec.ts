@@ -92,3 +92,17 @@ test('保存済みの画像を文中に置く: 編集していなければ末尾
   await expect(body.locator('img')).toHaveCount(2)
   await expect(page.locator('article.book figure')).toHaveCount(0)
 })
+
+// 複数のファイルを同時に選ぶ（#153）: 全部入る。読めない1枚が混ざっても残りは入り、トーストが出る
+test('画像を3枚同時に選ぶと3枚とも入り、読めない1枚が混ざっても残りは入る', async ({ page }) => {
+  await lessonWithDraft(page)
+  const png = (name: string) => ({ name, mimeType: 'image/png', buffer: PNG })
+  await page.locator('#imgf').setInputFiles([png('a.png'), png('b.png'), png('c.png')])
+  await expect(page.locator('.atts img')).toHaveCount(3)
+
+  await page
+    .locator('#imgf')
+    .setInputFiles([png('d.png'), { name: 'bad.png', mimeType: 'image/png', buffer: Buffer.from([1, 2, 3]) }, png('e.png')])
+  await expect(page.locator('.atts img')).toHaveCount(5)
+  await expect(page.locator('.toast')).toContainText('画像を読み込めませんでした')
+})
