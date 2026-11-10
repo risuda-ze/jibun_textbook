@@ -39,5 +39,10 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check",
     "format": "biome format --write"
+  },
+  "overrides": {
+    "workbox-build": {
+      "glob": "^14.0.2"
+    }
   }
 }
