@@ -47,7 +47,7 @@ src/
   styles.css      DESIGN.md のトークンとクラス
 tests/            Vitest（データ・守る対象・Markdown往復・AI層）
 e2e/              Playwright（完了条件をPC幅とスマホ幅で）
-docs/             実装メモ・テスト結果・あとでやること
+docs/             実装メモ・セキュリティ・Markdown 往復の計測
 ```
 
 ## コマンド

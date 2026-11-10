@@ -15,7 +15,7 @@ import { PROGRESS } from '../ai/types'
  * - danger:  赤い枠と赤い文字（outline の警告版）。取り消しにくい操作（端末から消す等）だけ。
  *            塗りにしないのは DESIGN.md の「色面は主操作の青だけ」に合わせるため
  */
-export type ButtonVariant = 'primary' | 'soft' | 'ghost' | 'outline' | 'danger'
+type ButtonVariant = 'primary' | 'soft' | 'ghost' | 'outline' | 'danger'
 
 /**
  * progress を渡すと「進行中のボタン」になる（#50）。押した瞬間に灰色になり、進んだ分（0〜100%）だけ左から青で塗る。
@@ -86,14 +86,14 @@ export function Button({
 export type PillTone = 'none' | 'ai' | 'me' | 'done' | 'warn' | 'review'
 
 export function Pill({ tone, children }: { tone: PillTone; children: ReactNode }) {
-  return <span className={tone === 'review' ? 'flag' : `chip ${tone}`}>{children}</span>
+  return <span className={`chip ${tone}`}>{children}</span>
 }
 
 /**
  * カード。既定は白地に細い罫線（White Feature Card）。
  * tone を付けると色面のカード（Accent Feature Card）になる。色面は1画面に1つまで。
  */
-export type CardTone = 'white' | 'sky' | 'marigold' | 'peach'
+type CardTone = 'white' | 'sky' | 'marigold' | 'peach'
 
 type CardProps = HTMLAttributes<HTMLElement> & { tone?: CardTone; stack?: boolean; as?: 'section' | 'div' }
 
@@ -113,20 +113,17 @@ export function PageHead({
   title,
   lead,
   actions,
-  children,
 }: {
   eyebrow?: ReactNode
   title?: ReactNode
   lead?: ReactNode
   actions?: ReactNode
-  children?: ReactNode
 }) {
   return (
     <div className="pagehead">
       <div>
         {eyebrow && <div className="eyebrow">{eyebrow}</div>}
         {title && <h1>{title}</h1>}
-        {children}
         {lead && <p className="lead">{lead}</p>}
       </div>
       {actions && <div className="row">{actions}</div>}

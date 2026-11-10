@@ -1,4 +1,5 @@
-import { getProvider, type AiError, type AiSettings, type LessonDraft, type ResearchInfo, type Usage } from '../ai'
+import { getProvider } from '../ai'
+import type { AiError, AiSettings, LessonDraft, ResearchInfo, Usage } from '../ai/types'
 import { setRunning, toast, updateLesson, type GenState } from '../store'
 import { newBlock, type Lesson, type Textbook } from '../types'
 import { splitDetail } from './common'
@@ -6,11 +7,6 @@ import { materialError, toMaterials, type MaterialInput } from './material'
 
 /** 生成の段階数（Web調査中… → 資料を作成中… → 資料ができた）。ボタンの塗りは stepPercent(step, GEN_STEPS) */
 export const GEN_STEPS = 2
-
-/** 進行中の状態。画面がボタンの塗りと中の文に使う（#55 #77） */
-export type { GenState }
-
-export const startGen = (): GenState => ({ step: 0, detail: '', hint: '', startedAt: Date.now(), endedAt: null })
 
 /**
  * Web 調査の状態を、完了の知らせに添える文にする（#81）。
@@ -83,8 +79,7 @@ export async function generateInto(
       ),
     )
     // Web 調査の状態（途中で切れた・検索が失敗した）を知らせる（#17 #81）。下書きは入るが、根拠が足りない可能性がある
-    const info = draft.research ?? (draft.truncated ? { truncated: true, searchErrors: [] } : undefined)
-    toast(`資料を生成しました${usageNote(usage)}${researchNote(usage, info)}`)
+    toast(`資料を生成しました${usageNote(usage)}${researchNote(usage, draft.research)}`)
     return true
   } catch (e) {
     const err = e as AiError
@@ -107,7 +102,8 @@ export async function startGeneration(tb: Textbook, lessonId: string, ai: AiSett
   if (controllers.has(lessonId)) return false
   const c = new AbortController()
   controllers.set(lessonId, c)
-  let g = startGen()
+  // 進行中の状態。画面がボタンの塗りと中の文に使う（#55 #77）
+  let g: GenState = { step: 0, detail: '', hint: '', startedAt: Date.now(), endedAt: null }
   setRunning(lessonId, g)
   try {
     return await generateInto(

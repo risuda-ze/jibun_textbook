@@ -1,14 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { L } from '../src/ui/labels'
-import { PNG, demoBook, writeNote } from './helpers'
+import { PNG, lessonWithDraft, writeNote } from './helpers'
 
 // 完了条件3（見たまま編集とノート）を機能ごとに分けた（#84）。1つが落ちても他の結果が見える
-async function lessonWithDraft(page: Parameters<typeof demoBook>[0]) {
-  await demoBook(page)
-  await page.getByRole('button', { name: L.generateLesson }).click()
-  await expect(page.locator('.doc [data-by="ai"]')).toHaveCount(3)
-}
-
 test('見たまま編集: 直すと「自分で修正」になり、状態が「書き込みあり」に変わる', async ({ page }) => {
   await lessonWithDraft(page)
   const first = page.locator('.doc [data-by="ai"]').first()

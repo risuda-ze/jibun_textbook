@@ -1,12 +1,11 @@
 import { L } from './labels'
-import { clearLesson, type Lesson, type Textbook } from '../types'
+import { clearLesson, type Block, type Lesson, type Textbook } from '../types'
 import { STATUS_LABEL, lessonStatus, statusCounts, type Status } from '../lib/status'
-import { MODELS, type AiKind } from '../ai/types'
-import { WEB_SEARCH_USD_PER_1000 } from '../ai'
+import { MODELS, PROGRESS, WEB_SEARCH_USD_PER_1000, type AiError, type AiKind, type Progress, type Usage } from '../ai/types'
 import { markExported, putBook, setAi, snapshot, toast, updateLesson, useApp } from '../store'
-import { SIZE_WARN_BYTES, byteSize, exportJson, fileName, formatSize } from '../lib/io'
-import { downloadText } from '../lib/download'
-import { PROGRESS, type AiError, type Progress, type Usage } from '../ai/types'
+import { SIZE_WARN_BYTES, byteSize, exportJson, fileName, formatSize, safeName } from '../lib/io'
+import { downloadBlob, downloadText } from '../lib/download'
+import { bookZip } from '../lib/mdexport'
 import { useEffect, useRef, useState, type InputHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 import { Button, Card, Pill, Segmented, type Busy } from './kit'
 
@@ -20,12 +19,24 @@ export function StatusChip({ lesson }: { lesson: Lesson }) {
   )
 }
 
+/** 元に戻せる操作の型（#128）。変更の前に snapshot を取り、変更のあと「元に戻す」付きのトーストを出す */
+export function withUndo(tbId: string, msg: string, fn: () => void): void {
+  const before = snapshot(tbId)
+  fn()
+  toast(msg, before ? () => putBook(before) : undefined)
+}
+
+/** 本文の1要素を書き換える（#128）。無ければ何もしない。レッスンと通読で共用 */
+export const patchBlock = (tbId: string, lessonId: string, blockId: string, fn: (x: Block) => void): void =>
+  updateLesson(tbId, lessonId, (l) => {
+    const x = l.blocks.find((y) => y.id === blockId)
+    if (x) fn(x)
+  })
+
 /** 「資料を消す」（#104）。確認のあと節の資料をまっさらにし、元に戻せる知らせを出す。ロードマップとレッスンで共用 */
 export function clearLessonWithUndo(tb: Textbook, lessonId: string): void {
   if (!window.confirm('この節の資料をすべて消します。自分のノートも消えます。')) return
-  const before = snapshot(tb.id)
-  updateLesson(tb.id, lessonId, (l) => Object.assign(l, clearLesson(l)))
-  toast('資料を消しました', before ? () => putBook(before) : undefined)
+  withUndo(tb.id, '資料を消しました', () => updateLesson(tb.id, lessonId, (l) => Object.assign(l, clearLesson(l))))
 }
 
 const METER_COLOR: Record<Status, string> = { done: 'var(--st-done)', me: 'var(--st-me)', ai: 'var(--st-ai)', none: 'transparent' }
@@ -50,8 +61,6 @@ export function Meter({ tb }: { tb: Textbook }) {
 
 const KINDS: [AiKind, string][] = [
   ['anthropic', 'Anthropic API'],
-  ['compat', 'OpenAI互換API'],
-  ['local', 'ローカル'],
   ['demo', 'デモ応答'],
 ]
 
@@ -125,11 +134,6 @@ export function AiBar() {
           </label>
         </div>
       )}
-      {(ai.kind === 'compat' || ai.kind === 'local') && (
-        <p className="sub">
-          この接続先はまだ使えません。次の段階で対応します。{ai.kind === 'local' && 'ローカルのモデルはPCでだけ使える予定です。'}
-        </p>
-      )}
       {ai.kind === 'demo' && <p className="sub">APIキーなしで動線を試すための見本を返します。調査はしません。</p>}
     </Card>
   )
@@ -171,24 +175,6 @@ export function Steps({ labels, step, detail }: { labels: string[]; step: number
       ))}
     </ol>
   )
-}
-
-/**
- * 生成の中止（#14）。start() で新しい AbortController を作って signal を返し、stop() で中止する。
- * 画面を離れる（unmount）ときも自動で中止する。
- */
-export function useAbort(): { start: () => AbortSignal; stop: () => void } {
-  const ref = useRef<AbortController | null>(null)
-  useEffect(() => () => ref.current?.abort(), [])
-  return {
-    start: () => {
-      ref.current?.abort()
-      const c = new AbortController()
-      ref.current = c
-      return c.signal
-    },
-    stop: () => ref.current?.abort(),
-  }
 }
 
 /**
@@ -266,11 +252,18 @@ export function downloadBook(tb: Textbook): void {
   )
 }
 
+/** Markdown 書き出し（#136）。zip（<名前>.md と img/）。端末間の受け渡しではないので「最後の書き出し日」は動かさない */
+export function downloadMarkdown(tb: Textbook): void {
+  const zip = bookZip(tb)
+  downloadBlob(`${safeName(tb)}.zip`, new Blob([zip as Uint8Array<ArrayBuffer>], { type: 'application/zip' }))
+  toast(`Markdown を書き出しました（${formatSize(zip.byteLength)}）`)
+}
+
 /** 使った量（検索回数・トークン）の1行。無ければ出さない */
 export function UsageLine({ usage }: { usage: Usage | null }) {
   if (!usage || (!usage.inputTokens && !usage.searches)) return null
   return (
-    <p className="usage">
+    <p className="usage mono">
       検索 {usage.searches}回 / 入力 {usage.inputTokens.toLocaleString()} / 出力 {usage.outputTokens.toLocaleString()} トークン
     </p>
   )
@@ -297,7 +290,9 @@ export function useAiRun() {
   const [startedAt, setStartedAt] = useState<number | null>(null)
   const [endedAt, setEndedAt] = useState<number | null>(null)
   const [error, setError] = useState('')
-  const abort = useAbort()
+  // 中止（#14）。run ごとに新しい AbortController を作り、画面を離れる（unmount）ときも中止する
+  const abort = useRef<AbortController | null>(null)
+  useEffect(() => () => abort.current?.abort(), [])
   const seconds = useElapsed(busy, startedAt, endedAt)
   async function run<T>(fn: (progress: Progress, signal: AbortSignal) => Promise<T>, doneStep?: number): Promise<T | null> {
     setBusy(true)
@@ -306,11 +301,13 @@ export function useAiRun() {
     setText({ detail: '', hint: '' })
     setStartedAt(Date.now())
     setEndedAt(null)
+    abort.current?.abort()
+    abort.current = new AbortController()
     try {
       const r = await fn((s, d) => {
         setStep(s)
         setText((cur) => splitDetail(cur, d))
-      }, abort.start())
+      }, abort.current.signal)
       if (doneStep !== undefined) setStep(doneStep)
       return r
     } catch (e) {
@@ -324,5 +321,5 @@ export function useAiRun() {
     }
   }
   const working: Busy | null = busy ? { label: text.detail, seconds, title: text.hint } : null
-  return { busy, step, detail: text.detail, hint: text.hint, working, error, setError, run, stop: abort.stop }
+  return { busy, step, detail: text.detail, hint: text.hint, working, error, setError, run, stop: () => abort.current?.abort() }
 }

@@ -47,7 +47,6 @@ export const AI_MSG = {
   refusal: `${AI_KEY.refusal}。言い回しを変えるか、モデルを切り替えてください。`,
   api: (status: string | number, detail: string) => `${AI_KEY.api}（${status}）: ${detail}`,
   parse: 'AIの返答を読み取れませんでした。もう一度お試しください。',
-  unsupported: 'この接続先はまだ使用できません（Phase 2で対応予定です）。Anthropic API かデモ応答をお選びください。',
   noLesson: '節が見つかりませんでした。',
   aborted: '生成をやめました。',
 } as const

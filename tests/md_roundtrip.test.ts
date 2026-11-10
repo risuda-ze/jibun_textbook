@@ -25,6 +25,8 @@ describe('往復で一字一句保たれる（same）', () => {
     ['画像', '![説明](https://example.com/a.png)'],
     ['画像（data URL）', '![](data:image/png;base64,iVBORw0KGgo=)'],
     ['段落', '一段落目\n\n二段落目'],
+    ['単一改行（breaks: true で <br>。#148 で行末の空白2つを付けない）', '一行目\n二行目'],
+    ['引用', '> 引用した文\n> 二行目'],
     ['エスケープ', '1 < 2 && 3 > 2 の "引用符"'],
     ['長い文', 'あ'.repeat(120)],
   ]
@@ -40,11 +42,9 @@ describe('文字列は変わるが意味は同じ（equiv・stable）', () => {
     ['番号付きの入れ子', '1. 一\n   - 一の子\n   - 一の子2\n2. 二', '1.  一\n    -   一の子\n    -   一の子2\n2.  二'],
     ['表（区切り行が | --- | になる）', '| BPM | 30fps |\n|---|---|\n| 120 | 15 |', '| BPM | 30fps |\n| --- | --- |\n| 120 | 15 |'],
     ['表の揃え', '| 左 | 中 | 右 |\n|:--|:-:|--:|\n| a | b | c |', '| 左 | 中 | 右 |\n| :-- | :-: | --: |\n| a | b | c |'],
-    ['引用（行末に空白2つ）', '> 引用した文\n> 二行目', '> 引用した文  \n> 二行目'],
     ['水平線（--- が * * * になる）', '上\n\n---\n\n下', '上\n\n* * *\n\n下'],
-    ['単一改行（breaks: true で <br>。行末に空白2つ）', '一行目\n二行目', '一行目  \n二行目'],
     ['チェックリスト（記号の後の空白が3つになる。箱はクリックで切り替えられる #56）', '- [ ] 未\n- [x] 済', '-   [ ] 未\n-   [x] 済'],
-    ['アスタリスクの文字（\\ でエスケープ）', '価格は 5*3 で 15 です', '価格は 5\\*3 で 15 です'],
+    ['アスタリスクの文字（#147: エスケープしない。単独の * は文字のまま）', '価格は 5*3 で 15 です', '価格は 5*3 で 15 です'],
     [
       '表の中の改行（<br> のまま残る #48）',
       '| 項目 | 説明 |\n|---|---|\n| A | 一行目<br>二行目 |',
@@ -60,26 +60,79 @@ describe('文字列は変わるが意味は同じ（equiv・stable）', () => {
   }
 })
 
+describe('本文の中の画像の参照記法（#125）', () => {
+  const images = [{ id: 'abcdefgh-1234', dataUrl: 'data:image/png;base64,AA==', alt: '' }]
+  const backEdit = (md: string) => htmlToMd(mdToHtml(md, images, 'edit'))
+  it('編集のチップは往復で一字一句 ![](img:ID) に戻る（文の途中でも・無い ID でも）', () => {
+    for (const md of ['前\n\n![](img:abcdefgh-1234)\n\n後', '文の途中に![](img:abcdefgh-1234)置く', '![](img:nothing)'])
+      expect(backEdit(md)).toBe(md)
+  })
+})
+
+describe('見たまま編集の Enter は行（<br>）、空行は段落（#148）', () => {
+  it('1行ずつ <br> で打った表は Markdown の表になる', () => {
+    const md = htmlToMd('<p>本文。<br>|a|b|<br>|-|-|<br>|1|2|</p>')
+    expect(md).toBe('本文。\n|a|b|\n|-|-|\n|1|2|')
+    expect(mdToHtml(md)).toContain('<table')
+    expect(stable(md)).toBe(true)
+  })
+  it('<br> で打ったリストは tight list になる（<li> の中に <p> が無い）', () => {
+    // 「- 」は #146（エスケープ無効化）が入るまで \\- になるため、turndown がエスケープしない「1) 」で確かめる
+    const md = htmlToMd('<p>1) 一<br>2) 二</p>')
+    expect(md).toBe('1) 一\n2) 二')
+    expect(mdToHtml(md)).toContain('<li>一</li>')
+  })
+  it('<br> が2つ続く（空行）と段落の区切り \\n\\n になる', () => {
+    expect(htmlToMd('<p>一段落目<br><br>二段落目</p>')).toBe('一段落目\n\n二段落目')
+    // ブラウザがブロックを分けたときの空の段落と末尾の <br> は消える
+    expect(htmlToMd('<p>一段落目<br><br></p><p><br></p><p>二段落目</p>')).toBe('一段落目\n\n二段落目')
+  })
+  it('li の末尾に残った <br> は消え、tight list のまま（Enter 2回で次の項目にしたとき）', () => {
+    const md = htmlToMd('<ul><li>一<br><br></li><li>二</li></ul>')
+    expect(md).toBe('-   一\n-   二')
+    expect(mdToHtml(md)).toContain('<li>一</li>')
+  })
+})
+
 describe('崩れる・落ちる（意図したものと、直す対象）', () => {
   it('HTML の直書きは、許可された要素だけ残り、style などの装飾は落ちる（意図どおり。DOMPurify）', () => {
     expect(back('<b>太字</b>と<span style="color:red">赤</span>')).toBe('**太字**と赤')
   })
   it('危険な HTML は落ちる', () => {
     expect(mdToHtml('<img src=x onerror="alert(1)"><script>alert(1)</script>')).not.toMatch(/onerror|<script/)
+    // 本文に直書きした target は落とし、同一タブで開く（#88）
+    expect(mdToHtml('<a href="https://example.com" target="_blank">x</a>')).not.toMatch(/target=/)
   })
 })
 
-describe('見たまま編集で文字として打った記法（#76）', () => {
-  it('[文](http(s) の URL) はリンクの記法に戻り、描画でリンクになる', () => {
+describe('見たまま編集で文字として打った記法は Markdown として扱う（#76 #145 → #147）', () => {
+  it('[文](URL) はリンクになる', () => {
     const md = htmlToMd('<p>編集中に [ツール](https://creatools.dev/color-palette) を使うと</p>')
     expect(md).toBe('編集中に [ツール](https://creatools.dev/color-palette) を使うと')
     expect(mdToHtml(md)).toContain('<a href="https://creatools.dev/color-palette">ツール</a>')
     expect(stable(md)).toBe(true)
   })
-  it('URL でないものは文字のまま（リンクにしない）', () => {
-    const md = htmlToMd('<p>[メモ](後で) と [x](javascript:alert(1)) を書く</p>')
-    expect(md).toBe('\\[メモ\\](後で) と \\[x\\](javascript:alert(1)) を書く')
-    expect(mdToHtml(md)).not.toContain('<a ')
-    expect(mdToHtml(md)).toContain('[メモ](後で)')
+  it('**文** と `文` は太字・コードになる', () => {
+    const md = htmlToMd('<p>それぞれの効果を確認する。**パンク・膨張**：パスの点を `Alt` で動かす</p>')
+    expect(md).toBe('それぞれの効果を確認する。**パンク・膨張**：パスの点を `Alt` で動かす')
+    expect(mdToHtml(md)).toContain('<strong>パンク・膨張</strong>')
+    expect(mdToHtml(md)).toContain('<code>Alt</code>')
+    expect(stable(md)).toBe(true)
+  })
+  it('段落の先頭の # と - は見出し・箇条書きになる（入力欄と同じ規則）', () => {
+    const md = htmlToMd('<p># 見出し</p><p>- 一</p><p>- 二</p>')
+    expect(mdToHtml(md)).toContain('<h1>見出し</h1>')
+    expect(mdToHtml(md)).toMatch(/<li>(?:<p>)?一(?:<\/p>)?\s*<\/li>\s*<li>(?:<p>)?二/)
+  })
+  it('対になっていない * や空白で囲まれた * は文字のまま（CommonMark の規則）', () => {
+    const md = htmlToMd('<p>2 * 3 = 6 と **強調 の片割れ</p>')
+    expect(md).toBe('2 * 3 = 6 と **強調 の片割れ')
+    expect(mdToHtml(md)).not.toContain('<strong>')
+  })
+  it('文字として保ちたい記号は自分で \\ を付ける（入力欄と同じ）', () => {
+    const md = htmlToMd('<p>\\*注\\* は文字</p>')
+    expect(md).toBe('\\*注\\* は文字')
+    expect(mdToHtml(md)).toContain('*注*')
+    expect(mdToHtml(md)).not.toContain('<em>')
   })
 })

@@ -18,7 +18,8 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
-const readAsDataUrl = (f: Blob): Promise<string> =>
+/** Blob を data URL にする。画像の縮小と PDF の資料（material.ts）で共用 */
+export const readAsDataUrl = (f: Blob): Promise<string> =>
   new Promise((res, rej) => {
     const r = new FileReader()
     r.onload = () => res(String(r.result))
@@ -26,10 +27,12 @@ const readAsDataUrl = (f: Blob): Promise<string> =>
     r.readAsDataURL(f)
   })
 
-export async function shrinkImage(input: Blob | string, max = MAX_EDGE, quality = 0.85): Promise<string> {
+const QUALITY = 0.85
+
+export async function shrinkImage(input: Blob | string): Promise<string> {
   const src = typeof input === 'string' ? input : await readAsDataUrl(input)
   const img = await loadImage(src)
-  const { w, h } = fitSize(img.naturalWidth, img.naturalHeight, max)
+  const { w, h } = fitSize(img.naturalWidth, img.naturalHeight)
   const c = document.createElement('canvas')
   c.width = w
   c.height = h
@@ -37,7 +40,7 @@ export async function shrinkImage(input: Blob | string, max = MAX_EDGE, quality 
   x.fillStyle = '#fff'
   x.fillRect(0, 0, w, h)
   x.drawImage(img, 0, 0, w, h)
-  const webp = c.toDataURL('image/webp', quality)
+  const webp = c.toDataURL('image/webp', QUALITY)
   // WebPに書けないブラウザはPNGを返すので、その場合はJPEGにする
-  return webp.startsWith('data:image/webp') ? webp : c.toDataURL('image/jpeg', quality)
+  return webp.startsWith('data:image/webp') ? webp : c.toDataURL('image/jpeg', QUALITY)
 }

@@ -52,11 +52,13 @@ export function statusCounts(tb: Textbook): Record<Status, number> {
 export const reviewCount = (tb: Textbook): number => allLessons(tb).filter((l) => l.review).length
 
 const plain = (md: string): number => md.replace(/[#*_`>\-|\s]/g, '').length
+/** ブロックの重み。文字数に画像1枚 40 字を足す */
+const weight = (b: Block): number => plain(b.md) + b.images.length * 40
 
 /** 節の中で自分の言葉が占める割合（%） */
 export function minePercent(l: Lesson): number {
-  const total = l.blocks.reduce((a, b) => a + plain(b.md) + b.images.length * 40, 0)
+  const total = l.blocks.reduce((a, b) => a + weight(b), 0)
   if (!total) return 0
-  const mine = l.blocks.filter(isMine).reduce((a, b) => a + plain(b.md) + b.images.length * 40, 0)
+  const mine = l.blocks.filter(isMine).reduce((a, b) => a + weight(b), 0)
   return Math.round((mine / total) * 100)
 }

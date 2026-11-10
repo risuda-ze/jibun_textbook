@@ -32,7 +32,7 @@
 - **refusal**: `claude-opus-5` / `claude-fable-5-1` 向けのサーバー側フォールバック（ベータ）は入れていない。
   応答を控えられたら、その旨とモデル切り替えを案内する
 - **検索チップ**（#17）: 参考情報の検索語は Google 検索の URL に固定（`LessonPage.tsx` の `gq`）。検索エンジンの切り替えは設けない
-- **`breaks: true`**（#17）: 単一改行を `<br>` にする設定の副作用は `docs/markdown_roundtrip.md` で実測済み。往復後に行末空白2つが付くが、2回目以降は安定する。変更しない
+- **`breaks: true`**（#17）: 単一改行を `<br>` にする設定の副作用は `docs/markdown_roundtrip.md` で実測済み。変更しない。往復後の行末空白2つは #148 で付けなくなった（表の外の `<br>` は改行1つに戻す）
 - **見たまま編集への貼り付け**（#17）: 文字だけ受け付ける。装飾つき HTML は落とし、画像は断る（ノートの「画像を入れる」を使う）
 - **読み込む JSON の上限**（#17）: 16MB。超えたら `JSON.parse` の前に断る
 - **保存失敗**（#17）: IndexedDB に書けなかったら画面の変更も取り消す。読めない教科書は本棚で知らせ、生データを書き出すか消せる
@@ -55,49 +55,54 @@
 
 - default ブランチは **`production`**（配信される状態）。統合ブランチは **`develop`**
 - 作業は Issue ごとに `feat/<Issue番号>_<概要>` を `develop` から切り、`develop` に向けて PR を出す。`develop → production` も PR で行う
-- Rulesets により `develop` と `production` は直接 push できず、線形履歴（squash か rebase でマージ）と CI の3ジョブ成功が必須
-- 配信用のタグ `vX.Y.Z` は `production` のコミットに打つ。タグは打ち直せない（`version-rule`）ので、打つ前に対象コミットを確かめる
+- Rulesets により `develop` と `production` は直接 push できず、線形履歴（squash か rebase でマージ）と CI の成功が必須
+- 配信用のタグ `vX.Y.Z` は人が打たない。リリース PR で `package.json` の `version` を上げると、`production` への push で `release.yml` が `v<version>` を打つ（下の「配信」）。タグは打ち直せない（`version-rule`）
 
 ### CI（`.github/workflows/ci.yml`）
 
-Pull Request と `develop` / `production` への push で3つのジョブが走る。配信はしない。
+Pull Request と `develop` / `production` への push で走る。配信はしない。ジョブの内容と落ちる条件は `ci.yml` を参照。
 （push を `develop` と `production` に絞るのは、PR を開いているブランチで push と pull_request の両方が発火して同じコミットが2回走るのを防ぐため。ブランチの検証は PR で行う）
-
-| ジョブ | 内容 | 落ちる条件 |
-|---|---|---|
-| `check` | `npm run typecheck` → `npm test` → `npm run build` | 型エラー・単体テスト失敗・ビルド失敗 |
-| `audit` | `npm audit --audit-level=high` | **high 以上の脆弱性が1件でもある**。moderate 以下は Dependabot の更新 PR に任せる |
-| `e2e` | Playwright（Chromium）で `npm run e2e`。デモ応答だけを使い外部につながない | 通しテスト失敗。失敗時は `playwright-report/` と `test-results/` が artifact に残る |
 
 Dependabot（`.github/dependabot.yml`）は npm を毎週月曜、GitHub Actions を毎月見て更新 PR を出す。
 minor と patch は1本にまとめる。Dependabot alerts と security updates はリポジトリ設定で有効にしてある。
-Rulesets: `develop-rule` と `production-rule` が PR 必須・線形履歴・required checks（CI の3ジョブ）を課す。`version-rule` は `v*` タグの更新と削除を禁止する。
+Rulesets: `develop-rule` と `production-rule` が PR 必須・線形履歴・required checks（`ci.yml` のジョブ）を課す。`version-rule` は `v*` タグの更新と削除を禁止する。
 
-### 配信（`.github/workflows/deploy.yml`）
+### 配信（`.github/workflows/release.yml`・2026-09-25 に `deploy.yml` と統合・#132）
 
-GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`v*` タグの push と手動実行でだけ配信する**。
-ブランチへの push では配信しない。配信のタイミングは人が握る。
+GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`production` への push で `package.json` の `version` が上がっていたときだけ配信する**。
+タグ・Release（zip）・Pages 配信が1つの run で終わる（ビルドは1回。配信したサイトと zip は同じ成果物）。
 
 1. リポジトリを public にする（Pages の無料枠は public が条件）
 2. Settings → Pages → Source を「GitHub Actions」にする
-3. `git tag vX.Y.Z && git push origin vX.Y.Z` で配信される（`release.yml` があれば Release も同時に発行される）
-4. 手動で配信し直す: `gh workflow run deploy.yml -f ref=vX.Y.Z`（`ref` が空なら実行元の `production`）
-5. Android の Chrome で配信 URL を開き、メニューから「ホーム画面に追加」
+3. リリース PR（`develop → production`）で `package.json` の `version` を上げる。これが配信の合図
+4. マージすると `release.yml` が走る: `tag`（`v<version>` を打つ。既にあれば以降を skip）→ `build`（`npm test` → `npm run build`）→ `deploy`（Pages）と `release`（zip を Release に添付・`generate_release_notes`）
+5. 手動で配信し直す: Actions → Release → Run workflow → `tag` に既存のタグ名（例: `v0.2.1`）。そのタグの内容でビルドし直して配信と Release を更新する。
+   コマンドなら `gh workflow run release.yml --ref production -f tag=vX.Y.Z`
+6. Android の Chrome で配信 URL を開き、メニューから「ホーム画面に追加」
 
-注意: ワークフローは**タグ先のコミットに入っている定義**で動く。古いコミットにタグを打つと、その時点に
-`deploy.yml` の新しい定義が無いので自動では走らない。その場合は 4 の手動実行で `ref` にタグを指定する。
-リポジトリ名を変えるなら `vite.config.ts` の `base` も変える。
-- **`github-pages` 環境の配信ルールにタグの許可が要る**。環境の Deployment branches が「production ブランチだけ」だと、タグからの配信は `Tag "vX.Y.Z" is not allowed to deploy to github-pages due to environment protection rules` で失敗する（Release の方は環境を使わないので成功する）。v0.2.0 で起きたので、環境に「tag `v*`」の許可を足した。確認と追加は次のコマンド
+- `version` を上げない push（docs だけの修正など）ではタグが既にあるので何も起きない（壊れない）。上げ忘れたら、上げる PR をもう1本出す
+- 同じ `version` で2回目は出ない。タグは打ち直せない（`version-rule`）ので、`version` は必ず前に進める。`version` が `X.Y.Z` の形式でなければ `tag` ジョブで止まる
+- リポジトリ名を変えるなら `vite.config.ts` の `base` も変える
+- **`github-pages` 環境の Deployment branches に `production` の許可が要る**（run はブランチ push から始まるため）。無いと `deploy` が
+  `Branch "production" is not allowed to deploy to github-pages due to environment protection rules` で失敗する（`release` は環境を使わないので成功する）。
+  v0.2.0 のときに足した「tag `v*`」の許可は残してよい。確認と追加は次のコマンド
 
   ```bash
   gh api repos/risuda-ze/jibun_textbook/environments/github-pages/deployment-branch-policies --jq '.branch_policies[] | "\(.type // "branch") \(.name)"'
   ```
 
   ```bash
-  gh api -X POST repos/risuda-ze/jibun_textbook/environments/github-pages/deployment-branch-policies -f name='v*' -f type=tag
+  gh api -X POST repos/risuda-ze/jibun_textbook/environments/github-pages/deployment-branch-policies -f name='production' -f type=branch
   ```
 
   失敗した配信は `gh run rerun <run id> --failed` で再実行できる（タグは打ち直せない）
+
+### 発行（`.github/workflows/release.yml`）
+
+Release（`dist/` の zip を添付・`softprops/action-gh-release`）は上の「配信」と同じ run の `release` ジョブが作る。**`version` を上げたリリース PR のマージ = タグ + Release + 配信**。
+手順は「配信」の 3〜5 と同じ。`deploy` と `release` は権限も失敗も独立（片方が落ちても、もう片方は出る）。
+
+zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても動かない。Pages 配下で動く前提の成果物。
 
 ## 文言のルール（2026-09-22・#4）
 
@@ -108,7 +113,7 @@ GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`v*` タグ�
 - 文末は「〜します」「〜しました」「〜できません」「〜してください」。体言止めの文は敬体に直す（「節がない。」→「節がありません。」）
 - 語彙は変えない（「消す」を「削除する」にしない）。文体だけを揃える
 - AI へのプロンプト（`src/ai/anthropic.ts` の system / user prompt）と、デモ応答が返す教科書の本文（`src/ai/demo.ts`）は画面の文言ではないので対象外。デモ応答の進行表示（「Web調査はしません」）は対象
-- e2e（`e2e/flow.spec.ts`）は画面の文をそのまま照合しているので、文を変えたら追随させる
+- e2e が操作に使う文言は `src/ui/labels.ts` に置き、UI と e2e が同じ定数を読む（#84）。文を変えるときはそこを直す
 
 ## 2026-09-22 の判断（Issue 本文に無いもの）
 
@@ -120,21 +125,6 @@ GitHub Pages（https://risuda-ze.github.io/jibun_textbook/ ）。**`v*` タグ�
 ## 実APIで分かったこと
 
 （キーを入れて試したら、ここに書く）
-
-### 発行（`.github/workflows/release.yml`）
-
-`v*` タグを打つと、その時点の `dist/` を zip にして GitHub Release に添付する（`softprops/action-gh-release`）。配信（`deploy.yml`）と同じトリガーなので、**タグ = Release + 配信**。
-
-1. `package.json` の `version` を上げてコミットし、`production` まで入れる
-2. `production` のそのコミットに `git tag vX.Y.Z && git push origin vX.Y.Z`。`release.yml` と `deploy.yml` が走る
-3. タグ名は `vX.Y.Z` だけを受け付ける。両ワークフローの最初のステップで形式を確かめ、違えば何もしない
-4. 手動で発行し直す: `gh workflow run release.yml --ref production -f tag=vX.Y.Z`
-
-**v0.1.0 の発行（初回生成 `6a96429`）**: この時点のコミットに `release.yml` は無いので、タグを push しても自動では走らない。
-`gh workflow run release.yml --ref production -f tag=v0.1.0` で発行する（この PR が `production` に入った後）。**配信はしない**。理由: Pages には既に新しい `production` の内容が配信されており、
-v0.1.0（初回生成の状態）を配信すると画面が巻き戻るため。v0.1.0 は「この時点の状態」を固定して参照するための Release で、配信の対象は次のタグから。
-
-zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても動かない。Pages 配下で動く前提の成果物。
 
 ## 2026-09-23 の判断（#12）
 
@@ -232,3 +222,38 @@ zip は `base` が `/jibun_textbook/` のため、解凍して直接開いても
 - 入力欄の `NoteDraft.images` は `{ dataUrl, alt }[]` にした。下書きは端末に保存しないので移行は無い
 - `figcaption` は `alt` が空なら出さない。`<img alt>` は空なら従来どおり「自分で入れた画像」
 
+
+## 2026-11-09 の判断（#136・Markdown 書き出し）
+
+- 出力は zip 1つ（`<名前>.zip`）。中は `<名前>.md` と `img/<画像ID>.<拡張子>`。名前は JSON と同じ `safeName`（OS が嫌う文字を `_`・40 文字まで）。拡張子は data URL の MIME から（jpeg → jpg、svg+xml → svg）
+- `.md` の形: frontmatter（`title` / `goal` / `created`。文字列は JSON 形式の二重引用符で 1 行）→ `# 章` → `## 節` → 狙い → ブロックを本文の順に平文で → 節末に `**参考情報**`（`- 検索: 語` と `- [題名](URL)`）。書き手の印・手を動かす・確かめ方・渡した資料の名前は出さない。本文の中の見出し（AI の `###`）はそのまま
+- ブロック: 本文の `img:<ID>` は `img/<ID>.<拡張子>` に置き換え、参照していない画像は本文の直後に `![](img/…)` で並べる。無い ID は「（消した画像）」。引用は `> ` の行、出典は `出典: <URL>` の 1 行
+- 表示できない画像（`data:image/` でない）は本文にも zip にも出さない。http(s) でないリンクは文字だけ出す（`safe.ts` と同じ基準）
+- zip は `fflate` の `zipSync`（画像は縮小時に圧縮済みなので `level: 0`）。「最後の書き出し日」は JSON のバックアップの印なので Markdown では動かさない
+- 置き場所: 本棚のカード「MD書出」（JSON書出の隣）とロードマップ「Markdownを書き出す」（JSONを書き出すの隣）
+
+## 2026-09-26 の判断（#125・画像を本文の中に置く）
+
+- 本文の Markdown に参照記法 `![](img:<ID>)` を書き、描画時に同じブロックの `images[]` から引く。保存形式は変えない（`schemaVersion` 1・画像の本体は `images[]` のまま）。古い JSON は参照が無いので今までどおり下に出る
+- 画像の説明（alt）の UI（#13 の `AltInput`・保存済み画像のクリック編集・`figcaption`）は消し、代わりに画像の **ID**（先頭8文字・`title` に全文）と「文中に置く」を出す。スキーマの `alt` は既定 `''` で残す（互換）。`<img alt>` は本文の中では空、下に出るものは固定文
+- 1つの画像は本文で1回だけ参照できる（入力欄では2回目のボタンを無効に）。参照した画像は本文の下に出さないので、保存済みの画像は参照するとボタンごと下から消える。同じ画像を2か所に置きたければ2回入れる
+- 見たまま編集では画像そのものではなく `[画像: <ID>]` のチップ（`contenteditable="false"`）を出す。turndown の rule が `data-id` から記法へ戻すので往復が厳密に `img:<ID>` に戻り、data URL が本文に混ざらない。DOMPurify は `contenteditable` を既定で落とすため、編集の描画だけ `ADD_ATTR` で許す
+- 保存済みの画像の「文中に置く」は、本文を見たまま編集中（フォーカスあり）ならカレットにチップを Range で差し込み（#88 と同じ・確定は blur）、そうでなければ本文の末尾に記法を足して保存する。ボタンの mousedown は既定を止めて本文のフォーカスを奪わない
+- 画像を × で外すとき（入力欄・保存済みの両方）は本文の参照も `removeRef` で消す。参照が残った id は「（消した画像）」と出て壊れない
+- Markdown 書き出し（#136）では `img:<ID>` を `img/<ID>.<拡張子>` に置き換える前提（ID がそのままファイル名）
+
+## 2026-09-25 の判断（#126 #127 #130・保守性）
+
+- 工場関数（`newBlock` / `newLesson` / `newTextbook`）は必須項目だけを `*Z.parse()` に通し、`extra` はその上に spread する。`extra` を parse に入れない理由は、zod が入れ子を複製して `newTextbook('本', { chapters: [ch] })` の `ch` と同一でなくなるため（`tests/protect.test.ts` は同一性で守る節を確かめる）。JSON の形とキーの順は前と同じ（`tests/data.test.ts` が直書きの形と照合）
+- 未実装の接続先（OpenAI互換・ローカル）は型・選択肢・文・分岐ごと消した。端末の設定に `compat` / `local` が残っていても `store.init` が `anthropic` に寄せる。Phase 2 で実装するときに `AiKind` と `KINDS` に戻す
+- `migrate()` の `opts` を消したので、2段の移行の単体（今の版を 2 に差し替える）は消した。版 2 ができたら旧版の見本 JSON で実際の移行関数を試す（規約どおり）
+- `kb`（資料の大きさ）は `formatSize` に寄せていない。表記が `200KB` → `200 KB` に変わり、Help の行・e2e・messages の KEY を同じ PR で直す必要があるため（別 PR）
+- AI 層の記号は `../ai/types` からだけ import する。`../ai` は `getProvider` だけ（`export * from './types'` は消した）
+- `MATERIAL_MSG.unreadable` の詳細は固定文（`ファイルを読めませんでした。`）。`file.text()` の例外文は英語で、前の FileReader の包みも固定文だったので出る文は変わらない
+
+## 2026-09-25 の判断（#123・ロードマップの操作）
+
+- 節の行のメニュー（∧ ∨ 別の章へ…）は「選んでいる行」に出す。開閉の状態は持たず、選択＝開く。`.chlist` と章構成が同じ `lessonItem` を描くので、スマホ幅でも同じ行に出る
+- スマホ幅の一覧で行を選んだときに詳細カードへ自動で飛ぶのをやめた。行にメニューが開いた直後に画面が飛ぶと、開いたメニューが見えなくなるため。詳細は下にスクロールすれば見える
+- 「この節を消す」の × は今までどおり確認ダイアログは無し（元に戻せるトーストだけ）。「資料を消す」だけが確認を出す
+- CSS の行の見た目は `.lessonlist li > button` に絞った。行の中のメニューのボタンにも `.lessonlist button` が当たって崩れるため。e2e の行の選択も同じセレクタ

@@ -1,29 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { htmlToMd, mdToHtml, toggleTask } from '../src/lib/md'
-
-const roundTrip = (md: string) => htmlToMd(mdToHtml(md))
-
-describe('見たまま編集とMarkdownの往復', () => {
-  it('見出し・強調・箇条書き', () => {
-    expect(roundTrip('### 見出し\n\n本文に**強調**がある。')).toBe('### 見出し\n\n本文に**強調**がある。')
-    expect(roundTrip('- 一\n- 二')).toMatch(/^-\s+一\n-\s+二$/)
-  })
-  it('コードブロックは中身が変わらない', () => {
-    const md = '```\nlet s2 = s1;\nprintln!("{}", s1);\n```'
-    expect(roundTrip(md)).toContain('let s2 = s1;\nprintln!("{}", s1);')
-    expect(roundTrip(md)).toMatch(/^```/)
-  })
-  it('表は表のまま', () => {
-    const out = roundTrip('| BPM | 30fps |\n|---|---|\n| 120 | 15 |')
-    expect(out).toContain('| BPM | 30fps |')
-    expect(out).toContain('| 120 | 15 |')
-  })
-  it('危険なHTMLは落とす', () => {
-    expect(mdToHtml('<img src=x onerror="alert(1)"><script>alert(1)</script>')).not.toMatch(/onerror|<script/)
-    // 本文に直書きした target は落とし、同一タブで開く（#88）
-    expect(mdToHtml('<a href="https://example.com" target="_blank">x</a>')).not.toMatch(/target=/)
-  })
-})
+import { mdToHtml, refIds, removeRef, toggleTask } from '../src/lib/md'
 
 describe('チェックリストの切り替え（#56）', () => {
   it('チェックボックスは disabled なしで描画される', () => {
@@ -41,5 +17,31 @@ describe('チェックリストの切り替え（#56）', () => {
   it('範囲外やチェック項目以外は変えない', () => {
     expect(toggleTask('- [ ] 未', 3)).toBe('- [ ] 未')
     expect(toggleTask('本文 [ ] ではない', 0)).toBe('本文 [ ] ではない')
+  })
+})
+
+describe('本文の中の画像の参照記法 ![](img:ID)（#125）', () => {
+  const images = [{ id: 'abcdefgh-1234', dataUrl: 'data:image/png;base64,AA==', alt: '' }]
+  it('読み取りでは images[] の data URL の <img>、説明は空', () => {
+    expect(mdToHtml('前\n\n![](img:abcdefgh-1234)\n\n後', images)).toContain('<img src="data:image/png;base64,AA==" alt="">')
+  })
+  it('編集ではチップ（contenteditable="false"・data-id が残る）。data URL は本文に入らない', () => {
+    const html = mdToHtml('![](img:abcdefgh-1234)', images, 'edit')
+    expect(html).toContain('<span class="imgref" contenteditable="false" data-id="abcdefgh-1234">[画像: abcdefgh]</span>')
+    expect(html).not.toContain('data:image')
+  })
+  it('無い ID は「（消した画像）」。img: 以外の画像は今までどおり', () => {
+    expect(mdToHtml('![](img:nothing)', images)).toContain('<span class="imgref missing" data-id="nothing">（消した画像）</span>')
+    expect(mdToHtml('![説明](https://example.com/a.png)', images)).toContain('<img src="https://example.com/a.png" alt="説明">')
+  })
+  it('data:image/ でない画像は表示しない（#35）', () => {
+    expect(mdToHtml('![](img:x)', [{ id: 'x', dataUrl: 'data:text/html,<b>x</b>', alt: '' }])).not.toContain('<img')
+  })
+  it('refIds は参照している id の集合、removeRef はその参照だけ消す', () => {
+    const md = '前\n\n![](img:a)\n\n![](img:b)\n\n後'
+    expect([...refIds(md)]).toEqual(['a', 'b'])
+    expect(removeRef(md, 'a')).toBe('前\n\n![](img:b)\n\n後')
+    expect(removeRef('![](img:a)', 'a')).toBe('')
+    expect(removeRef(md, 'zzz')).toBe(md)
   })
 })

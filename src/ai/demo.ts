@@ -1,5 +1,6 @@
-import type { CourseInput, Textbook } from '../types'
+import type { CourseInput, Lesson, Textbook } from '../types'
 import { findLesson, isProtectedLesson } from '../lib/status'
+import type { PlanLesson } from '../lib/protect'
 import {
   PROGRESS,
   abortError,
@@ -20,18 +21,11 @@ import {
  * 見本の1段階あたりの待ち時間（ms）。通しテストは `?demoDelay=3000` のように URL で長くして、
  * 「やめる」を押す前に終わってしまう競走を避ける（#84）。本番の URL に付ける意味は無い
  */
-export const DEMO_DELAY_MS = (() => {
-  try {
-    const v = new URLSearchParams(globalThis.location?.search ?? '').get('demoDelay')
-    const n = v === null ? NaN : Number(v)
-    return Number.isFinite(n) && n >= 0 ? n : 200
-  } catch {
-    return 200
-  }
-})()
+const delayParam = Number(new URLSearchParams(globalThis.location?.search).get('demoDelay') ?? NaN)
+const DEMO_DELAY_MS = Number.isFinite(delayParam) && delayParam >= 0 ? delayParam : 200
 
 /** 見本の待ち時間。signal で中止できる（#14。e2e で「やめる」を確かめるため） */
-const wait = (ms = DEMO_DELAY_MS, signal?: AbortSignal) =>
+const wait = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((res, rej) => {
     if (signal?.aborted) return rej(abortError())
     const onAbort = () => {
@@ -130,7 +124,7 @@ export class DemoProvider implements AiProvider {
     await wait(DEMO_DELAY_MS, opts.signal)
     const tag = order ? `（${order.slice(0, 16)}）` : '（見直し）'
     let plan: RedesignPlan
-    const keepOrChange = (l: Textbook['chapters'][number]['lessons'][number], first: boolean) => ({
+    const keepOrChange = (l: Lesson, first: boolean): PlanLesson => ({
       id: l.id,
       title: !isProtectedLesson(l) && first ? `${l.title}${tag}` : l.title,
       minutes: l.minutes,
@@ -141,13 +135,13 @@ export class DemoProvider implements AiProvider {
       plan = { scope, blocks: [`### 作り直した下書き${tag}\nデモ応答の見本。`, '### 要点\n- 作り直しでも、自分のノートは残る'] }
     } else if (scope === 'chapter') {
       let first = true
-      const lessons = f.chapter.lessons.map((l) => {
+      const lessons: PlanLesson[] = f.chapter.lessons.map((l) => {
         const r = keepOrChange(l, first && !isProtectedLesson(l))
         if (!isProtectedLesson(l)) first = false
         return r
       })
-      lessons.push({ id: null as unknown as string, title: `注文から追加した節${tag}`, minutes: 45, isTask: false, summary: '' })
-      plan = { scope, lessons: lessons.map((l) => ({ ...l, id: l.id || null })) }
+      lessons.push({ id: null, title: `注文から追加した節${tag}`, minutes: 45, isTask: false, summary: '' })
+      plan = { scope, lessons }
     } else {
       plan = {
         scope,
@@ -155,7 +149,7 @@ export class DemoProvider implements AiProvider {
           ...tb.chapters.map((c) => ({
             id: c.id,
             title: c.title,
-            lessons: c.lessons.map((l) => ({ ...keepOrChange(l, false), id: l.id as string | null })),
+            lessons: c.lessons.map((l) => keepOrChange(l, false)),
           })),
           { id: null, title: `追加の章${tag}`, lessons: [{ id: null, title: '新しい節', minutes: 45, isTask: false, summary: '' }] },
         ],

@@ -36,15 +36,16 @@ test('つくる: 設計の進行中も文はボタンの中に出て幅が変わ
   await page.getByRole('button', { name: 'デモ応答' }).click()
   await page.locator('#goal').fill('幅の確認')
   const design = page.getByRole('button', { name: L.design })
-  const w0 = (await design.boundingBox())?.width ?? 0
   await design.click()
+  // 幅は「スキップ」を押す直前（質問パネルが出て設計ボタンが idle）に測る。質問パネルでページが伸びて
+  // スクロールバーが出ると行の幅が変わるため、質問の前に測ると CI（Linux）で 2px ずれる（#121）
+  await expect(page.getByText('AIからの確認')).toBeVisible()
+  await expect(design).not.toHaveAttribute('aria-busy', 'true')
+  const w0 = (await design.boundingBox())?.width ?? 0
+  expect(w0).toBeGreaterThan(0)
   await page.getByRole('button', { name: 'スキップ' }).click()
   const busy = busyButton(page)
   await expect(busy.getByRole('status')).toHaveText(/^分解中…・\d+秒$/)
   const w1 = (await busy.boundingBox())?.width ?? 0
   expect(Math.abs(w1 - w0)).toBeLessThan(1)
-  await expect(page.locator('.working')).toHaveCount(1)
-  await expect(page.getByRole('button', { name: L.stop })).toBeVisible()
-  await page.getByRole('button', { name: L.stop }).click()
-  await expect(page.locator('.toast')).toContainText('生成をやめました')
 })

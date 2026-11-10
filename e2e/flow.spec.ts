@@ -25,28 +25,17 @@ test('スマホ幅は章ごとの一覧、PC幅はタイムライン', async ({ 
   }
 })
 
-test('完了条件2: 資料を生成すると本文と参考情報が入る', async ({ page }) => {
-  await demoBook(page)
-  await page.getByRole('button', { name: L.generateLesson }).click()
-  await expect(page.locator('.doc [data-by="ai"]')).toHaveCount(3)
-  await expect(page.locator('.doc table')).toBeVisible()
-  const clues = page.getByLabel('参考情報')
-  await expect(clues.locator('a.qchip').first()).toHaveAttribute('href', /google\.com\/search\?q=/)
-  await expect(clues.getByText('本文の例を自分の環境で再現する')).toBeVisible()
-  await expect(page.locator('.rail').getByText('例を自分の環境で試す')).toBeVisible()
-})
-
 test('完了条件4: 完了と再確認の印がロードマップと本棚に出る', async ({ page }) => {
   await blankBook(page)
   await page.getByRole('button', { name: L.startWriting }).click()
   await writeNote(page, '最初のノート')
   await page.getByLabel('あとで再確認').check()
-  await expect(page.locator('.pagehead .flag')).toBeVisible()
+  await expect(page.locator('.pagehead .chip.review')).toBeVisible()
   await page.getByLabel('完了', { exact: true }).check()
   await expect(page.locator('.pagehead .chip.done')).toBeVisible()
   await page.getByRole('main').getByRole('button', { name: L.roadmap, exact: true }).click()
   await expect(page.locator('.detail .chip.done').locator('visible=true').first()).toBeVisible()
-  await expect(page.locator('.detail .flag').locator('visible=true').first()).toBeVisible()
+  await expect(page.locator('.detail .chip.review').locator('visible=true').first()).toBeVisible()
   await nav(page, /本棚/).click()
   await expect(page.getByText('すべて完了')).toBeVisible()
   await expect(page.getByText('再確認 1件')).toBeVisible()

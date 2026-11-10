@@ -52,7 +52,8 @@ export function App() {
         {screen === 'shelf' && <Shelf />}
         {screen === 'new' && <Create />}
         {screen === 'road' && tb && <Roadmap tb={tb} />}
-        {screen === 'lesson' && tb && <LessonPage tb={tb} />}
+        {/* 節が変わったら state（差し込み位置など）ごと作り直す（#128） */}
+        {screen === 'lesson' && tb && <LessonPage key={s.lessonId} tb={tb} />}
         {screen === 'book' && tb && <Book tb={tb} />}
         {screen === 'help' && <Help />}
       </main>

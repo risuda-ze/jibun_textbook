@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test'
 import { demoBook } from './helpers'
 
 // #14: 生成の途中で「やめる」。教科書は変わらず、短い知らせが出る
+// #88: 確認質問を考えている途中で「やめる」。質問は出ず、もう一度押せる
 test('ロードマップ・レッスン: 資料の生成を途中でやめると教科書は変わらない', async ({ page }) => {
   await demoBook(page, { demoDelay: 3000 })
   await page.getByRole('button', { name: L.generateLesson }).click()
@@ -47,4 +48,18 @@ test('設計を直す: 途中でやめると案は出ない', async ({ page }) =
   await expect(page.locator('.toast')).toContainText('生成をやめました')
   await expect(redo.getByRole('button', { name: L.propose })).toBeEnabled()
   await expect(redo.getByRole('button', { name: '別の案を出す' })).toHaveCount(0)
+})
+
+test('つくる: 確認質問の途中でやめると質問は出ない', async ({ page }) => {
+  await page.goto('./?demoDelay=3000')
+  await page.getByRole('button', { name: L.newWithAi }).click()
+  await page.getByRole('button', { name: 'デモ応答' }).click()
+  await page.locator('#goal').fill('やめるの確認')
+  await page.getByRole('button', { name: L.design }).click()
+  await expect(page.getByRole('button', { name: L.stop })).toBeVisible()
+  await page.getByRole('button', { name: L.stop }).click()
+  await expect(page.locator('.toast')).toContainText('生成をやめました')
+  await expect(page.getByText('AIからの確認')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: L.stop })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: L.design })).toBeEnabled()
 })

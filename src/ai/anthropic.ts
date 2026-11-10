@@ -6,6 +6,7 @@ import { findLesson, isProtectedLesson, lessonNo } from '../lib/status'
 import { AI_MSG } from '../lib/messages'
 import {
   AiError,
+  DesignOutZ,
   MAX_SEARCH_DESIGN,
   MAX_SEARCH_LESSON,
   PROGRESS,
@@ -16,7 +17,6 @@ import {
   type AiProvider,
   type Material,
   type AiSettings,
-  type CourseDesign,
   type LessonDraft,
   type Progress,
   type QA,
@@ -44,12 +44,12 @@ export interface MessagesLike {
   ): Promise<{ parsed_output: unknown; stop_reason: string | null; usage?: RawUsage }>
 }
 /** SDK の request options のうち使うもの。signal で中止する（#14） */
-export type RequestOpts = { signal?: AbortSignal }
+type RequestOpts = { signal?: AbortSignal }
 type RawUsage = { input_tokens?: number; output_tokens?: number; server_tool_use?: { web_search_requests?: number } | null }
 type AnyBlock = { type: string; [k: string]: unknown }
 type AnyMessage = { content: AnyBlock[]; stop_reason: string | null; usage?: RawUsage }
 
-export type Source = { title: string; url: string }
+type Source = { title: string; url: string }
 /** user メッセージの内容。文字だけか、資料のブロック＋文字（#63） */
 type Prompt = string | AnyBlock[]
 
@@ -66,15 +66,18 @@ function withMaterials(prompt: string, mats: Material[]): Prompt {
   )
   return [...blocks, { type: 'text', text: prompt }]
 }
-export type Research = { text: string; sources: Source[]; searchErrors: string[]; truncated: boolean }
+type Research = { text: string; sources: Source[]; searchErrors: string[]; truncated: boolean }
 
-export function makeClient(apiKey: string): MessagesLike {
+function makeClient(apiKey: string): MessagesLike {
   // ブラウザ直呼びはSDKで既定無効。自分専用でキーは端末内にだけ置くので明示的に許可する。
   const c = new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
   return c.messages as unknown as MessagesLike
 }
 
-function toAiError(e: unknown): AiError {
+/** 例外を AiError にし、ここまでに使った分（中止時など）を添える（#14） */
+const toAiError = (e: unknown, usage: Usage): AiError => Object.assign(classifyError(e), { usage })
+
+function classifyError(e: unknown): AiError {
   if (e instanceof AiError) return e
   // 自分でやめた（#14）。APIUserAbortError は APIError の子なので先に見る
   if (e instanceof Anthropic.APIUserAbortError || (e instanceof Error && e.name === 'AbortError')) return abortError()
@@ -159,9 +162,7 @@ export class AnthropicProvider implements AiProvider {
         if (i === MAX_PAUSE_CONTINUES) out.truncated = true
       }
     } catch (e) {
-      const err = toAiError(e)
-      err.usage = usage
-      throw err
+      throw toAiError(e, usage)
     }
     return out
   }
@@ -185,9 +186,7 @@ export class AnthropicProvider implements AiProvider {
       if (res.parsed_output == null) throw new AiError('parse', AI_MSG.parse)
       return res.parsed_output as z.infer<T>
     } catch (e) {
-      const err = toAiError(e)
-      err.usage = usage
-      throw err
+      throw toAiError(e, usage)
     }
   }
 
@@ -233,17 +232,16 @@ export class AnthropicProvider implements AiProvider {
       opts.signal,
     )
     onProgress(3, PROGRESS.designed)
-    return { design: design as CourseDesign, usage, research }
+    return { design, usage, research }
   }
 
   async generateLesson(tb: Textbook, lessonId: string, onProgress: Progress, opts: AiOpts = {}) {
     const f = findLesson(tb, lessonId)
     if (!f) throw new AiError('api', AI_MSG.noLesson)
     const usage = zeroUsage()
-    const ctx = `${describeInput(tb.input)}\n\nコース: ${tb.title}（${tb.goal}）\n\n${outline(tb)}\n\n今回書く節: ${lessonNo(tb, lessonId)} ${f.lesson.title}\n狙い: ${f.lesson.summary || '（未設定）'}`
+    const ctx = `${outline(tb)}\n\n今回書く節: ${lessonNo(tb, lessonId)} ${f.lesson.title}\n狙い: ${f.lesson.summary || '（未設定）'}`
     let sources: Source[] = []
     let found = ''
-    let truncated = false
     let research: ResearchInfo | undefined
     // 渡された資料（#63）。「この資料だけから作る」なら Web 調査をしない
     const mats = opts.materials ?? []
@@ -267,7 +265,6 @@ export class AnthropicProvider implements AiProvider {
         opts.signal,
       )
       sources = r.sources
-      truncated = r.truncated
       research = { truncated: r.truncated, searchErrors: r.searchErrors }
       found = `\n\n## 調査で分かったこと\n${r.text}\n\n## 見つけたページ\n${sources.map((s, i) => `[${i}] ${s.title} ${s.url}`).join('\n')}`
     }
@@ -290,7 +287,7 @@ export class AnthropicProvider implements AiProvider {
       .filter((i) => Number.isInteger(i) && sources[i])
       .slice(0, 6)
       .map((i) => ({ ...sources[i], fetchedAt }))
-    const draft: LessonDraft = { blocks: d.blocks, tasks: d.tasks, clues: { queries: d.queries, how: d.how, links }, truncated, research }
+    const draft: LessonDraft = { blocks: d.blocks, tasks: d.tasks, clues: { queries: d.queries, how: d.how, links }, research }
     onProgress(2, PROGRESS.written)
     return { draft, usage }
   }
@@ -300,7 +297,7 @@ export class AnthropicProvider implements AiProvider {
     if (!f) throw new AiError('api', AI_MSG.noLesson)
     const usage = zeroUsage()
     onProgress(0, PROGRESS.proposing)
-    const base = `${describeInput(tb.input)}\n\nコース: ${tb.title}（${tb.goal}）\n\n${outline(tb, true)}\n\n注文: ${order || '（特になし。より良くする）'}`
+    const base = `${outline(tb, true)}\n\n注文: ${order || '（特になし。より良くする）'}`
     let plan: RedesignPlan
     if (scope === 'lesson') {
       const r = await this.structure(
@@ -348,18 +345,6 @@ const SYS =
 
 const PlanLessonZ = z.object({ id: z.string(), title: z.string(), minutes: z.number(), isTask: z.boolean(), summary: z.string() })
 
-/** AI の出力（設計）のスキーマ。保存形式の types.ts の TextbookZ とは別物 */
-const DesignOutZ = z.object({
-  title: z.string(),
-  goal: z.string(),
-  chapters: z.array(
-    z.object({
-      title: z.string(),
-      lessons: z.array(z.object({ title: z.string(), minutes: z.number(), isTask: z.boolean(), summary: z.string() })),
-    }),
-  ),
-})
-
 /** AI の出力（節）のスキーマ。保存形式の types.ts の LessonZ とは別物 */
 const LessonOutZ = z.object({
   blocks: z.array(z.string()),
@@ -378,9 +363,10 @@ function describeQa(qa: QA[]): string {
   return a.length ? `\n\n## 確認への回答\n${a.map((x) => `Q: ${x.q}\nA: ${x.a}`).join('\n')}` : ''
 }
 
+/** 教科書の文脈（学ぶ人・コース・今の設計）。節の生成と設計の見直しが同じ前置きで始まる */
 function outline(tb: Textbook, withIds = false): string {
   return (
-    '## 今の設計\n' +
+    `${describeInput(tb.input)}\n\nコース: ${tb.title}（${tb.goal}）\n\n## 今の設計\n` +
     tb.chapters
       .map(
         (c, ci) =>
